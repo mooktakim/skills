@@ -1,6 +1,6 @@
 ---
 name: rails-context
-description: Set up and maintain per-directory CLAUDE.md context files in a Rails application (MVCC — Model, View, Controller, Context). Surveys app/ and lib/, proposes which directories deserve a context file, generates intent-focused CLAUDE.md files with AGENTS.md symlinks, and wires up drift auditing via bin/audit_context. Use when asked to set up MVCC context, add per-directory agent context files, or bootstrap CLAUDE.md/AGENTS.md files in a Rails app.
+description: Set up and maintain per-directory CLAUDE.md context files in a Rails application (MVC Context — Model, View, Controller, plus Context). Surveys app/ and lib/, proposes which directories deserve a context file, generates intent-focused CLAUDE.md files with AGENTS.md symlinks, and wires up drift auditing via bin/audit_context. Use when asked to set up MVC context, add per-directory agent context files, or bootstrap CLAUDE.md/AGENTS.md files in a Rails app.
 ---
 
 # MVC Context
@@ -89,7 +89,7 @@ After writing each `CLAUDE.md`, create the `AGENTS.md` symlink beside it.
 Append this block to the root context file (adapt wording to fit, keep the substance):
 
 ```markdown
-## Context files (MVCC)
+## Context files (MVC Context)
 
 Directories under app/ carry their own CLAUDE.md (symlinked as AGENTS.md)
 describing local conventions. After changing code, before finishing the task,
