@@ -1,0 +1,9 @@
+{
+  "name": "skills",
+  "version": "0.1.0",
+  "description": "All skills in one plugin; each skill's name and description carry its domain (Rails, etc.)",
+  "author": {
+    "name": "Mooktakim",
+    "email": "mooktakim@fluxter.co.uk"
+  }
+}
