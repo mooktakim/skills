@@ -3,7 +3,7 @@ name: rails-context
 description: Set up and maintain per-directory CLAUDE.md context files in a Rails application (MVCC — Model, View, Controller, Context). Surveys app/ and lib/, proposes which directories deserve a context file, generates intent-focused CLAUDE.md files with AGENTS.md symlinks, and wires up drift auditing via bin/audit_context. Use when asked to set up MVCC context, add per-directory agent context files, or bootstrap CLAUDE.md/AGENTS.md files in a Rails app.
 ---
 
-# MVCC Context Setup
+# MVC Context
 
 You are setting up per-directory agent context files in this Rails application. Rails is MVC; this adds a fourth letter: Context. Follow this document exactly. Work through the phases in order and show me the plan after Phase 1 before writing anything.
 
