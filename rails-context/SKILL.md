@@ -1,0 +1,181 @@
+---
+name: rails-context
+description: Set up and maintain per-directory CLAUDE.md context files in a Rails application (MVCC — Model, View, Controller, Context). Surveys app/ and lib/, proposes which directories deserve a context file, generates intent-focused CLAUDE.md files with AGENTS.md symlinks, and wires up drift auditing via bin/audit_context. Use when asked to set up MVCC context, add per-directory agent context files, or bootstrap CLAUDE.md/AGENTS.md files in a Rails app.
+---
+
+# MVCC Context Setup
+
+You are setting up per-directory agent context files in this Rails application. Rails is MVC; this adds a fourth letter: Context. Follow this document exactly. Work through the phases in order and show me the plan after Phase 1 before writing anything.
+
+## File naming convention
+
+- The canonical context file is `CLAUDE.md`.
+- `AGENTS.md` is a relative symlink to it, created inside the directory: `ln -s CLAUDE.md AGENTS.md`.
+- All edits go to `CLAUDE.md`. Never write to `AGENTS.md` directly. Never use absolute paths in symlinks.
+- If a directory already has a real (non-symlink) `AGENTS.md`, migrate it first:
+
+```bash
+git mv AGENTS.md CLAUDE.md
+ln -s CLAUDE.md AGENTS.md
+git add AGENTS.md
+```
+
+Move content unchanged in the migration commit. Do not migrate the root `AGENTS.md` without asking me first.
+
+## The one rule that matters: intent, not inventory
+
+Context files describe the *shape* of a directory, never its *contents*.
+
+- ALLOWED: "Services are single-purpose command objects named `VerbNoun`, exposing `.call` and returning a `Result`. API clients live under `app/services/clients/`, one class per provider."
+- FORBIDDEN: file lists, class inventories, method listings, counts, "the main models are X, Y, Z".
+
+Inventory goes stale the moment anyone adds a file, and a stale context file is worse than none. The code is the inventory; you can glob and grep. Context files answer what grep cannot: why it is structured this way, what a correct new addition looks like, what mistakes to avoid. If a sentence would need editing when someone adds one more file of the same kind, delete the sentence. One short illustrative code example per pattern is fine; copies of real classes are not. Never explain standard Rails behaviour, only what is specific to this app.
+
+## Size discipline
+
+Each `CLAUDE.md` is 30-100 lines, hard cap 120. If it wants to grow past that, the content is drifting into inventory or generic Rails knowledge. Cut it.
+
+## Phase 1: Survey and plan
+
+1. Read the `Gemfile`, the root `CLAUDE.md`/`AGENTS.md` if present, and list directories under `app/` and `lib/`.
+2. For each candidate directory, skim several representative files.
+3. A directory qualifies for a context file when at least one is true:
+   - 5+ files following a local convention (services, components, jobs).
+   - Namespacing that encodes domain knowledge (e.g. `app/models/billing/`).
+   - Code an agent would plausibly get wrong without guidance (API clients, state machines, money, multi-tenancy).
+   Skip near-empty, purely generated, or entirely conventional directories (a vanilla `app/helpers/` gets nothing). Fewer, denser files beat blanket coverage.
+4. A nested namespace gets its own file only if its conventions differ from its parent's; otherwise cover it in a short "Namespaces" section of the parent file.
+5. Present me the list of directories you propose to cover, with one line each on what the file would say. Wait for my approval.
+
+## Phase 2: Generate
+
+For each approved directory, read enough files to genuinely extract the conventions: naming, base classes, call signatures, return types, error handling, namespacing. Do not guess patterns; derive them from code. If files contradict each other, document the dominant pattern and flag the exceptions to me rather than inventing a rule.
+
+Use this skeleton, omitting any section that would be empty or would restate Rails defaults:
+
+```markdown
+# app/<dir> - Context
+
+## Purpose
+One or two sentences: what belongs here and what does not.
+
+## Conventions
+Naming, base classes, file placement, call signatures.
+
+## Patterns
+The recurring shapes, each with at most one minimal example.
+
+## Adding new code here
+What a correct new addition looks like.
+
+## Gotchas
+Non-obvious constraints, deliberate deviations from Rails norms.
+```
+
+Layer-specific questions to answer from the code:
+
+- **app/models**: namespaces and the domain each owns; concerns and when to include each; ApplicationRecord customisations; callback philosophy (embraced/tolerated/banned); validation style (model, form object, DB constraint); cross-cutting conventions (soft delete, tenancy, money, time zones); where query logic lives.
+- **app/controllers**: auth/authz mechanism and what a new controller must include; namespace base controllers; strong params style; response conventions (formats, turbo_stream, error rendering); what belongs in a controller vs a service.
+- **app/services**: naming and structure; call signature; return convention (show the shape once); which errors are rescued vs propagated; API client location, namespacing, credential injection, test fakes; transaction boundaries.
+- **app/components**: ViewComponent or Phlex (and migration direction if both); sidecar/preview/Stimulus structure; slot conventions; styling approach; what earns a component vs a partial.
+- **app/jobs**: queue backend and named queues with latency expectations; idempotency expectations and how achieved; retry/discard conventions; where jobs are enqueued from; argument conventions.
+- **app/views** (only if non-trivial): partial naming, helper boundaries, Turbo frame/stream conventions.
+- **lib/ and others**: use the skeleton; if you cannot fill Purpose and Conventions with app-specific content, tell me the directory does not need a file instead of writing filler.
+
+After writing each `CLAUDE.md`, create the `AGENTS.md` symlink beside it.
+
+## Phase 3: Wire up maintenance
+
+Append this block to the root context file (adapt wording to fit, keep the substance):
+
+```markdown
+## Context files (MVCC)
+
+Directories under app/ carry their own CLAUDE.md (symlinked as AGENTS.md)
+describing local conventions. After changing code, before finishing the task,
+check each directory you touched that has a CLAUDE.md and ask: did this change
+introduce a new pattern, break a documented one, or add a new namespace or
+convention? If yes, update that CLAUDE.md surgically - edit the affected lines
+only, never regenerate the file. Routine changes that follow documented
+patterns need no update. If a change deliberately contradicts a CLAUDE.md,
+update the file to match the new reality and mention it. Context files
+describe intent and patterns, never file inventories. Context file edits
+ship in the same commit as the code change that caused them.
+```
+
+Then create `bin/audit_context` (chmod +x) with this content:
+
+```bash
+#!/usr/bin/env bash
+# Report drift between CLAUDE.md context files and the code they describe.
+# Run from the repo root. Output is a drift SIGNAL, not proof of staleness.
+set -euo pipefail
+git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "not a git repo" >&2; exit 1; }
+found=0; drift=0
+while IFS= read -r legacy; do
+  found=1; drift=1
+  echo "== $legacy"
+  echo "   real AGENTS.md - migrate: git mv AGENTS.md CLAUDE.md && ln -s CLAUDE.md AGENTS.md"
+  echo
+done < <(find app lib -name AGENTS.md -type f 2>/dev/null | sort)
+while IFS= read -r ctx; do
+  found=1
+  dir=$(dirname "$ctx")
+  last=$(git log -1 --format=%H -- "$ctx" 2>/dev/null || true)
+  if [ -z "$last" ]; then
+    echo "== $ctx"; echo "   never committed - commit it or review now"; echo
+    drift=1; continue
+  fi
+  changed=$(git diff --name-only "$last"..HEAD -- "$dir" 2>/dev/null \
+    | grep -v -e '/AGENTS\.md$' -e '/CLAUDE\.md$' || true)
+  uncommitted=$( { git status --porcelain -- "$dir" 2>/dev/null || true; } \
+    | awk '{print $NF}' | grep -v -e '/AGENTS\.md$' -e '/CLAUDE\.md$' || true)
+  all=$(printf "%s\n%s" "$changed" "$uncommitted" | sed '/^$/d' | sort -u)
+  note=""
+  if [ ! -e "$dir/AGENTS.md" ] && [ ! -L "$dir/AGENTS.md" ]; then
+    note="missing AGENTS.md symlink - run: (cd $dir && ln -s CLAUDE.md AGENTS.md)"
+  elif [ -L "$dir/AGENTS.md" ] && [ "$(readlink "$dir/AGENTS.md")" != "CLAUDE.md" ]; then
+    note="AGENTS.md symlink points to $(readlink "$dir/AGENTS.md"), expected CLAUDE.md"
+  fi
+  if [ -n "$all" ] || [ -n "$note" ]; then
+    drift=1
+    echo "== $ctx (last updated $(git log -1 --format=%cs -- "$ctx"))"
+    [ -n "$note" ] && echo "   $note"
+    if [ -n "$all" ]; then
+      echo "   $(printf "%s\n" "$all" | wc -l | tr -d ' ') file(s) changed since:"
+      printf "%s\n" "$all" | sed 's/^/     - /'
+    fi
+    echo
+  fi
+done < <(find app lib -name CLAUDE.md -type f 2>/dev/null | sort)
+[ "$found" -eq 0 ] && { echo "No context files found under app/ or lib/."; exit 0; }
+if [ "$drift" -eq 0 ]; then
+  echo "No drift detected."
+else
+  echo "Review flagged directories: most changes are routine and need nothing."
+  echo "Edit CLAUDE.md surgically only where a documented pattern changed."
+fi
+```
+
+Also create `.claude/commands/context-audit.md`:
+
+```markdown
+Run bin/audit_context from the repo root. For each flagged directory, read the
+changed files and the current CLAUDE.md, then decide whether any documented
+pattern is now false or a new convention has emerged. If yes, edit the
+CLAUDE.md surgically - affected lines only, never regenerate. If no, leave it
+untouched and report it was checked and found accurate. Never add file
+inventories. Summarise what you updated and what you left alone.
+```
+
+## Phase 4: Review
+
+Show me every generated `CLAUDE.md` grouped in one message. I will correct anything that misstates intent; my stated intent always outranks what you inferred from code. Fold corrections in, then commit everything with a clear message.
+
+## Never do
+
+- Put file or class inventories in context files.
+- Duplicate root-level content (setup, test commands, deploy) into subdirectory files.
+- Create files for directories with nothing non-obvious to say.
+- Regenerate an existing context file when a surgical edit will do.
+- Let a context file state something the code contradicts; the code is the truth and the context file is the bug.
