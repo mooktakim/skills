@@ -31,6 +31,8 @@ Each skill is a directory at the repo root:
 
 Commit directly on `main`. Never create a branch unless explicitly asked to.
 
+Commit automatically, without asking, whenever a coherent unit of work is done — a skill created or edited, a convention changed, a correction folded in. Don't batch unrelated changes into one commit, and don't leave finished work sitting uncommitted. This overrides the global ask-before-every-commit rule for this repository. Pushing still requires explicit confirmation.
+
 ## Using these skills
 
 To make a skill available, symlink or copy its directory into `~/.claude/skills/` (personal, all projects) or a project's `.claude/skills/` directory. To test a change, invoke the skill by name in a Claude Code session inside a target Rails app.
