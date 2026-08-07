@@ -1,6 +1,6 @@
 ---
 name: rails-context
-description: Set up and maintain per-directory CLAUDE.md context files in a Rails application (MVC Context — Model, View, Controller, plus Context). Surveys app/ and lib/, proposes which directories deserve a context file, generates intent-focused CLAUDE.md files with AGENTS.md symlinks, and wires up drift auditing via bin/audit_context. Use when asked to set up MVC context, add per-directory agent context files, or bootstrap CLAUDE.md/AGENTS.md files in a Rails app.
+description: Set up and maintain per-directory CLAUDE.md context files in a Rails application (MVC Context — Model, View, Controller, plus Context). Surveys app/, lib/, and the test suite, proposes which directories deserve a context file, generates intent-focused CLAUDE.md files with AGENTS.md symlinks, and wires up drift auditing via bin/audit_context. Use when asked to set up MVC context, add per-directory agent context files, or bootstrap CLAUDE.md/AGENTS.md files in a Rails app.
 ---
 
 # MVC Context
@@ -20,7 +20,7 @@ ln -s CLAUDE.md AGENTS.md
 git add AGENTS.md
 ```
 
-Move content unchanged in the migration commit. Do not migrate the root `AGENTS.md` without asking me first.
+Move content unchanged in the migration commit. If a directory has BOTH a real `CLAUDE.md` and a real `AGENTS.md`, do not run the `mv` — show me the diff and ask how to merge before converting `AGENTS.md` into the symlink. Do not migrate the root `AGENTS.md` without asking me first.
 
 ## The one rule that matters: intent, not inventory
 
@@ -46,6 +46,8 @@ Each `CLAUDE.md` is 30-100 lines, hard cap 120. If it wants to grow past that, t
    Skip near-empty, purely generated, or entirely conventional directories (a vanilla `app/helpers/` gets nothing). Fewer, denser files beat blanket coverage.
 4. A nested namespace gets its own file only if its conventions differ from its parent's; otherwise cover it in a short "Namespaces" section of the parent file.
 5. Present me the list of directories you propose to cover, with one line each on what the file would say. Wait for my approval.
+
+Re-running on an app that already has context files is a gap-fill, not a rewrite: keep existing `CLAUDE.md` files untouched, propose only missing qualifying directories, add missing `AGENTS.md` symlinks, and migrate any real `AGENTS.md` files. Never regenerate an existing context file; Phase 4 then reviews only what was newly written or changed.
 
 ## Phase 2: Generate
 
@@ -84,13 +86,13 @@ After writing each `CLAUDE.md`, create the `AGENTS.md` symlink beside it.
 
 ## Phase 3: Wire up maintenance
 
-Append this block to the root context file (adapt wording to fit, keep the substance):
+Append this block to the root context file (adapt wording to fit, keep the substance). If the app has no root `CLAUDE.md`, create one with this block as its content, plus the root `AGENTS.md` symlink if no `AGENTS.md` exists:
 
 ```markdown
 ## Context files (MVC Context)
 
-Directories under app/ carry their own CLAUDE.md (symlinked as AGENTS.md)
-describing local conventions. After changing code, before finishing the task,
+Directories under app/, lib/, and the test suite carry their own CLAUDE.md
+(symlinked as AGENTS.md) describing local conventions. After changing code, before finishing the task,
 check each directory you touched that has a CLAUDE.md and ask: did this change
 introduce a new pattern, break a documented one, or add a new namespace or
 convention? If yes, update that CLAUDE.md surgically - edit the affected lines
@@ -115,7 +117,7 @@ while IFS= read -r legacy; do
   echo "== $legacy"
   echo "   real AGENTS.md - migrate: git mv AGENTS.md CLAUDE.md && ln -s CLAUDE.md AGENTS.md"
   echo
-done < <(find app lib -name AGENTS.md -type f 2>/dev/null | sort)
+done < <(find app lib test spec -name AGENTS.md -type f 2>/dev/null | sort)
 while IFS= read -r ctx; do
   found=1
   dir=$(dirname "$ctx")
@@ -145,8 +147,8 @@ while IFS= read -r ctx; do
     fi
     echo
   fi
-done < <(find app lib -name CLAUDE.md -type f 2>/dev/null | sort)
-[ "$found" -eq 0 ] && { echo "No context files found under app/ or lib/."; exit 0; }
+done < <(find app lib test spec -name CLAUDE.md -type f 2>/dev/null | sort)
+[ "$found" -eq 0 ] && { echo "No context files found under app/, lib/, test/, or spec/."; exit 0; }
 if [ "$drift" -eq 0 ]; then
   echo "No drift detected."
 else

@@ -30,6 +30,7 @@ Adding a new skill means creating its directory (with `SKILL.md`, `plugin.json`,
 - Skill bodies are instructions addressed to Claude, written in imperative voice ("Read the Gemfile", "Wait for approval").
 - Skills that touch a user's codebase should gate destructive or bulk actions behind an explicit approval step (see `rails-context`'s Phase 1 → approval → Phase 2 flow for the pattern).
 - Editing an existing skill: make surgical edits to the affected sections; don't regenerate the whole file.
+- When a skill's behaviour changes, bump its `plugin.json` version in the same commit — that's what makes `/plugin marketplace update` meaningful for installed copies. Patch for wording fixes, minor for new capability.
 
 ## Git workflow
 

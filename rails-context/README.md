@@ -25,11 +25,26 @@ The skill works in four phases, with you approving between them:
 3. **Wire up maintenance** — adds the root maintenance rule, `bin/audit_context`, and the `/context-audit` command.
 4. **Review** — shows you every generated file; your stated intent outranks anything inferred from code. Corrections are folded in before committing.
 
-## Install and use
+## Install
 
 ```
 /plugin marketplace add mooktakim/skills
 /plugin install rails-context@mooktakim
 ```
 
-Then, in a Claude Code session inside your Rails app, ask to "set up MVC context" (or invoke the skill directly). Afterwards, run `/context-audit` periodically — or after big refactors — to catch drift.
+## How to use it
+
+Open a Claude Code session inside your Rails app and either ask in plain words — "set up MVC context" / "add per-directory context files" — or invoke the skill directly: `/rails-context:rails-context`.
+
+What to expect:
+
+1. Claude surveys the app and proposes a list of directories with one line each on what its context file would say. **Nothing is written until you approve** — trim, add, or redirect the list here.
+2. The files are generated from your actual code, with the `AGENTS.md` symlinks created alongside, and the maintenance rule, `bin/audit_context`, and `/context-audit` command wired up.
+3. Claude shows you every generated file in one message. Correct anything that misstates intent — your word outranks whatever was inferred from the code — then it commits.
+
+Re-running later is safe and useful: existing context files are kept and gap-filled (newly qualifying directories proposed, missing symlinks added, real `AGENTS.md` files migrated), never regenerated.
+
+Afterwards, day to day:
+
+- The maintenance rule in your root `CLAUDE.md` makes agents update affected context files as part of normal work, in the same commit as the change.
+- Run `/context-audit` periodically — or after a big refactor — to catch drift; `bin/audit_context` gives the same signal from the shell.
