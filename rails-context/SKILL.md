@@ -44,7 +44,7 @@ Each `CLAUDE.md` is 30-100 lines, hard cap 120. If it wants to grow past that, t
    - Namespacing that encodes domain knowledge (e.g. `app/models/billing/`).
    - Code an agent would plausibly get wrong without guidance (API clients, state machines, money, multi-tenancy).
    Skip near-empty, purely generated, or entirely conventional directories (a vanilla `app/helpers/` gets nothing). Fewer, denser files beat blanket coverage.
-4. A nested namespace gets its own file only if its conventions differ from its parent's; otherwise cover it in a short "Namespaces" section of the parent file.
+4. A nested namespace gets its own file in two cases: its conventions differ from its parent's, or it encapsulates deep domain knowledge that would bloat the parent file — an external-provider wrapper (`app/services/cloudflare/`), a subsystem with its own vocabulary (`app/models/billing/`). Otherwise cover it in a short "Namespaces" section of the parent file.
 5. Present me the list of directories you propose to cover, with one line each on what the file would say. Wait for my approval.
 
 Re-running on an app that already has context files is a gap-fill, not a rewrite: keep existing `CLAUDE.md` files untouched, propose only missing qualifying directories, add missing `AGENTS.md` symlinks, and migrate any real `AGENTS.md` files. Never regenerate an existing context file; Phase 4 then reviews only what was newly written or changed.
@@ -83,6 +83,10 @@ The guides are prompts, not content: every statement in a generated file must st
 For `lib/` and anything without a guide: use the skeleton; if you cannot fill Purpose and Conventions with app-specific content, tell me the directory does not need a file instead of writing filler.
 
 After writing each `CLAUDE.md`, create the `AGENTS.md` symlink beside it.
+
+### Nested context files
+
+Agents load the full chain of context files down to the directory they're working in (root → `app/services/` → `app/services/cloudflare/`), so a nested file contains ONLY the delta from its ancestors — never repeat a parent or root convention; duplication is drift waiting to happen. Keep nested files shorter (10-60 lines). Their value is the knowledge the code cannot show: the external system's auth model and rate limits, environment differences (sandbox vs live), invariants ("zone ids are cached at boot; never fetch per request"), known failure modes and how the app expects them handled. The same rules apply as everywhere else: intent not inventory, `AGENTS.md` symlink beside it, and the audit script picks nested files up automatically.
 
 ## Phase 3: Wire up maintenance
 

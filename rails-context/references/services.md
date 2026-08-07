@@ -10,6 +10,7 @@ Read this before generating `app/services/CLAUDE.md` in the target app. Derive e
 - **Return convention**: Result object, record-or-raise, nullable — show the shape exactly once.
 - **Error handling**: which errors are rescued and converted, which propagate; custom error class hierarchy.
 - **API clients**: where they live, one-class-per-provider conventions, how credentials are injected (Rails credentials? a `Creds` wrapper? ENV?), timeout/retry policy, and what test fakes exist.
+- **Provider namespaces**: a provider directory with deep external-system knowledge (auth model, rate limits, environment differences) may deserve its own nested context file — if it gets one, keep the provider specifics there and out of this file (SKILL.md, "Nested context files").
 - **Transactions**: who owns transaction boundaries — services, models, or callers.
 
 ## Target shape (fictional excerpt — copy the density, never the content)
