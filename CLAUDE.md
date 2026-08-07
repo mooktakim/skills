@@ -8,7 +8,7 @@ A hand-authored collection of Claude Code skills, not limited to any one domain 
 
 ## Repository structure
 
-The repo is a Claude Code plugin marketplace (`skills`) where each skill is its own plugin, living in a directory at the repo root:
+The repo is a Claude Code plugin marketplace (named `mooktakim` â€” the install handle after `@`) where each skill is its own plugin, living in a directory at the repo root:
 
 ```
 .claude-plugin/marketplace.json    # marketplace manifest; one plugins[] entry per skill
@@ -39,4 +39,4 @@ Commit automatically, without asking, whenever a coherent unit of work is done â
 
 ## Using these skills
 
-Install via the marketplace: `/plugin marketplace add <path-or-repo>` then install skills individually, e.g. `/plugin install rails-context@skills`. From a local checkout, add the marketplace by path (`/plugin marketplace add ~/Workspace/skills`). To test a change, invoke the skill in a Claude Code session inside a target project.
+Install via the marketplace: `/plugin marketplace add <path-or-repo>` then install skills individually, e.g. `/plugin install rails-context@mooktakim`. From a local checkout, add the marketplace by path (`/plugin marketplace add ~/Workspace/skills`). To test a change, invoke the skill in a Claude Code session inside a target project.
