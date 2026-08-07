@@ -35,6 +35,10 @@ Inventory goes stale the moment anyone adds a file, and a stale context file is 
 
 Each `CLAUDE.md` is 30-100 lines, hard cap 120. If it wants to grow past that, the content is drifting into inventory or generic Rails knowledge. Cut it.
 
+## One fact, one level
+
+Context files form a chain — root → `app/<dir>/` → nested namespace — and agents load every file on the path down to where they're working. So every fact lives at exactly one level: the most specific level it applies to. A directory file never repeats the root; a nested file never repeats its parent. And it works upward too: when a more specific file exists (or gets created), the parent sheds whatever it covers, keeping only a one-line pointer ("`cloudflare/` — Cloudflare API wrapper; see its CLAUDE.md"). Deeper means more specific and shorter. A file restating something from another level is duplicate context, and duplicates drift.
+
 ## Phase 1: Survey and plan
 
 1. Read the `Gemfile`, the root `CLAUDE.md`/`AGENTS.md` if present, and list directories under `app/`, `lib/`, and `test/` (or `spec/`). `test/` qualifies only when the suite has non-obvious infrastructure (stub helpers, factory conventions, job-testing quirks), not merely because tests exist.
@@ -87,6 +91,8 @@ After writing each `CLAUDE.md`, create the `AGENTS.md` symlink beside it.
 ### Nested context files
 
 Agents load the full chain of context files down to the directory they're working in (root → `app/services/` → `app/services/cloudflare/`), so a nested file contains ONLY the delta from its ancestors — never repeat a parent or root convention; duplication is drift waiting to happen. Keep nested files shorter (10-60 lines). Their value is the knowledge the code cannot show: the external system's auth model and rate limits, environment differences (sandbox vs live), invariants ("zone ids are cached at boot; never fetch per request"), known failure modes and how the app expects them handled. The same rules apply as everywhere else: intent not inventory, `AGENTS.md` symlink beside it, and the audit script picks nested files up automatically.
+
+"One fact, one level" applies with force here: creating a nested file where the parent already covers the namespace means moving that content down and slimming the parent to a one-line pointer, in the same commit.
 
 ## Phase 3: Wire up maintenance
 
@@ -180,7 +186,7 @@ Show me every generated `CLAUDE.md` grouped in one message. I will correct anyth
 
 - Put file or class inventories in context files.
 - Create a directory, or write a context file for a directory the app doesn't have or barely uses — context files document what exists, they never scaffold.
-- Duplicate root-level content (setup, test commands, deploy) into subdirectory files.
+- Duplicate content across levels: root content (setup, test commands, deploy) in subdirectory files, or parent conventions restated in nested files — every fact lives at exactly one level.
 - Create files for directories with nothing non-obvious to say.
 - Regenerate an existing context file when a surgical edit will do.
 - Let a context file state something the code contradicts; the code is the truth and the context file is the bug.
