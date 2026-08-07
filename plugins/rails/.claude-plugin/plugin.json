@@ -1,0 +1,9 @@
+{
+  "name": "rails",
+  "version": "0.1.0",
+  "description": "Rails development skills: per-directory MVC Context files and more",
+  "author": {
+    "name": "Mooktakim",
+    "email": "mooktakim@fluxter.co.uk"
+  }
+}

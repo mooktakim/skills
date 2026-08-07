@@ -1,0 +1,15 @@
+{
+  "name": "rails-skills",
+  "description": "Hand-authored Claude Code skills for Rails development",
+  "owner": {
+    "name": "Mooktakim",
+    "email": "mooktakim@fluxter.co.uk"
+  },
+  "plugins": [
+    {
+      "name": "rails",
+      "source": "./plugins/rails",
+      "description": "Rails development skills: per-directory MVC Context files and more"
+    }
+  ]
+}

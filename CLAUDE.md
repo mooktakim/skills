@@ -8,13 +8,18 @@ A hand-authored collection of Claude Code skills for Rails development. There is
 
 ## Repository structure
 
-Each skill is a directory at the repo root:
+The repo is a Claude Code plugin marketplace (`rails-skills`) hosting a single plugin (`rails`) that bundles all skills:
 
 ```
-<skill-name>/
-  SKILL.md          # required: frontmatter + instructions
-  <supporting files> # optional: scripts, templates, references
+.claude-plugin/marketplace.json          # marketplace manifest; lists the plugin(s)
+plugins/rails/
+  .claude-plugin/plugin.json             # plugin manifest
+  skills/<skill-name>/
+    SKILL.md           # required: frontmatter + instructions
+    <supporting files> # optional: scripts, templates, references
 ```
+
+New skills go under `plugins/rails/skills/` â€” no manifest changes needed; the plugin picks up every skill directory automatically. Installed skills are namespaced as `rails:<skill-name>`.
 
 - `SKILL.md` starts with YAML frontmatter containing `name` and `description`, followed by the skill body in markdown.
 - `name` must match the directory name: lowercase, hyphen-separated.
@@ -35,4 +40,4 @@ Commit automatically, without asking, whenever a coherent unit of work is done â
 
 ## Using these skills
 
-To make a skill available, symlink or copy its directory into `~/.claude/skills/` (personal, all projects) or a project's `.claude/skills/` directory. To test a change, invoke the skill by name in a Claude Code session inside a target Rails app.
+Install via the marketplace: `/plugin marketplace add <path-or-repo>` then `/plugin install rails@rails-skills`. From a local checkout, add the marketplace by path (`/plugin marketplace add ~/Workspace/skills/rails`). To test a change, invoke the skill (`/rails:<skill-name>`) in a Claude Code session inside a target Rails app.
