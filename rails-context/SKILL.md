@@ -37,7 +37,7 @@ Each `CLAUDE.md` is 30-100 lines, hard cap 120. If it wants to grow past that, t
 
 ## Phase 1: Survey and plan
 
-1. Read the `Gemfile`, the root `CLAUDE.md`/`AGENTS.md` if present, and list directories under `app/` and `lib/`.
+1. Read the `Gemfile`, the root `CLAUDE.md`/`AGENTS.md` if present, and list directories under `app/`, `lib/`, and `test/` (or `spec/`). `test/` qualifies only when the suite has non-obvious infrastructure (stub helpers, factory conventions, job-testing quirks), not merely because tests exist.
 2. For each candidate directory, skim several representative files.
 3. A directory qualifies for a context file when at least one is true:
    - 5+ files following a local convention (services, components, jobs).
@@ -72,15 +72,13 @@ What a correct new addition looks like.
 Non-obvious constraints, deliberate deviations from Rails norms.
 ```
 
-Layer-specific questions to answer from the code:
+Per-layer generation guides ship with this skill under `references/`. Before generating a directory's context file, read the matching guide — it lists the questions to answer from the app's code and shows the target density:
 
-- **app/models**: namespaces and the domain each owns; concerns and when to include each; ApplicationRecord customisations; callback philosophy (embraced/tolerated/banned); validation style (model, form object, DB constraint); cross-cutting conventions (soft delete, tenancy, money, time zones); where query logic lives.
-- **app/controllers**: auth/authz mechanism and what a new controller must include; namespace base controllers; strong params style; response conventions (formats, turbo_stream, error rendering); what belongs in a controller vs a service.
-- **app/services**: naming and structure; call signature; return convention (show the shape once); which errors are rescued vs propagated; API client location, namespacing, credential injection, test fakes; transaction boundaries.
-- **app/components**: ViewComponent or Phlex (and migration direction if both); sidecar/preview/Stimulus structure; slot conventions; styling approach; what earns a component vs a partial.
-- **app/jobs**: queue backend and named queues with latency expectations; idempotency expectations and how achieved; retry/discard conventions; where jobs are enqueued from; argument conventions.
-- **app/views** (only if non-trivial): partial naming, helper boundaries, Turbo frame/stream conventions.
-- **lib/ and others**: use the skeleton; if you cannot fill Purpose and Conventions with app-specific content, tell me the directory does not need a file instead of writing filler.
+- `references/models.md`, `references/controllers.md`, `references/services.md`, `references/components.md`, `references/jobs.md`, `references/views.md`, `references/test.md`
+
+The guides are prompts, not content: every statement in a generated file must still be derived from the target app's code, and their exemplar excerpts exist to show density and tone, never to be copied. A guide existing for a layer does NOT mean the app gets that file — only directories that already exist and qualified in Phase 1 get one. Never create a directory, and never write a context file for a layer the app doesn't use (no `app/services/` means no services file; the guide is simply irrelevant there).
+
+For `lib/` and anything without a guide: use the skeleton; if you cannot fill Purpose and Conventions with app-specific content, tell me the directory does not need a file instead of writing filler.
 
 After writing each `CLAUDE.md`, create the `AGENTS.md` symlink beside it.
 
@@ -175,6 +173,7 @@ Show me every generated `CLAUDE.md` grouped in one message. I will correct anyth
 ## Never do
 
 - Put file or class inventories in context files.
+- Create a directory, or write a context file for a directory the app doesn't have or barely uses — context files document what exists, they never scaffold.
 - Duplicate root-level content (setup, test commands, deploy) into subdirectory files.
 - Create files for directories with nothing non-obvious to say.
 - Regenerate an existing context file when a surgical edit will do.

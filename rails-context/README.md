@@ -21,7 +21,7 @@ The litmus test: if a sentence would need editing when someone adds one more fil
 The skill works in four phases, with you approving between them:
 
 1. **Survey and plan** — reads the Gemfile and representative files, then proposes which directories deserve a context file (5+ files sharing a local convention, domain-encoding namespaces, or code an agent would plausibly get wrong: API clients, state machines, money, multi-tenancy). Waits for your approval.
-2. **Generate** — derives each directory's conventions from the actual code, never guessing, using a fixed skeleton (Purpose / Conventions / Patterns / Adding new code here / Gotchas) with layer-specific prompts for models, controllers, services, components, jobs, and views. Contradictory patterns get flagged to you rather than papered over.
+2. **Generate** — derives each directory's conventions from the actual code, never guessing, using a fixed skeleton (Purpose / Conventions / Patterns / Adding new code here / Gotchas) guided by per-layer generation guides bundled in `references/` (models, controllers, services, components, jobs, views, test). Context files are only written for directories the app actually has and uses — nothing is ever scaffolded. Contradictory patterns get flagged to you rather than papered over.
 3. **Wire up maintenance** — adds the root maintenance rule, `bin/audit_context`, and the `/context-audit` command.
 4. **Review** — shows you every generated file; your stated intent outranks anything inferred from code. Corrections are folded in before committing.
 
