@@ -1,15 +1,15 @@
 {
   "name": "skills",
-  "description": "Hand-authored Claude Code skills by Mooktakim",
+  "description": "Hand-authored Claude Code skills by Mooktakim, one plugin per skill",
   "owner": {
     "name": "Mooktakim",
     "email": "mooktakim@fluxter.co.uk"
   },
   "plugins": [
     {
-      "name": "skills",
-      "source": "./plugins/skills",
-      "description": "All skills in one plugin; each skill's name and description carry its domain (Rails, etc.)"
+      "name": "rails-context",
+      "source": "./rails-context",
+      "description": "Per-directory CLAUDE.md context files for Rails apps (MVC Context)"
     }
   ]
 }

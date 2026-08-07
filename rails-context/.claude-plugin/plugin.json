@@ -1,0 +1,9 @@
+{
+  "name": "rails-context",
+  "version": "0.1.0",
+  "description": "Per-directory CLAUDE.md context files for Rails apps (MVC Context): survey, generate, symlink AGENTS.md, audit drift",
+  "author": {
+    "name": "Mooktakim",
+    "email": "mooktakim@fluxter.co.uk"
+  }
+}

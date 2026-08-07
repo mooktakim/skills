@@ -8,18 +8,17 @@ A hand-authored collection of Claude Code skills, not limited to any one domain 
 
 ## Repository structure
 
-The repo is a Claude Code plugin marketplace (`skills`) hosting a single plugin (`skills`) that bundles all skills:
+The repo is a Claude Code plugin marketplace (`skills`) where each skill is its own plugin, living in a directory at the repo root:
 
 ```
-.claude-plugin/marketplace.json          # marketplace manifest; lists the plugin(s)
-plugins/skills/
-  .claude-plugin/plugin.json             # plugin manifest
-  skills/<skill-name>/
-    SKILL.md           # required: frontmatter + instructions
-    <supporting files> # optional: scripts, templates, references
+.claude-plugin/marketplace.json    # marketplace manifest; one plugins[] entry per skill
+<skill-name>/
+  .claude-plugin/plugin.json       # plugin manifest (name matches the directory)
+  SKILL.md             # required: frontmatter + instructions, at the plugin root
+  <supporting files>   # optional: scripts, templates, references
 ```
 
-New skills go under `plugins/skills/skills/` — no manifest changes needed; the plugin picks up every skill directory automatically. Installed skills are namespaced as `skills:<skill-name>`.
+Adding a new skill means creating its directory (with `SKILL.md` and `plugin.json`) AND adding a matching entry to the `plugins` array in `marketplace.json` — the marketplace only offers what that array lists. Skill, directory, and plugin names must all match. Run `claude plugin validate .` and `claude plugin validate <skill-name>` after changes. Installed skills are namespaced by plugin: `<skill-name>:<skill-name>`.
 
 - `SKILL.md` starts with YAML frontmatter containing `name` and `description`, followed by the skill body in markdown.
 - `name` must match the directory name: lowercase, hyphen-separated.
@@ -40,4 +39,4 @@ Commit automatically, without asking, whenever a coherent unit of work is done �
 
 ## Using these skills
 
-Install via the marketplace: `/plugin marketplace add <path-or-repo>` then `/plugin install skills@skills`. From a local checkout, add the marketplace by path (`/plugin marketplace add ~/Workspace/skills`). To test a change, invoke the skill (`/skills:<skill-name>`) in a Claude Code session inside a target project.
+Install via the marketplace: `/plugin marketplace add <path-or-repo>` then install skills individually, e.g. `/plugin install rails-context@skills`. From a local checkout, add the marketplace by path (`/plugin marketplace add ~/Workspace/skills`). To test a change, invoke the skill in a Claude Code session inside a target project.
