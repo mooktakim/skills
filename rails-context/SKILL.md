@@ -72,7 +72,7 @@ What a correct new addition looks like.
 Non-obvious constraints, deliberate deviations from Rails norms.
 ```
 
-Per-layer generation guides ship with this skill under `references/`. Before generating a directory's context file, read the matching guide — it lists the questions to answer from the app's code and shows the target density:
+Per-layer generation guides ship with this skill in the `references/` directory that sits next to this SKILL.md — they are part of the skill, NOT files in the target app, so resolve their paths from this skill's own directory. You MUST read the matching guide immediately before generating each directory's context file (per file, not once upfront) — it lists the questions to answer from the app's code and shows the target density:
 
 - `references/models.md`, `references/controllers.md`, `references/services.md`, `references/components.md`, `references/jobs.md`, `references/views.md`, `references/test.md`
 
