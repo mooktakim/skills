@@ -18,7 +18,7 @@ The repo is a Claude Code plugin marketplace (named `mooktakim` — the install 
   <supporting files>   # optional: scripts, templates, references
 ```
 
-Adding a new skill means creating its directory (with `SKILL.md` and `plugin.json`) AND adding a matching entry to the `plugins` array in `marketplace.json` — the marketplace only offers what that array lists. Skill, directory, and plugin names must all match. Run `claude plugin validate .` and `claude plugin validate <skill-name>` after changes. Installed skills are namespaced by plugin: `<skill-name>:<skill-name>`.
+Adding a new skill means creating its directory (with `SKILL.md`, `plugin.json`, and a human-facing `README.md`) AND adding a matching entry to the `plugins` array in `marketplace.json` — the marketplace only offers what that array lists — AND a row in the root `README.md` skills table. Skill, directory, and plugin names must all match. Run `claude plugin validate .` and `claude plugin validate <skill-name>` after changes. Installed skills are namespaced by plugin: `<skill-name>:<skill-name>`.
 
 - `SKILL.md` starts with YAML frontmatter containing `name` and `description`, followed by the skill body in markdown.
 - `name` must match the directory name: lowercase, hyphen-separated.
