@@ -1,8 +1,8 @@
 {
   "name": "mooktakim",
-  "description": "Hand-authored Claude Code skills by Mooktakim, one plugin per skill",
+  "description": "Hand-authored Claude Code skills by Mooktakim Ahmed, one plugin per skill",
   "owner": {
-    "name": "Mooktakim",
+    "name": "Mooktakim Ahmed",
     "email": "mooktakim@fluxter.co.uk"
   },
   "plugins": [
