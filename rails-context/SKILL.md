@@ -1,11 +1,13 @@
 ---
 name: rails-context
-description: Set up and maintain per-directory CLAUDE.md context files in a Rails application (MVC Context — Model, View, Controller, plus Context). Surveys app/, lib/, and the test suite, proposes which directories deserve a context file, generates intent-focused CLAUDE.md files with AGENTS.md symlinks, and wires up drift auditing via bin/audit_context. Use when asked to set up MVC context, add per-directory agent context files, or bootstrap CLAUDE.md/AGENTS.md files in a Rails app.
+description: Set up and maintain per-directory CLAUDE.md context files in a Rails application (MVC Context — Model, View, Controller, plus Context). Surveys app/, lib/, and the test suite, proposes which directories deserve a context file, generates intent-focused CLAUDE.md files with AGENTS.md symlinks, and wires up drift auditing via bin/audit_context. Re-runnable: on an app already set up, a run audits existing context files for drift, fills gaps, and slims ancestors that repeat what deeper files own. Use when asked to set up MVC context, add per-directory agent context files, bootstrap CLAUDE.md/AGENTS.md files in a Rails app, or audit/refresh existing context files.
 ---
 
 # MVC Context
 
 You are setting up per-directory agent context files in this Rails application. Rails is MVC; this adds a fourth letter: Context. Follow this document exactly. Work through the phases in order and show me the plan after Phase 1 before writing anything.
+
+This skill is re-runnable. The first run on an app sets everything up; every later run is maintenance — audit, gap-fill, repair — through the same phases and the same approval gate (see "Re-runs: maintenance mode" in Phase 1).
 
 ## File naming convention
 
@@ -51,7 +53,16 @@ Context files form a chain — root → `app/<dir>/` → nested namespace — an
 4. A nested namespace gets its own file in two cases: its conventions differ from its parent's, or it encapsulates deep domain knowledge that would bloat the parent file — an external-provider wrapper (`app/services/cloudflare/`), a subsystem with its own vocabulary (`app/models/billing/`). Otherwise cover it in a short "Namespaces" section of the parent file.
 5. Present me the list of directories you propose to cover, with one line each on what the file would say. Wait for my approval.
 
-Re-running on an app that already has context files is a gap-fill, not a rewrite: keep existing `CLAUDE.md` files untouched, propose only missing qualifying directories, add missing `AGENTS.md` symlinks, and migrate any real `AGENTS.md` files. Never regenerate an existing context file; Phase 4 then reviews only what was newly written or changed.
+### Re-runs: maintenance mode
+
+Re-running on an app that already has context files is maintenance, not a rewrite. The survey then also covers the existing context files, and the Phase 1 plan proposes four kinds of work:
+
+- **Gap-fill**: new files for newly qualifying directories, missing `AGENTS.md` symlinks added, real `AGENTS.md` files migrated.
+- **Drift review**: run `bin/audit_context` (if it doesn't exist yet, create it first — Phase 3). For each flagged pre-existing file, read the changed files and the current `CLAUDE.md`, then propose a surgical edit only where a documented pattern is now false or a new convention has emerged. A flagged file that is still accurate gets reported as "checked, still accurate" — never edited to look busy, and never silently skipped.
+- **One fact, one level repair**: where an existing file (the root included) states a fact that a deeper file owns — or will own after this run's gap-fill — propose slimming the ancestor to a one-line pointer.
+- **Size repair**: flag files outside the size discipline, with a proposed cut (over the cap) or a note on whether a short file is legitimately short or missing its layer's substance.
+
+Never regenerate an existing context file: every change to one is a surgical edit, listed in the plan and approved before writing. Phase 4 then reviews only what was newly written or changed. If the app has a `.claude/commands/context-audit.md` left over from an earlier version of this skill, propose deleting it — re-running this skill is now the audit.
 
 ## Phase 2: Generate
 
@@ -88,6 +99,8 @@ For `lib/` and anything without a guide: use the skeleton; if you cannot fill Pu
 
 After writing each `CLAUDE.md`, create the `AGENTS.md` symlink beside it.
 
+If an ancestor file (the root included) already states a fact the new file now owns, slim the ancestor to a one-line pointer in the same commit. "One fact, one level" applies to pre-existing content too — the maintenance-mode rule against regenerating existing files does not forbid these surgical shed-edits; it requires them to be listed in the plan.
+
 ### Nested context files
 
 Agents load the full chain of context files down to the directory they're working in (root → `app/services/` → `app/services/cloudflare/`), so a nested file contains ONLY the delta from its ancestors — never repeat a parent or root convention; duplication is drift waiting to happen. Keep nested files shorter (10-60 lines). Their value is the knowledge the code cannot show: the external system's auth model and rate limits, environment differences (sandbox vs live), invariants ("zone ids are cached at boot; never fetch per request"), known failure modes and how the app expects them handled. The same rules apply as everywhere else: intent not inventory, `AGENTS.md` symlink beside it, and the audit script picks nested files up automatically.
@@ -111,6 +124,8 @@ patterns need no update. If a change deliberately contradicts a CLAUDE.md,
 update the file to match the new reality and mention it. Context files
 describe intent and patterns, never file inventories. Context file edits
 ship in the same commit as the code change that caused them.
+bin/audit_context reports drift; a periodic MVC Context maintenance run
+works through what it flags.
 ```
 
 Then create `bin/audit_context` (chmod +x) with this content:
@@ -167,20 +182,13 @@ else
 fi
 ```
 
-Also create `.claude/commands/context-audit.md`:
-
-```markdown
-Run bin/audit_context from the repo root. For each flagged directory, read the
-changed files and the current CLAUDE.md, then decide whether any documented
-pattern is now false or a new convention has emerged. If yes, edit the
-CLAUDE.md surgically - affected lines only, never regenerate. If no, leave it
-untouched and report it was checked and found accurate. Never add file
-inventories. Summarise what you updated and what you left alone.
-```
+Do not create any slash command for auditing: re-running this skill IS the audit (see "Re-runs: maintenance mode").
 
 ## Phase 4: Review
 
-Show me every generated `CLAUDE.md` grouped in one message. I will correct anything that misstates intent; my stated intent always outranks what you inferred from code. Fold corrections in, then commit everything with a clear message.
+Show me every generated or edited `CLAUDE.md` grouped in one message. I will correct anything that misstates intent; my stated intent always outranks what you inferred from code. Fold corrections in, then commit everything with a clear message.
+
+Close every run — first run or maintenance — by running `bin/audit_context` and reporting what it still flags: items I chose to defer, plus anything the run didn't cover. Nothing flagged gets silently ignored.
 
 ## Never do
 
