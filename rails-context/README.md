@@ -15,7 +15,7 @@ There is no separate audit command: re-running the skill is the audit (see below
 
 Context files describe the *shape* of a directory, never its *contents*. "Services are single-purpose command objects named `VerbNoun`, exposing `.call` and returning a `Result`" is allowed; "the main services are X, Y, Z" is forbidden. File lists go stale the moment anyone adds a file, and a stale context file is worse than none — the code is the inventory, and agents can glob and grep it. Context files answer what grep cannot: why the directory is structured this way, what a correct new addition looks like, what mistakes to avoid.
 
-The litmus test: if a sentence would need editing when someone adds one more file of the same kind, the sentence gets deleted. Files stay between 30 and 100 lines (hard cap 120), and only directories that earn one get one — a vanilla `app/helpers/` gets nothing.
+The litmus test: if a sentence would need editing when someone adds one more file of the same kind, the sentence gets deleted. Files aim for 30-100 lines - a density check, not a token budget, since each file loads only for work in its own directory. A file may grow past 100 once it provably holds nothing but app-specific intent, and 150 triggers a restructuring review (usually a nested-file split). Only directories that earn a file get one — a vanilla `app/helpers/` gets nothing.
 
 ## How it runs
 

@@ -35,7 +35,15 @@ Inventory goes stale the moment anyone adds a file, and a stale context file is 
 
 ## Size discipline
 
-Each `CLAUDE.md` is 30-100 lines, hard cap 120. If it wants to grow past that, the content is drifting into inventory or generic Rails knowledge. Cut it.
+Aim for 30-100 lines per `CLAUDE.md`. The limit is a density check, not a token budget: a directory file loads only for work inside that directory, so length is cheap - but every line competes for the agent's attention, so padding is not, and growth is usually the first sign of inventory creep.
+
+A file may grow past 100 lines only after passing this checklist:
+
+1. No inventory and no generic Rails knowledge has crept in - cut those first.
+2. No single namespace owns the growth - if one does, give it a nested context file and slim the parent to a pointer.
+3. Everything that remains is app-specific intent an agent would otherwise get wrong.
+
+150 lines is the review trigger: maintenance-mode size repair flags anything past it for a restructuring proposal. A file that big almost always contains a nested file waiting to be split out.
 
 ## One fact, one level
 
@@ -60,7 +68,7 @@ Re-running on an app that already has context files is maintenance, not a rewrit
 - **Gap-fill**: new files for newly qualifying directories, missing `AGENTS.md` symlinks added, real `AGENTS.md` files migrated.
 - **Drift review**: run `bin/audit_context` (if it doesn't exist yet, create it first — Phase 3). For each flagged pre-existing file, read the changed files and the current `CLAUDE.md`, then propose a surgical edit only where a documented pattern is now false or a new convention has emerged. A flagged file that is still accurate gets reported as "checked, still accurate" — never edited to look busy, and never silently skipped.
 - **One fact, one level repair**: where an existing file (the root included) states a fact that a deeper file owns — or will own after this run's gap-fill — propose slimming the ancestor to a one-line pointer.
-- **Size repair**: flag files outside the size discipline, with a proposed cut (over the cap) or a note on whether a short file is legitimately short or missing its layer's substance.
+- **Size repair**: flag files outside the size discipline - over the 150-line review trigger, propose a restructuring (usually a nested-file split); under the 30-line floor, note whether the file is legitimately short or missing its layer's substance.
 
 Never regenerate an existing context file: every change to one is a surgical edit, listed in the plan and approved before writing. Phase 4 then reviews only what was newly written or changed. If the app has a `.claude/commands/context-audit.md` left over from an earlier version of this skill, propose deleting it — re-running this skill is now the audit.
 
