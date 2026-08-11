@@ -41,11 +41,13 @@ Realising a spec as an ERB partial, ViewComponent, or Phlex class happens during
 
 ## Phase 1: Survey and plan
 
+Delegate steps 1-4 to one read-only subagent when the environment provides subagents - fact-gathering only: it reports back Tailwind version, entry and compiled CSS paths, view layer, candidate sections with their evidence, representative-view observations, and any existing design docs. Build the plan from its report yourself: the plan, the approval conversation, and every decision stay in the main session. Run the survey inline if subagents are unavailable.
+
 1. Read the `Gemfile` and lockfile: view layer (`phlex-rails`, `view_component`, or plain ERB) and Tailwind. **Tailwind CSS v4 is a hard requirement.** No Tailwind at all: stop and tell me this skill needs it. Tailwind v3 (a `tailwind.config.js` and a pre-4 version): stop and advise upgrading to v4 first. Confirm v4 by version number and by the `@import "tailwindcss"` / `@theme` entry-point CSS.
 2. Locate the Tailwind entry CSS (where `@theme` lives or will live) and the compiled CSS the app serves (e.g. `app/assets/builds/tailwind.css`) - the preview pages link the compiled file by relative path.
 3. Detect candidate sections. Evidence, strongest first: layouts in `app/views/layouts/`, controller namespaces, route namespaces. An `Api::` namespace with no HTML views is not a section. Skim representative views per candidate to judge whether its look genuinely diverges.
 4. Read `docs/design-system/` if it exists - that switches the run into maintenance mode (below).
-5. Present the plan: sections found with their evidence, and per section every file that would be written or edited, one line each on what it would say. Flag the section split explicitly - it is the expensive-to-change decision. Wait for my approval.
+5. Present the plan: sections found with their evidence, and per section every file that would be written or edited, one line each on what it would say. Flag the section split explicitly - it is the expensive-to-change decision - and state how many subagents the run will use (one survey agent plus one generation agent per section), so the fan-out is approved, never a surprise. Wait for my approval.
 
 ### Re-runs: maintenance mode
 
@@ -58,11 +60,13 @@ Re-running on an app that already has `docs/design-system/` is maintenance, not 
 - **Divergences ledger**: record newly collapsed variants; mark migrated ones done.
 - **Preview sync**: for each spec added or changed since the last run, verify the matching block in the section's preview pages still matches - same recipe markup, every variant rendered - and propose the edits to bring it current.
 
-Never regenerate an existing doc or preview page: every change is a surgical edit, listed in the plan and approved before writing.
+Never regenerate an existing doc or preview page: every change is a surgical edit, listed in the plan and approved before writing. Section-scoped maintenance work (drift fixes, gap-fill, preview sync) may be dispatched to per-section subagents exactly like Phase 2 generation, behind the same approved plan.
 
 ## Phase 2: Generate
 
-For each approved section, work in dependency order: `design.md` → `tokens.md` → `components/*.md` → `patterns/*.md` → `divergences.md` → the section's preview pages (`tokens.html`, `components.html`, `patterns.html`). After all sections, write the shared router `docs/design-system/README.md` and the style-guide entry page `docs/design-system/index.html`.
+Sections are islands, so they generate in parallel: dispatch one subagent per approved section (run inline when subagents are unavailable, or for a single small section). Before dispatching, resolve everything that needs my input - in particular the interview for sections with no views - so each agent's prompt already carries the answers; a generation agent never asks me anything. Each agent's prompt must scope it to its section only and include: the approved file list, the section's token prefix, the interview answers, the path to this skill's directory, and the instruction to follow this Phase's rules - reading the matching `references/` guide immediately before each file, and the `catalog/` map when speccing components. When every agent has returned, check the output against the doctrine (token purity, no cross-section references, spec-preview sync) before moving on.
+
+Each section, whether dispatched or inline, is generated in dependency order: `design.md` → `tokens.md` → `components/*.md` → `patterns/*.md` → `divergences.md` → the section's preview pages (`tokens.html`, `components.html`, `patterns.html`). After all sections, write the shared router `docs/design-system/README.md` and the style-guide entry page `docs/design-system/index.html` yourself - they are the only cross-section files.
 
 Generation guides ship with this skill in `references/` next to this SKILL.md - they are part of the skill, NOT files in the target app, so resolve their paths from this skill's own directory. You MUST read the matching guide immediately before generating each file (per file, not once upfront):
 

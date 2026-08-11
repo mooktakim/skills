@@ -31,7 +31,7 @@ A curated component catalog ships with the skill (buttons, forms, tables, naviga
 ## How it runs
 
 1. **Survey and plan** - detects Tailwind v4 (hard requirement), the view layer, and the candidate sections, then proposes the section split and every file it would write. Nothing is written until you approve.
-2. **Generate** - derives each section's tokens and aesthetics from its actual views (interviewing you where none exist), specs the components and patterns in use, and renders the style-guide pages.
+2. **Generate** - derives each section's tokens and aesthetics from its actual views (interviewing you where none exist), specs the components and patterns in use, and renders the style-guide pages. Sections are independent, so they generate in parallel - one subagent per section, with the agent count declared in the plan you approved.
 3. **Wire up maintenance** - root `CLAUDE.md` block, `bin/audit_design`, and the Tailwind `@source` directive that keeps the preview styled.
 4. **Review** - shows you everything; your stated design intent outranks anything inferred. Commits after corrections, and closes with an audit report.
 
