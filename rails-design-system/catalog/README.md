@@ -25,6 +25,7 @@ All colour classes in catalog samples use these roles. A target app defines them
 Rules that make the catalog usable:
 
 - Colour comes only from roles. No raw hex, no named palette classes (`bg-indigo-600`, `text-gray-900`), no `[...]` arbitrary values, anywhere in a sample.
+- Samples use bare role names. A section whose tokens carry a prefix (`admin-*`) gets the prefix applied during adaptation: `bg-primary` becomes `bg-admin-primary`.
 - Non-colour utilities (type, spacing, radius, shadow) use the standard Tailwind scale (`text-sm/6`, `px-3 py-2`, `rounded-md`, `shadow-xs`). A section's `tokens.md` declares which steps are canonical for that section; adapt samples to those steps when speccing.
 - No dark-mode variants in samples: dark theming is a section-level remap of the roles, not per-component classes.
 - Interactive samples always carry `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary` and a disabled treatment. A component without its states is not done.

@@ -1,6 +1,6 @@
 # <section>/components/<name>.md - generation guide
 
-Read this immediately before writing each component spec. A spec is prescriptive - the rule every future instance follows - and must fit one screen; if it is longer than the component it describes, cut. Look the component up in `catalog/README.md` first and load the mapped catalog file as raw material; re-shape it to this section's tokens and the app's real markup. No catalog entry means derive everything from the app's own markup. Filenames are kebab-case singular (`button.md`, `page-heading.md`).
+Read this immediately before writing each component spec. A spec is prescriptive - the rule every future instance follows - and must fit one screen; if it is longer than the component it describes, cut. Look the component up in `catalog/README.md` first and load the mapped catalog file as raw material; re-shape it to this section's tokens and the app's real markup - catalog samples use bare role names, so apply the section's token prefix (`bg-primary` → `bg-admin-primary`) while adapting. No catalog entry means derive everything from the app's own markup. Filenames are kebab-case singular (`button.md`, `page-heading.md`).
 
 ## Questions to answer from the code
 

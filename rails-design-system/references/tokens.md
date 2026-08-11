@@ -14,6 +14,8 @@ Read this immediately before writing a section's `tokens.md`. This file is the s
 
 ## Compilation
 
+All sections share one entry CSS, so apply the section's approved prefix (from the Phase 1 plan) to every role: `--color-admin-primary` → `bg-admin-primary`. A section holding the bare names skips the prefix. State the prefix (or its absence) in the doc's intro line.
+
 Close the file with the single `@theme` block the app's Tailwind entry CSS must contain for this section's roles:
 
 ```css

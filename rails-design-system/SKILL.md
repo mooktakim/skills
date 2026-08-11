@@ -29,6 +29,8 @@ Nothing points upward, and no tier restates a lower one. This is what makes the 
 
 Colour tokens are role-named, never hue-named: `surface`, `on-surface`, `muted`, `muted-surface`, `border`, `primary`, `primary-hover`, `on-primary`, `danger`, `success`, `warning`. Role names survive a re-theme; `blue-500` does not. Tokens compile to a Tailwind v4 `@theme` block - the section's `tokens.md` is the source of truth and the CSS is its compiled form; they must agree.
 
+All sections compile into the app's single Tailwind entry CSS, so role names must not collide across sections. With one section, use bare role names (`--color-primary` → `bg-primary`). With several, prefix each section's roles with its name (`--color-admin-primary` → `bg-admin-primary`); at most one section - typically the app's dominant surface - may keep the bare names. Propose the prefix assignment as part of the Phase 1 plan, and state each section's prefix at the top of its `tokens.md`.
+
 Everything you write - specs, recipes, preview pages, proposed fixes - uses token-based Tailwind utilities only. Never a raw hex value, never a literal palette class (`bg-gray-100`, `text-indigo-600`), never an arbitrary `[...]` value. This is the rule the whole standard rests on: it makes drift mechanically detectable (`bin/audit_design` is three greps), so breaking it once makes every audit a lie. A value not on the section's scale is drift, by definition.
 
 ## Specs, not code
@@ -50,7 +52,7 @@ Realising a spec as an ERB partial, ViewComponent, or Phlex class happens during
 Re-running on an app that already has `docs/design-system/` is maintenance, not a rewrite. The survey then also covers the existing docs, and the Phase 1 plan proposes six kinds of work:
 
 - **Gap-fill**: newly detected sections; components or patterns now in use but unspecced.
-- **Drift review**: run `bin/audit_design` (create it first if missing - Phase 3). Each finding becomes a proposed fix - retokenise the view, or add a missing token to the section's `tokens.md` - never a silent skip.
+- **Drift review**: run `bin/audit_design` (if it is missing or differs from the script in Phase 3 of this skill version, create or update it first). Each finding becomes a proposed fix - retokenise the view, or add a missing token to the section's `tokens.md` - never a silent skip.
 - **Promotion**: the same one-off markup repeated in a section's views becomes a proposed component spec in that section's library.
 - **Spec-vs-realized drift**: read each spec's "Realized as" file; where code and spec contradict, propose which side changes - never let them disagree silently.
 - **Divergences ledger**: record newly collapsed variants; mark migrated ones done.
@@ -102,6 +104,7 @@ works through what it flags.
 # Report design drift: colours and utilities that bypass the design-system tokens.
 # Run from the repo root. Findings are drift signals to review, not proof of defects.
 # Mark a deliberate exception by putting "design-ok" on the same line.
+# Mailer templates are exempt: email clients require inline styles.
 set -euo pipefail
 dirs=()
 for d in app/views app/components app/frontend app/javascript app/assets/stylesheets; do
@@ -116,6 +119,7 @@ scan() { # scan <label> <extended-regex>
         --include='*.rb' --include='*.css' --include='*.js' \
         "$re" "${dirs[@]}" 2>/dev/null \
         | grep -v 'design-ok' \
+        | grep -vE '_mailer/|/layouts/mailer' \
         | grep -vE '(^|/)(tokens|theme)[^/]*\.css:' || true)
   [ -n "$out" ] && count=$(printf '%s\n' "$out" | wc -l | tr -d ' ')
   total=$((total + count))
