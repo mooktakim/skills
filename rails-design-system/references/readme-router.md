@@ -1,0 +1,38 @@
+# docs/design-system/README.md - generation guide
+
+Read this immediately before writing the top-level `README.md`. It is the router agents load first: the usage protocol plus the section index, and nothing else. No token values, no recipes, no aesthetic prose - link to the files that own those. If the README needs updating when a component is added, it contains something it should not.
+
+## Questions to answer
+
+- **Protocol**: the ordered steps for building or changing a view - identify the section, read its `tokens.md` and the relevant `components/` and `patterns/` specs before writing markup, compose token-only, spec missing pieces before hand-rolling, update spec + preview with the change, run `bin/audit_design`.
+- **The one rule**: token utilities only - one line, since the root CLAUDE.md block and the specs carry the detail.
+- **Independence**: one line - sections never share tokens or code.
+- **Index**: one row per section - name, audience, layout(s) it owns, path. Plus where the preview lives (`index.html`).
+
+## Target shape (fictional excerpt - copy the density, never the content)
+
+```markdown
+# Design system
+
+The standard every view is built against. Browsable preview: open
+`docs/design-system/index.html`.
+
+## Building a view
+1. Identify the section (by layout/namespace - see index below).
+2. Read the section's `tokens.md`, then the specs for every component and
+   pattern the view touches, before writing markup.
+3. Compose from specced components using token utilities only - never raw
+   hex, palette classes, or arbitrary values.
+4. Missing component or pattern? Spec it first (re-run rails-design-system
+   or write the spec + preview block by hand) - never hand-roll a one-off.
+5. If the change alters a documented pattern, update the spec and its
+   preview block in the same commit. `bin/audit_design` reports drift.
+
+Sections are independent: nothing is shared between them.
+
+## Sections
+| Section | Audience | Layouts | Docs |
+|---------|----------|---------|------|
+| admin | internal operators | admin | `admin/` |
+| marketing | visitors | marketing, minimal | `marketing/` |
+```

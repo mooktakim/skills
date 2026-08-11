@@ -1,0 +1,12 @@
+{
+  "name": "rails-design-system",
+  "version": "0.1.0",
+  "description": "Per-section design-system docs for Rails apps on Tailwind v4: role tokens, component specs, page patterns, an HTML style guide, and drift auditing",
+  "author": {
+    "name": "Mooktakim Ahmed",
+    "email": "mooktakim@fluxter.co.uk"
+  },
+  "homepage": "https://github.com/mooktakim/skills",
+  "repository": "https://github.com/mooktakim/skills",
+  "keywords": ["rails", "design-system", "tailwind", "components", "tokens", "ui"]
+}
