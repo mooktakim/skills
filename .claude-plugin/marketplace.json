@@ -14,7 +14,7 @@
     {
       "name": "rails-design-system",
       "source": "./rails-design-system",
-      "description": "Per-section design-system docs for Rails apps on Tailwind v4: role tokens, component specs, page patterns, HTML style guide, drift auditing"
+      "description": "Per-section design-system docs for Rails apps on Tailwind v4: role tokens, component specs, page patterns, drift auditing, edit-time enforcement"
     }
   ]
 }

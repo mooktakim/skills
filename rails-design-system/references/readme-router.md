@@ -4,18 +4,17 @@ Read this immediately before writing the top-level `README.md`. It is the router
 
 ## Questions to answer
 
-- **Protocol**: the ordered steps for building or changing a view - identify the section, read its `tokens.md` and the relevant `components/` and `patterns/` specs before writing markup, compose token-only, spec missing pieces before hand-rolling, update spec + preview with the change, run `bin/audit_design`.
+- **Protocol**: the ordered steps for building or changing a view - identify the section, read its `tokens.md` and the relevant `components/` and `patterns/` specs before writing markup, compose token-only, spec missing pieces before hand-rolling, update the spec with the change, run `bin/audit_design`.
 - **The one rule**: token utilities only - one line, since the root CLAUDE.md block and the specs carry the detail.
 - **Independence**: one line - sections never share tokens or code.
-- **Index**: one row per section - name, audience, layout(s) it owns, path. Plus where the preview lives (`index.html`).
+- **Index**: one row per section - name, audience, layout(s) it owns, path.
 
 ## Target shape (fictional excerpt - copy the density, never the content)
 
 ```markdown
 # Design system
 
-The standard every view is built against. Browsable preview: open
-`docs/design-system/index.html`.
+The standard every view is built against.
 
 ## Building a view
 1. Identify the section (by layout/namespace - see index below).
@@ -24,9 +23,9 @@ The standard every view is built against. Browsable preview: open
 3. Compose from specced components using token utilities only - never raw
    hex, palette classes, or arbitrary values.
 4. Missing component or pattern? Spec it first (re-run rails-design-system
-   or write the spec + preview block by hand) - never hand-roll a one-off.
-5. If the change alters a documented pattern, update the spec and its
-   preview block in the same commit. `bin/audit_design` reports drift.
+   or write the spec by hand) - never hand-roll a one-off.
+5. If the change alters a documented pattern, update the spec in the same
+   commit. `bin/audit_design` reports drift.
 
 Sections are independent: nothing is shared between them.
 
