@@ -17,7 +17,7 @@ In the target app, under `docs/design-system/`:
   - `divergences.md` - the migration backlog: every off-system value found, and what it should become.
 - **A browsable style guide** - `index.html` plus per-section `tokens.html` / `components.html` / `patterns.html`, rendered with the app's own compiled CSS so it always shows the real theme.
 
-Plus, outside `docs/`: a design-system block in the root `CLAUDE.md` so agents load the standard before any view work, and `bin/audit_design` - a grep-based drift script that flags raw hex, arbitrary `[...]` values, and literal palette classes.
+Plus, outside `docs/`: a design-system block in the root `CLAUDE.md` so agents load the standard before any view work; `bin/audit_design` - a grep-based drift script that flags raw hex, arbitrary `[...]` values, and literal palette classes; and a Claude Code `PostToolUse` hook that runs the same checks on every agent edit to view code and feeds violations back as blocking errors, so generated code is enforced at the moment it is written.
 
 ## Philosophy
 
@@ -32,7 +32,7 @@ A curated component catalog ships with the skill (buttons, forms, tables, naviga
 
 1. **Survey and plan** - detects Tailwind v4 (hard requirement), the view layer, and the candidate sections, then proposes the section split and every file it would write. Nothing is written until you approve.
 2. **Generate** - derives each section's tokens and aesthetics from its actual views (interviewing you where none exist), specs the components and patterns in use, and renders the style-guide pages. Sections are independent, so they generate in parallel - one subagent per section, with the agent count declared in the plan you approved.
-3. **Wire up maintenance** - root `CLAUDE.md` block, `bin/audit_design`, and the Tailwind `@source` directive that keeps the preview styled.
+3. **Wire up maintenance** - root `CLAUDE.md` block, `bin/audit_design`, the `PostToolUse` enforcement hook, and the Tailwind `@source` directive that keeps the preview styled.
 4. **Review** - shows you everything; your stated design intent outranks anything inferred. Commits after corrections, and closes with an audit report.
 
 Re-running later is how you maintain it: drift review, gap-fill for new sections and components, promotion of repeated one-offs into specs, and preview sync - all behind the same approval gate. Existing docs are never regenerated, only surgically edited.

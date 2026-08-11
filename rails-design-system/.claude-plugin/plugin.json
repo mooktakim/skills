@@ -1,6 +1,6 @@
 {
   "name": "rails-design-system",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Per-section design-system docs for Rails apps on Tailwind v4: role tokens, component specs, page patterns, an HTML style guide, and drift auditing",
   "author": {
     "name": "Mooktakim Ahmed",

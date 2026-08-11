@@ -53,7 +53,7 @@ Delegate steps 1-4 to one read-only subagent when the environment provides subag
 
 Re-running on an app that already has `docs/design-system/` is maintenance, not a rewrite. The survey then also covers the existing docs, and the Phase 1 plan proposes six kinds of work:
 
-- **Gap-fill**: newly detected sections; components or patterns now in use but unspecced.
+- **Gap-fill**: newly detected sections; components or patterns now in use but unspecced; missing enforcement wiring (the PostToolUse hook in `.claude/settings.json`).
 - **Drift review**: run `bin/audit_design` (if it is missing or differs from the script in Phase 3 of this skill version, create or update it first). Each finding becomes a proposed fix - retokenise the view, or add a missing token to the section's `tokens.md` - never a silent skip.
 - **Promotion**: the same one-off markup repeated in a section's views becomes a proposed component spec in that section's library.
 - **Spec-vs-realized drift**: read each spec's "Realized as" file; where code and spec contradict, propose which side changes - never let them disagree silently.
@@ -95,8 +95,9 @@ token-based Tailwind utilities only - never raw hex, literal palette classes
 When a change adds or alters a documented pattern, update the affected spec
 AND its block in the section's preview pages, in the same commit. If a needed
 component has no spec, spec it first rather than hand-rolling a one-off.
-bin/audit_design reports drift; a periodic design-system maintenance run
-works through what it flags.
+bin/audit_design reports drift, and a PostToolUse hook (bin/audit_design
+--hook) blocks token violations at edit time; a periodic design-system
+maintenance run works through what the audit flags.
 ```
 
 2. Wire the preview's CSS: add an `@source "../../docs/design-system"` directive (path relative to the entry CSS) to the Tailwind entry file so classes used only in preview pages survive purging, and confirm each preview page's relative `<link>` to the compiled CSS resolves.
@@ -109,7 +110,39 @@ works through what it flags.
 # Run from the repo root. Findings are drift signals to review, not proof of defects.
 # Mark a deliberate exception by putting "design-ok" on the same line.
 # Mailer templates are exempt: email clients require inline styles.
+# Modes:
+#   bin/audit_design         scan the app and report; always exits 0
+#   bin/audit_design --hook  Claude Code PostToolUse hook: reads the tool-call JSON
+#                            from stdin, checks only the edited file, exits 2 with
+#                            findings on stderr so the agent fixes them immediately
 set -euo pipefail
+HEX='#([0-9a-fA-F]{6}|[0-9a-fA-F]{8}|[0-9a-fA-F]{3,4})([^0-9a-zA-Z]|$)'
+ARB='[a-z][a-z0-9:-]*-\[[^]]+\]'
+PAL='(bg|text|border|ring|divide|outline|fill|stroke|from|via|to|accent|decoration|placeholder|caret|shadow)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}'
+
+if [ "${1:-}" = "--hook" ]; then
+  file=$(ruby -rjson -e 'puts JSON.parse($stdin.read).dig("tool_input", "file_path").to_s' 2>/dev/null || true)
+  { [ -n "$file" ] && [ -f "$file" ]; } || exit 0
+  rel=${file#"$PWD"/}
+  case "$rel" in
+    *_mailer/*|*layouts/mailer*|*tokens*.css|*theme*.css) exit 0 ;;
+    app/views/*|app/components/*|app/frontend/*|app/javascript/*|app/assets/stylesheets/*) ;;
+    *) exit 0 ;;
+  esac
+  case "$rel" in
+    *.erb|*.haml|*.slim|*.html|*.rb|*.css|*.js) ;;
+    *) exit 0 ;;
+  esac
+  out=$(grep -nE "($HEX|$ARB|$PAL)" "$file" | grep -v 'design-ok' || true)
+  [ -z "$out" ] && exit 0
+  {
+    echo "Design-system drift in $rel - token utilities only (no raw hex, no literal palette classes, no arbitrary [...] values):"
+    printf '%s\n' "$out" | sed 's/^/  /'
+    echo "Use the section's role tokens instead (see docs/design-system/). For a deliberate exception, put design-ok on that line."
+  } >&2
+  exit 2
+fi
+
 dirs=()
 for d in app/views app/components app/frontend app/javascript app/assets/stylesheets; do
   [ -d "$d" ] && dirs+=("$d")
@@ -131,9 +164,9 @@ scan() { # scan <label> <extended-regex>
   [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/   /'
   echo
 }
-scan "raw hex colours" '#([0-9a-fA-F]{6}|[0-9a-fA-F]{8}|[0-9a-fA-F]{3,4})([^0-9a-zA-Z]|$)'
-scan "arbitrary values" '[a-z][a-z0-9:-]*-\[[^]]+\]'
-scan "literal palette classes" '(bg|text|border|ring|divide|outline|fill|stroke|from|via|to|accent|decoration|placeholder|caret|shadow)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}'
+scan "raw hex colours" "$HEX"
+scan "arbitrary values" "$ARB"
+scan "literal palette classes" "$PAL"
 if [ "$total" -eq 0 ]; then
   echo "No drift detected."
 else
@@ -141,6 +174,23 @@ else
   echo "Never quiet a finding by weakening this script; mark deliberate exceptions with design-ok."
 fi
 ```
+
+4. Wire generation-time enforcement: add this hook to the app's `.claude/settings.json` (create the file if missing; if it exists, merge the entry without duplicating it and without touching existing hooks):
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [{ "type": "command", "command": "bin/audit_design --hook" }]
+      }
+    ]
+  }
+}
+```
+
+The harness runs the hook after every agent file edit. Non-view files exit instantly; a token violation in view code is fed back to the agent as a blocking error, so it gets fixed the moment it is written - even by an agent that never read the context files.
 
 Do not create any slash command for auditing: re-running this skill IS the audit (see "Re-runs: maintenance mode").
 
