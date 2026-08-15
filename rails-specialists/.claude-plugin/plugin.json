@@ -1,0 +1,9 @@
+{
+  "name": "rails-specialists",
+  "version": "0.1.0",
+  "description": "A team of Rails specialist agents: models, Hotwire, tests, jobs, debugging, review, security, performance, deploy, and upgrades",
+  "author": { "name": "Mooktakim Ahmed", "email": "mooktakim@fluxter.co.uk" },
+  "homepage": "https://github.com/mooktakim/skills",
+  "repository": "https://github.com/mooktakim/skills",
+  "keywords": ["rails", "agents", "subagents", "testing", "security", "performance", "hotwire"]
+}

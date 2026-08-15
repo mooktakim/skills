@@ -15,6 +15,11 @@
       "name": "rails-design-system",
       "source": "./rails-design-system",
       "description": "Per-section design-system docs for Rails apps on Tailwind v4: role tokens, component specs, page patterns, drift auditing, edit-time enforcement"
+    },
+    {
+      "name": "rails-specialists",
+      "source": "./rails-specialists",
+      "description": "A team of ten Rails specialist agents: models, Hotwire, tests, jobs, debugging, review, security, performance, deploy, upgrades"
     }
   ]
 }

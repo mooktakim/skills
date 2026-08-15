@@ -11,18 +11,19 @@ A hand-authored collection of Claude Code skills, not limited to any one domain 
 The repo is a Claude Code plugin marketplace (named `mooktakim` — the install handle after `@`) where each skill is its own plugin, living in a directory at the repo root:
 
 ```
-.claude-plugin/marketplace.json    # marketplace manifest; one plugins[] entry per skill
-<skill-name>/
+.claude-plugin/marketplace.json    # marketplace manifest; one plugins[] entry per plugin
+<plugin-name>/
   .claude-plugin/plugin.json       # plugin manifest (name matches the directory)
-  SKILL.md             # required: frontmatter + instructions, at the plugin root
+  SKILL.md             # skill plugins: frontmatter + instructions, at the plugin root
+  agents/<name>.md     # agent plugins: one file per subagent
   <supporting files>   # optional: scripts, templates, references
 ```
 
-Adding a new skill means creating its directory (with `SKILL.md`, `plugin.json`, and a human-facing `README.md`) AND adding a matching entry to the `plugins` array in `marketplace.json` — the marketplace only offers what that array lists — AND a row in the root `README.md` skills table. Skill, directory, and plugin names must all match. Run `claude plugin validate .` and `claude plugin validate <skill-name>` after changes. Installed skills are namespaced by plugin: `<skill-name>:<skill-name>`.
+A plugin ships a `SKILL.md`, an `agents/` directory, or both. Adding a new plugin means creating its directory (with `SKILL.md` and/or `agents/`, plus `plugin.json` and a human-facing `README.md`) AND adding a matching entry to the `plugins` array in `marketplace.json` — the marketplace only offers what that array lists — AND a row in the root `README.md` skills table. Plugin and directory names must all match. Run `claude plugin validate .` and `claude plugin validate <plugin-name>` after changes. Installed skills and agents are namespaced by plugin: `<plugin-name>:<skill-or-agent-name>`.
 
-- `SKILL.md` starts with YAML frontmatter containing `name` and `description`, followed by the skill body in markdown.
-- `name` must match the directory name: lowercase, hyphen-separated.
+- `SKILL.md` starts with YAML frontmatter containing `name` and `description`, followed by the skill body in markdown. `name` must match the directory name: lowercase, hyphen-separated.
 - The `description` is what Claude reads to decide whether to trigger the skill — write it as *what the skill does + when to use it* (including trigger phrases), not a summary of the body. It is the only part loaded before invocation.
+- Agent files (`agents/*.md`) also start with `name` + `description` frontmatter; the body is the agent's system prompt. The `description` drives auto-delegation, so it states what the agent does, when to use it, AND when not to. Additional frontmatter supported for plugin agents: `model`, `effort`, `maxTurns`, `tools`, `disallowedTools`, `skills`, `memory`, `background`, `isolation: worktree` — but NOT `hooks`, `mcpServers`, or `permissionMode`. Give read-only advisor agents `disallowedTools: Write, Edit, NotebookEdit`. Omit `model` so agents inherit the session model.
 - Supporting files live beside `SKILL.md` and are referenced from it by relative path. Keep `SKILL.md` lean; long reference material belongs in supporting files loaded on demand.
 
 ## Authoring conventions
