@@ -38,6 +38,14 @@ A curated component catalog ships with the skill (buttons, forms, tables, naviga
 
 Re-running later is how you maintain it: drift review, gap-fill for new sections and components, and promotion of repeated one-offs into specs - all behind the same approval gate. Existing docs are never regenerated, only surgically edited.
 
+## The design-reviewer agent
+
+`bin/audit_design` catches token violations; it cannot see a button rebuilt by hand, a page with the wrong width, or a status shown two different ways. The plugin ships a read-only agent for that: `rails-design-system:design-reviewer`. It loads the router, `conventions.md`, the section's specs and frames, and checks a change against them - hand-rolled markup where a component is specced, pages off their pattern or frame, broken conventions (text case, status representation, formats, icons), `design.md` rules, and specs left stale. Every finding cites the spec line it breaks; anything without a written rule is treated as taste and not reported as a defect.
+
+- **When:** a `SessionStart` note (only in apps with `docs/design-system/`) tells the main session to delegate a review after view changes, before committing or opening a PR.
+- **Code by default, screenshots on request:** give it a running dev server URL and ask for a visual check, and it screenshots the affected pages at desktop and phone width with `agent-browser` to compare frames and spacing.
+- **Sweep mode:** maintenance runs dispatch it per section to find convention and frame drift across the whole app.
+
 ## Install
 
 ```

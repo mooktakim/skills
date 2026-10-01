@@ -1,5 +1,5 @@
 {
-  "description": "rails-design-system: weekly notice when a project's design system is due a maintenance run",
+  "description": "rails-design-system: weekly maintenance notice, and when to delegate to the design-reviewer agent",
   "hooks": {
     "SessionStart": [
       {
@@ -9,6 +9,16 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/maintenance-nudge.sh\"",
             "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/reviewer-context.sh\"",
+            "timeout": 10
           }
         ]
       }

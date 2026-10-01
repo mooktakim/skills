@@ -23,7 +23,7 @@ Browse everything interactively with `/plugin`.
 | Skill | Domain | What it does |
 |-------|--------|--------------|
 | [`rails-context`](rails-context/) | Rails | Sets up per-directory `CLAUDE.md` context files across a Rails app (MVC Context — Model, View, Controller, plus Context), with `AGENTS.md` symlinks and drift-audit tooling. |
-| [`rails-design-system`](rails-design-system/) | Rails | Codifies a Rails app's UI into per-section design-system docs (role tokens, component specs, page patterns) on Tailwind v4, with drift auditing and edit-time enforcement. |
+| [`rails-design-system`](rails-design-system/) | Rails | Codifies a Rails app's UI into per-section design-system docs (role tokens, component specs, page patterns) on Tailwind v4, with drift auditing, edit-time enforcement, and a design-reviewer agent. |
 | [`rails-specialists`](rails-specialists/) | Rails | Ships a team of ten Rails specialist agents (models, Hotwire, tests, jobs, debugging, review, security, performance, deploy, upgrades) that detect the project's stack and follow its conventions. |
 
 Each skill directory has its own README with full details.
