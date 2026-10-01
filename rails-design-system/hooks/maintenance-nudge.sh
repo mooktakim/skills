@@ -14,25 +14,21 @@ stamp="$data/nudge-$(printf '%s' "$root" | shasum | cut -c1-16)"
 
 out=$("$audit" 2>/dev/null) || exit 0
 findings=$(awk -F': ' '/^== / { n += $NF } END { print n + 0 }' <<<"$out")
-skill="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}/SKILL.md"
+plugin="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"
 script_outdated=0
-if [ -f "$skill" ]; then
-  current=$(awk '/^```bash$/ { b = ""; inb = 1; next }
-    inb && /^```$/ { inb = 0; if (b ~ /Report design drift/) { printf "%s", b; exit } }
-    inb { b = b $0 "\n" }' "$skill")
-  [ -n "$current" ] && [ "$current" != "$(cat "$audit")" ] && script_outdated=1
-fi
-settings="$root/.claude/settings.json"
-hooks_outdated=0
-if [ ! -f "$settings" ] || ! grep -q 'CLAUDE_PROJECT_DIR.*audit_design --stop' "$settings" \
-   || grep -q '"bin/audit_design --hook"' "$settings"; then
-  hooks_outdated=1
-fi
+[ -f "$plugin/scripts/audit_design" ] && ! cmp -s "$plugin/scripts/audit_design" "$audit" && script_outdated=1
+# The plugin ships the enforcement hooks now; entries an older skill version wrote
+# into the project settings would run the checks twice (or fail from subfolders).
+legacy_hooks=0
+grep -qs 'audit_design' "$root/.claude/settings.json" && legacy_hooks=1
+no_ci=0
+grep -rqs 'audit_design' "$root/config/ci.rb" "$root/.github/workflows" || no_ci=1
 
 reasons=()
 [ "$findings" -gt 0 ] && reasons+=("bin/audit_design reports $findings finding(s)")
 [ "$script_outdated" -eq 1 ] && reasons+=("bin/audit_design differs from the installed skill version")
-[ "$hooks_outdated" -eq 1 ] && reasons+=("the enforcement hooks in .claude/settings.json are missing or outdated")
+[ "$legacy_hooks" -eq 1 ] && reasons+=("old audit_design hooks in .claude/settings.json duplicate the plugin's own")
+[ "$no_ci" -eq 1 ] && reasons+=("bin/audit_design is not run in CI")
 [ ${#reasons[@]} -eq 0 ] && exit 0
 
 touch "$stamp"

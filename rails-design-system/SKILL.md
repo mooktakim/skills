@@ -1,6 +1,6 @@
 ---
 name: rails-design-system
-description: Set up and maintain a design-system context repository at docs/design-system/ in a Rails app using Tailwind CSS v4. Detects the app's UI sections (admin, marketing, app...), then generates per-section role-token definitions, component specs, and page-pattern specs, plus a bin/audit_design drift script and an edit-time enforcement hook. Re-runnable, an app already set up gets maintenance - drift review, gap-fill - through the same approval gate. Use when asked to set up a design system, codify styles or UI conventions, keep views visually consistent, spec a component library, standardise a UI rule across every page, or audit design drift.
+description: Set up and maintain a design-system context repository at docs/design-system/ in a Rails app using Tailwind CSS v4. Detects the app's UI sections (admin, marketing, app...), then generates per-section role-token definitions, component specs, and page-pattern specs, plus a bin/audit_design drift script, edit-time enforcement hooks, and a CI check. Re-runnable, an app already set up gets maintenance - drift review, gap-fill - through the same approval gate. Use when asked to set up a design system, codify styles or UI conventions, keep views visually consistent, spec a component library, standardise a UI rule across every page, or audit design drift.
 ---
 
 # Rails Design System
@@ -63,8 +63,8 @@ Delegate steps 1-4 to one read-only subagent when the environment provides subag
 
 Re-running on an app that already has `docs/design-system/` is maintenance, not a rewrite. The survey then also covers the existing docs, and the Phase 1 plan proposes six kinds of work:
 
-- **Gap-fill**: newly detected sections; components or patterns now in use but unspecced; missing or outdated enforcement wiring (the hooks in `.claude/settings.json` must match Phase 3 of this skill version - an older entry with the relative command `bin/audit_design --hook` fails from subfolders and gets replaced; a gitignored `.claude/settings.json` gets reported, as in Phase 3).
-- **Drift review**: run `bin/audit_design` (if it is missing or differs from the script in Phase 3 of this skill version, create or update it first, then run the Phase 3 smoke test). Each finding becomes a proposed fix - retokenise the view, or add a missing token to the section's `tokens.md` - never a silent skip.
+- **Gap-fill**: newly detected sections; components or patterns now in use but unspecced; missing or outdated enforcement wiring: `audit_design` entries an older version of this skill wrote into `.claude/settings.json` get removed (the plugin ships the hooks now, so they would run twice), and a missing CI step gets added as in Phase 3.
+- **Drift review**: run `bin/audit_design` (if it is missing or differs from `scripts/audit_design` in this skill, copy it over first, then run the Phase 3 smoke test; an older copy that someone customised by hand gets its customisations moved into `vendor-paths` or `audit-rules`, and I approve that move). Each finding becomes a proposed fix - retokenise the view, or add a missing token to the section's `tokens.md` - never a silent skip.
 - **Promotion**: the same one-off markup repeated in a section's views becomes a proposed component spec in that section's library; a design-reviewer finding that recurs and that a regular expression catches reliably becomes a proposed `docs/design-system/audit-rules` line (the agent reports these under "Promote to the audit").
 - **Conventions and frames**: rules the views now follow consistently, or that I stated since the last run (look for repeated corrections in recent commits), but `conventions.md` lacks; views that break a recorded convention; page patterns that restate the frame instead of naming it. Find them with the `design-reviewer` agent this plugin ships: one agent per section in sweep mode, dispatched during the survey and counted in the plan's fan-out. Propose each fix across every section at once.
 - **Spec-vs-realized drift**: read each spec's "Realized as" file; where code and spec contradict, propose which side changes - never let them disagree silently.
@@ -112,180 +112,15 @@ a rule for docs/design-system/audit-rules so the hooks enforce it from then on.
 When a change adds or alters a documented pattern, update the affected spec
 in the same commit. If a needed
 component has no spec, spec it first rather than hand-rolling a one-off.
-bin/audit_design reports drift, and Claude Code hooks (bin/audit_design
---hook after each edit, --stop before each turn ends) block token violations
-in new code; a periodic design-system maintenance run works through what the
+bin/audit_design reports drift. The rails-design-system plugin's hooks block
+violations in new code after each edit and before each turn ends, and CI runs
+the audit too; a periodic design-system maintenance run works through what the
 audit flags.
 ```
 
-2. Create `bin/audit_design` with this content:
+2. Copy the audit script this skill ships into the app: `cp "${CLAUDE_SKILL_DIR}/scripts/audit_design" bin/audit_design` (`${CLAUDE_SKILL_DIR}` is this skill's directory; resolve it yourself if the variable is not expanded). Copy it unchanged - project-specific behaviour lives in data files the script reads (`docs/design-system/vendor-paths`, `docs/design-system/audit-rules`), never in edits to the script, so every app runs the same checks and an outdated copy is a plain file difference. Read the script's header comment: it documents the modes.
 
-```bash
-#!/usr/bin/env bash
-# Report design drift: colours and utilities that bypass the design-system tokens,
-# plus the project rules in docs/design-system/audit-rules (see below).
-# Works from any directory: paths always resolve from the repo root.
-# Findings are drift signals to review, not proof of defects.
-# Mark a deliberate exception by putting "design-ok" on the same line.
-# Mailer templates are exempt: email clients require inline styles.
-# Modes:
-#   bin/audit_design         scan the app and report; always exits 0
-#   bin/audit_design --hook  Claude Code PostToolUse hook (Write|Edit): reads the
-#                            tool-call JSON from stdin and checks the edited file
-#   bin/audit_design --stop  Claude Code Stop/SubagentStop hook: checks every view
-#                            file changed in the working tree, which catches edits
-#                            made through Bash, generators, or subagents
-# Both hook modes check only lines added since HEAD (the whole file if untracked),
-# so old drift elsewhere in a file never blocks an unrelated edit. They exit 2
-# with findings on stderr so the agent fixes them before moving on.
-set -euo pipefail
-orig=$PWD
-cd "$(dirname "$0")/.."
-root=$PWD
-# A hex colour never follows a letter, digit, "_", "-", "." or "&": "cart#add" is a
-# Stimulus action, "this.#fade" a private JS field, "&#123;" an HTML entity.
-HEX='(^|[^0-9a-zA-Z_.&-])#([0-9a-fA-F]{6}|[0-9a-fA-F]{8}|[0-9a-fA-F]{3,4})([^0-9a-zA-Z_-]|$)'
-# Arbitrary values: w-[260px], bg-[var(--x)], and the v4 shorthand bg-(--x). A
-# bracket followed by ":" (or "/name:") is a variant selector such as
-# data-[state=open]: - Tailwind grammar, not a value - and passes.
-ARB='[a-z][a-z0-9:-]*-(\[[^]]+\]|\(--[^)]+\))([^:/]|/[0-9]|$)'
-PAL='(bg|text|border|ring|divide|outline|fill|stroke|from|via|to|accent|decoration|placeholder|caret|shadow)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}'
-# Sections on the External library model: palette classes are allowed under the
-# path prefixes listed in docs/design-system/vendor-paths (one per line, # comments).
-VENDOR=""
-if [ -f docs/design-system/vendor-paths ]; then
-  VENDOR=$(grep -vE '^[[:space:]]*(#|$)' docs/design-system/vendor-paths \
-    | sed 's/[.[\*^$]/\\&/g; s/^/^/' | paste -sd'|' - || true)
-fi
-vendor() { [ -n "$VENDOR" ] && printf '%s\n' "$1" | grep -qE "$VENDOR"; }
-# Project rules promoted from design reviews: docs/design-system/audit-rules, one
-# per line as "<label> :: <extended regex>" (# comments). They apply in every mode
-# and section; "design-ok" on a line exempts it, as for the built-in checks.
-RULE_LABELS=(); RULE_RES=()
-if [ -f docs/design-system/audit-rules ]; then
-  while IFS= read -r line || [ -n "$line" ]; do
-    line="${line#"${line%%[![:space:]]*}"}"
-    case "$line" in ''|'#'*) continue ;; esac
-    label=${line%% :: *}; rule=${line#* :: }
-    [ "$label" != "$line" ] || { echo "audit-rules: no \" :: \" in \"$line\" - skipped" >&2; continue; }
-    rc=0; grep -qE "$rule" </dev/null 2>/dev/null || rc=$?
-    [ "$rc" -ne 2 ] || { echo "audit-rules: invalid regex for \"$label\" - skipped" >&2; continue; }
-    RULE_LABELS+=("$label"); RULE_RES+=("$rule")
-  done < docs/design-system/audit-rules
-fi
-
-in_scope() { # in_scope <repo-relative path>
-  case "$1" in
-    *_mailer/*|*layouts/mailer*|*tokens*.css|*theme*.css) return 1 ;;
-    app/views/*|app/components/*|app/frontend/*|app/javascript/*|app/assets/stylesheets/*) ;;
-    *) return 1 ;;
-  esac
-  case "$1" in
-    *.erb|*.haml|*.slim|*.html|*.rb|*.css|*.js) return 0 ;;
-    *) return 1 ;;
-  esac
-}
-
-added_lines() { # added_lines <repo-relative path>: "<line>: <text>" per line added since HEAD
-  if git rev-parse -q --verify HEAD >/dev/null 2>&1 && git cat-file -e "HEAD:$1" 2>/dev/null; then
-    git diff -U0 HEAD -- "$1" | awk '
-      /^@@/ { split($3, a, ","); n = substr(a[1], 2) + 0; hunk = 1; next }
-      hunk && /^\+/ { print n ": " substr($0, 2); n++ }'
-  else
-    grep -n '' -- "$1" | sed 's/:/: /'
-  fi
-}
-
-added_findings() { # added_findings <repo-relative path>: violating lines added since HEAD
-  local re="($HEX|$ARB|$PAL)" lines i=0
-  vendor "$1" && re="($HEX|$ARB)"
-  lines=$(added_lines "$1" | grep -v 'design-ok' || true)
-  [ -n "$lines" ] || return 0
-  printf '%s\n' "$lines" | grep -E "$re" | awk -v p="  $1:" '{ print p $0 }' || true
-  while [ "$i" -lt "${#RULE_RES[@]}" ]; do
-    printf '%s\n' "$lines" | grep -E "${RULE_RES[$i]}" \
-      | awk -v p="  $1:" -v l="   [rule: ${RULE_LABELS[$i]}]" '{ print p $0 l }' || true
-    i=$((i + 1))
-  done
-}
-
-block() { # block <findings>
-  {
-    echo "Design-system drift in the lines just written:"
-    printf '%s\n' "$1"
-    echo "Untagged lines break the token rule (no raw hex, no literal palette classes, no arbitrary [...] values): use the section's role tokens (see docs/design-system/)."
-    case "$1" in *"[rule: "*) echo "Lines tagged [rule: ...] break a project rule in docs/design-system/audit-rules: follow the spec it names." ;; esac
-    echo "For a deliberate exception, put design-ok on that line."
-  } >&2
-  exit 2
-}
-
-if [ "${1:-}" = "--hook" ]; then
-  file=$(ruby -rjson -e 'puts JSON.parse($stdin.read).dig("tool_input", "file_path").to_s' 2>/dev/null || true)
-  [ -n "$file" ] || exit 0
-  case "$file" in /*) ;; *) file="$orig/$file" ;; esac
-  rel=${file#"$root"/}
-  [ "$rel" = "$file" ] && rel=${file#"$(pwd -P)"/}
-  { [ -f "$rel" ] && in_scope "$rel"; } || exit 0
-  out=$(added_findings "$rel")
-  [ -z "$out" ] || block "$out"
-  exit 0
-fi
-
-if [ "${1:-}" = "--stop" ]; then
-  # stop_hook_active means the agent was already sent back once: never loop.
-  if grep -qE '"stop_hook_active" *: *true'; then exit 0; fi
-  out=""
-  while IFS= read -r rel; do
-    { [ -f "$rel" ] && in_scope "$rel"; } || continue
-    found=$(added_findings "$rel")
-    [ -z "$found" ] || out+="$found"$'\n'
-  done < <({ git diff --name-only HEAD 2>/dev/null || true; git ls-files --others --exclude-standard; } | sort -u)
-  [ -z "$out" ] || block "${out%$'\n'}"
-  exit 0
-fi
-
-dirs=()
-for d in app/views app/components app/frontend app/javascript app/assets/stylesheets; do
-  [ -d "$d" ] && dirs+=("$d")
-done
-[ ${#dirs[@]} -eq 0 ] && { echo "No view directories found."; exit 0; }
-total=0
-scan() { # scan <label> <extended-regex> [skip-vendor]
-  local label=$1 re=$2 skip=${3:-} out count=0
-  out=$(grep -rInE \
-        --include='*.erb' --include='*.haml' --include='*.slim' --include='*.html' \
-        --include='*.rb' --include='*.css' --include='*.js' \
-        "$re" "${dirs[@]}" 2>/dev/null \
-        | grep -v 'design-ok' \
-        | grep -vE '_mailer/|/layouts/mailer' \
-        | grep -vE '(^|/)(tokens|theme)[^/]*\.css:' || true)
-  if [ -n "$skip" ] && [ -n "$VENDOR" ] && [ -n "$out" ]; then
-    out=$(printf '%s\n' "$out" | grep -vE "$VENDOR" || true)
-  fi
-  [ -n "$out" ] && count=$(printf '%s\n' "$out" | wc -l | tr -d ' ')
-  total=$((total + count))
-  echo "== $label: $count"
-  [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/   /'
-  echo
-}
-scan "raw hex colours" "$HEX"
-scan "arbitrary values" "$ARB"
-scan "literal palette classes" "$PAL" skip-vendor
-i=0
-while [ "$i" -lt "${#RULE_RES[@]}" ]; do
-  scan "rule: ${RULE_LABELS[$i]}" "${RULE_RES[$i]}"
-  i=$((i + 1))
-done
-if [ "$total" -eq 0 ]; then
-  echo "No drift detected."
-else
-  echo "Fix findings by retokenising the view or adding a token to the section's tokens.md."
-  echo "Never quiet a finding by weakening this script; mark deliberate exceptions with design-ok."
-fi
-```
-
-3. Make the script executable and prove it works before any hook points at it. A hook wired to a missing or non-executable script fails on every edit. Run this from the repo root; it exercises both hook modes from a subfolder, the way the harness will call them, and removes its test file:
+3. Make the script executable and prove it works. Run this from the repo root; it exercises both hook modes from a subfolder, the way the harness calls them, and removes its test file:
 
 ```bash
 chmod +x bin/audit_design
@@ -300,32 +135,15 @@ rm "$f"
 
 Any result other than the expected one: stop, find the cause, and fix it before step 4. Report the three results in Phase 4.
 
-4. Wire generation-time enforcement: add these hooks to the app's `.claude/settings.json` (create the file if missing; if it exists, merge the entries without duplicating them and without touching unrelated hooks; replace any older `bin/audit_design --hook` entry that uses a relative command):
+4. Enforcement needs no wiring: this plugin ships the hooks. In every session, in any app with `docs/design-system/README.md`, the plugin runs its own copy of `audit_design` against the project - after each Write/Edit (`--hook`), and before each turn and subagent ends (`--stop`), which catches views written through Bash, heredocs, `sed -i`, or generators that no tool matcher sees. Both modes check only lines added since HEAD, and a violation goes back to the agent as a blocking error, so it gets fixed before the work is handed back - even by an agent that never read the context files. Because the plugin runs its own copy, a fix to the checks reaches every app when the plugin updates. Do not add audit hooks to `.claude/settings.json`; if an older version of this skill put `audit_design` entries there, remove them (and only them), or the checks run twice.
 
-```json
-{
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/bin/audit_design --hook" }]
-      }
-    ],
-    "Stop": [
-      { "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/bin/audit_design --stop" }] }
-    ],
-    "SubagentStop": [
-      { "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/bin/audit_design --stop" }] }
-    ]
-  }
-}
-```
+5. Wire the audit into CI, so drift from people and other tools is caught too, and teammates without the plugin are covered. Pick the mode from the full audit result:
+   - Audit clean (0 findings): `bin/audit_design --strict` - any drift anywhere fails.
+   - Old drift remains: `bin/audit_design --changed <default branch>` - only lines a branch adds must be clean, so the backlog never blocks a merge while it shrinks. Switch to `--strict` once the audit reaches 0.
 
-The harness runs hooks in the session's current directory, which moves whenever the agent `cd`s, so the command must be anchored on `$CLAUDE_PROJECT_DIR` - a relative `bin/audit_design` fails from any subfolder. The PostToolUse hook checks each Write/Edit the moment it lands. Agents also write views through Bash (heredocs, `sed -i`, scripts) and generators, which no tool matcher sees, so the Stop and SubagentStop hooks check every changed view file in the working tree before a turn ends. Both modes check only lines added since HEAD, and a violation is fed back to the agent as a blocking error, so it gets fixed before the work is handed back - even by an agent that never read the context files.
+   Add it as a step in `config/ci.rb` (`step "Design: token audit", "bin/audit_design --strict"`) when the app has one, and as a step in the GitHub Actions `lint` job (or the closest equivalent) when the app has `.github/workflows/`; `--changed` there needs `fetch-depth: 0` on the checkout step. Other CI systems: propose the step and let me place it. List the CI edits in the Phase 1 plan like any other file.
 
-`bin/audit_design` also enforces project rules from `docs/design-system/audit-rules`, one per line as `<label> :: <extended regex>` - for example `no gradients (app/design.md) :: (^|[^a-z-])bg-(gradient|linear|radial|conic)-`. Do not create the file on a first run; rules arrive by promotion, from design-reviewer findings that recur. Only add a rule whose regex matches the violations and nothing legitimate in the current code, and name the spec rule it enforces in its label. Keeping rules in a data file keeps the script itself identical across apps.
-
-Then run `git check-ignore -q .claude/settings.json`. If it succeeds, the file is gitignored and the hooks exist only on this machine - no teammate, worktree, or fresh clone gets them. Tell me, and propose un-ignoring it (a `!.claude/settings.json` line in `.gitignore`); never change `.gitignore` without my approval.
+`bin/audit_design` also enforces project rules from `docs/design-system/audit-rules`, one per line as `<label> :: <extended regex>` - for example `no gradients (app/design.md) :: (^|[^a-z-])bg-(gradient|linear|radial|conic)-`. Do not create the file on a first run; rules arrive by promotion, from design-reviewer findings that recur. Only add a rule whose regex matches the violations and nothing legitimate in the current code, and name the spec rule it enforces in its label.
 
 Do not create any slash command for auditing: re-running this skill IS the audit (see "Re-runs: maintenance mode").
 
