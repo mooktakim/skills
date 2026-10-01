@@ -141,8 +141,10 @@ Then create `bin/audit_context` (chmod +x) with this content:
 ```bash
 #!/usr/bin/env bash
 # Report drift between CLAUDE.md context files and the code they describe.
-# Run from the repo root. Output is a drift SIGNAL, not proof of staleness.
+# Works from any directory: paths always resolve from the repo root.
+# Output is a drift SIGNAL, not proof of staleness.
 set -euo pipefail
+cd "$(dirname "$0")/.."
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "not a git repo" >&2; exit 1; }
 found=0; drift=0
 while IFS= read -r legacy; do
