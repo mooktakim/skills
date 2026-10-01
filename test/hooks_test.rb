@@ -121,6 +121,71 @@ class HooksTest < Minitest::Test
     refute_includes message, "differs"
   end
 
+  # -- rails-context: the context reach log and report -----------------------
+
+  def log_event(mode, session, extra = {})
+    hook("rails-context", "log-context.sh", mode, stdin: JSON.generate({ "session_id" => session }.merge(extra)))
+  end
+
+  def report(*args)
+    out, err, status = Open3.capture3(ruby_bin, File.join(REPO, "rails-context/scripts/context_report"), *args, chdir: path("app"))
+    Result.new(out, err, status)
+  end
+
+  def context_app
+    install "rails-context", "audit_context"
+    write "CLAUDE.md", "# root\n"
+    write "app/models/CLAUDE.md", "# models\n"
+    write "app/services/CLAUDE.md", "# services\n"
+    write "app/helpers/CLAUDE.md", "# helpers\n"
+    write "app/models/user.rb", "class User; end\n"
+    write "app/services/pay.rb", "class Pay; end\n"
+    commit "init"
+  end
+
+  def test_context_log_is_silent_without_rails_context
+    write "README", "x"
+    commit
+    log_event("start", "s1")
+    refute File.exist?(path(".git/claude-context-log.jsonl"))
+  end
+
+  def test_context_report_measures_reach_and_the_coverage_gap
+    context_app
+    assert_includes report.out, "No context log yet"
+
+    # Session 1 changes models (reached by a nested load) and services (never reached).
+    log_event("start", "s1")
+    log_event("load", "s1", "file_path" => path("CLAUDE.md"), "load_reason" => "session_start")
+    log_event("load", "s1", "file_path" => path("app/models/CLAUDE.md"), "load_reason" => "nested_traversal",
+                            "trigger_file_path" => path("app/models/user.rb"))
+    append "app/models/user.rb", "# edit\n"          # an edit by any tool, e.g. sed -i
+    write "app/services/refund.rb", "class Refund; end\n" # an untracked new file
+    log_event("stop", "s1")
+    log_event("stop", "s1") # an unchanged turn writes nothing new
+    commit "work"
+
+    # Session 2 reads the services file on purpose (via its AGENTS.md symlink path), then changes it.
+    log_event("start", "s2")
+    log_event("read", "s2", "tool_input" => { "file_path" => path("app/services/AGENTS.md") })
+    log_event("read", "s2", "tool_input" => { "file_path" => path("app/services/pay.rb") }) # not a context file
+    append "app/services/pay.rb", "# edit\n"
+    log_event("stop", "s2")
+
+    lines = File.readlines(path(".git/claude-context-log.jsonl"))
+    assert_equal 1, lines.count { |line| line.include?('"s":"s1","e":"changed"') }, "unchanged turns are not logged twice"
+    assert_equal 1, lines.count { |line| line.include?('"e":"read"') }
+
+    out = report.out
+    assert_includes out, "Context reach - 2 session(s)"
+    assert_match(%r{app/services/CLAUDE.md\s+2\s+1\s+1\s+read 1}, out)
+    assert_match(%r{app/models/CLAUDE.md\s+1\s+1\s+0\s+nested 1}, out)
+    assert_includes out, "Never reached Claude: app/helpers/CLAUDE.md"
+    assert_includes out, "Root CLAUDE.md: 1 KB, loaded in 1 of 2 session(s)."
+    assert_includes out, "Gap = sessions that changed code"
+    assert_includes report("--days", "0").out, "No sessions logged"
+  end
+
   # -- capture: the correction hint ------------------------------------------
 
   def prompt_hint(prompt)

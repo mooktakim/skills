@@ -1,0 +1,114 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Report whether context files reach Claude where it works, from the local log
+# that the rails-context plugin's hooks write (.git/claude-context-log.jsonl).
+# Plain Ruby, standard library only (Ruby 2.6+). Run it from anywhere inside the
+# project: context_report [--days N] (default: the last 30 days).
+#
+# For each directory context file it shows:
+#   Worked   sessions that changed code the file owns (by any tool, Bash included)
+#   Reached  sessions where the file reached Claude - loaded automatically
+#            (nested, path rule, include, after compaction) or read on purpose
+#   Gap      worked minus reached: sessions that changed this code without its
+#            context file reaching Claude - the number that matters
+# A code file is owned by the nearest context file above it; the root CLAUDE.md
+# loads in every session, so it is listed for its size cost only.
+
+require "json"
+require "time"
+
+days = 30
+if (index = ARGV.index("--days"))
+  days = Integer(ARGV[index + 1]) rescue abort("usage: context_report [--days N]")
+end
+
+root = IO.popen(%w[git rev-parse --show-toplevel], err: File::NULL, &:read).strip
+abort "Run this inside the project's git repository." if root.empty?
+Dir.chdir(root)
+git_dir = IO.popen(%w[git rev-parse --git-common-dir], err: File::NULL, &:read).strip
+log = File.expand_path("claude-context-log.jsonl", git_dir)
+
+unless File.file?(log)
+  puts "No context log yet (#{log})."
+  puts "The rails-context plugin's hooks start it in sessions after the plugin is installed or updated."
+  exit 0
+end
+
+since = Time.now - days * 86_400
+events = File.foreach(log).map { |line| JSON.parse(line) rescue nil }.compact
+events.select! { |event| (Time.parse(event["t"].to_s) rescue Time.at(0)) >= since }
+
+# The directory context file a logged path stands for (AGENTS.md is its symlink).
+def context_for(path)
+  path = path.to_s.sub(%r{(\A|/)AGENTS\.md\z}, '\1CLAUDE.md')
+  path.end_with?("CLAUDE.md") ? path : nil
+end
+
+contexts = (%w[app lib test spec].select { |dir| File.directory?(dir) }
+             .flat_map { |dir| Dir.glob("#{dir}/**/CLAUDE.md") }
+             .select { |path| File.file?(path) && !File.symlink?(path) }).sort
+owned_dirs = contexts.map { |path| File.dirname(path) }.sort_by { |dir| -dir.length }
+
+def owner(file, owned_dirs)
+  dir = owned_dirs.find { |candidate| file.start_with?("#{candidate}/") }
+  dir && "#{dir}/CLAUDE.md"
+end
+
+sessions = Hash.new { |hash, id| hash[id] = { reached: Hash.new { |h, k| h[k] = [] }, changed: [], times: [] } }
+events.each do |event|
+  session = sessions[event["s"].to_s]
+  session[:times] << event["t"]
+  case event["e"]
+  when "load"
+    (file = context_for(event["f"])) && session[:reached][file] << event["r"].to_s
+  when "read"
+    (file = context_for(event["f"])) && session[:reached][file] << "read"
+  when "changed"
+    session[:changed] |= Array(event["files"])
+  end
+end
+sessions.reject! { |_, session| session[:reached].empty? && session[:changed].empty? }
+
+if sessions.empty?
+  puts "No sessions logged in the last #{days} days."
+  exit 0
+end
+
+times = sessions.values.flat_map { |session| session[:times] }.sort
+puts "Context reach - #{sessions.size} session(s), #{times.first[0, 10]} to #{times.last[0, 10]} (last #{days} days)"
+puts ""
+
+rows = contexts.map do |context|
+  worked = sessions.values.count do |session|
+    session[:changed].any? { |file| !file.end_with?("CLAUDE.md", "AGENTS.md") && owner(file, owned_dirs) == context }
+  end
+  reached_sessions = sessions.values.select { |session| session[:reached].key?(context) }
+  gap = sessions.values.count do |session|
+    !session[:reached].key?(context) &&
+      session[:changed].any? { |file| !file.end_with?("CLAUDE.md", "AGENTS.md") && owner(file, owned_dirs) == context }
+  end
+  how = reached_sessions.flat_map { |session| session[:reached][context].uniq }
+                        .group_by(&:itself).map { |reason, list| "#{reason.sub('nested_traversal', 'nested').sub('path_glob_match', 'path rule')} #{list.size}" }
+  [context, worked, reached_sessions.size, gap, how.join(", "), File.size(context)]
+end
+
+width = [rows.map { |row| row[0].length }.max.to_i, 4].max
+puts format("%-#{width}s  %6s  %7s  %3s  %-24s  %s", "File", "Worked", "Reached", "Gap", "How it reached", "Size")
+rows.sort_by { |row| [-row[3], row[0]] }.each do |file, worked, reached, gap, how, size|
+  puts format("%-#{width}s  %6d  %7d  %3d  %-24s  %d KB", file, worked, reached, gap, how.empty? ? "-" : how, (size / 1024.0).ceil)
+end
+
+if File.file?("CLAUDE.md")
+  root_loads = sessions.values.count { |session| session[:reached].key?("CLAUDE.md") }
+  puts "", "Root CLAUDE.md: #{(File.size('CLAUDE.md') / 1024.0).ceil} KB, loaded in #{root_loads} of #{sessions.size} session(s)."
+end
+
+never = rows.select { |row| row[2].zero? }.map(&:first)
+puts "", "Never reached Claude: #{never.join(', ')}" unless never.empty?
+gaps = rows.select { |row| row[3].positive? }
+if gaps.empty?
+  puts "", "No coverage gap: every session that changed code had its context file reach Claude."
+else
+  puts "", "Gap = sessions that changed code in the directory without its context file reaching Claude."
+end
