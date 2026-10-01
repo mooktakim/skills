@@ -37,7 +37,7 @@ Inventory goes stale the moment anyone adds a file, and a stale context file is 
 
 ## Size discipline
 
-Aim for 30-100 lines per `CLAUDE.md`. The limit is a density check, not a token budget: a directory file loads only for work inside that directory, so length is cheap - but every line competes for the agent's attention, so padding is not, and growth is usually the first sign of inventory creep.
+Aim for 30-100 lines per `CLAUDE.md`. The limit is a density check, not a token budget: a directory file loads only when a file inside that directory is read, so length is cheap - but every line competes for the agent's attention, so padding is not, and growth is usually the first sign of inventory creep.
 
 A file may grow past 100 lines only after passing this checklist:
 
@@ -51,7 +51,9 @@ The root `CLAUDE.md` is different: it loads in every session, so its size is a r
 
 ## One fact, one level
 
-Context files form a chain — root → `app/<dir>/` → nested namespace — and agents load every file on the path down to where they're working. So every fact lives at exactly one level: the most specific level it applies to. A directory file never repeats the root; a nested file never repeats its parent. And it works upward too: when a more specific file exists (or gets created), the parent sheds whatever it covers, keeping only a one-line pointer ("`cloudflare/` — Cloudflare API wrapper; see its CLAUDE.md"). Deeper means more specific and shorter. A file restating something from another level is duplicate context, and duplicates drift.
+Context files form a chain - root → `app/<dir>/` → nested namespace - and an agent working deep in the tree ends up with every file on that path in context. So every fact lives at exactly one level: the most specific level it applies to. A directory file never repeats the root; a nested file never repeats its parent. And it works upward too: when a more specific file exists (or gets created), the parent sheds whatever it covers, keeping only a one-line pointer ("`cloudflare/` — Cloudflare API wrapper; see its CLAUDE.md"). Deeper means more specific and shorter. A file restating something from another level is duplicate context, and duplicates drift.
+
+How the chain loads matters. Claude Code loads the root `CLAUDE.md` at session start, but a directory's `CLAUDE.md` only when Claude reads a file in that directory with its Read tool. Shell reads (`cat`, `grep`), shell edits (`sed -i`, heredocs, scripts), and a new file written into a directory nothing was read from do not load it - and agents do much of their work through the shell. So the root block (Phase 3) tells agents to read the directory's context files before changing code there; never rely on automatic loading alone.
 
 ## Phase 1: Survey and plan
 
@@ -115,7 +117,7 @@ If an ancestor file (the root included) already states a fact the new file now o
 
 ### Nested context files
 
-Agents load the full chain of context files down to the directory they're working in (root → `app/services/` → `app/services/cloudflare/`), so a nested file contains ONLY the delta from its ancestors — never repeat a parent or root convention; duplication is drift waiting to happen. Keep nested files shorter (10-60 lines). Their value is the knowledge the code cannot show: the external system's auth model and rate limits, environment differences (sandbox vs live), invariants ("zone ids are cached at boot; never fetch per request"), known failure modes and how the app expects them handled. The same rules apply as everywhere else: intent not inventory, `AGENTS.md` symlink beside it, and the audit script picks nested files up automatically.
+An agent working in a nested directory gets the full chain of context files down to it (root → `app/services/` → `app/services/cloudflare/`), so a nested file contains ONLY the delta from its ancestors — never repeat a parent or root convention; duplication is drift waiting to happen. Keep nested files shorter (10-60 lines). Their value is the knowledge the code cannot show: the external system's auth model and rate limits, environment differences (sandbox vs live), invariants ("zone ids are cached at boot; never fetch per request"), known failure modes and how the app expects them handled. The same rules apply as everywhere else: intent not inventory, `AGENTS.md` symlink beside it, and the audit script picks nested files up automatically.
 
 "One fact, one level" applies with force here: creating a nested file where the parent already covers the namespace means moving that content down and slimming the parent to a one-line pointer, in the same commit.
 
@@ -127,7 +129,10 @@ Append this block to the root context file (adapt wording to fit, keep the subst
 ## Context files (MVC Context)
 
 Directories under app/, lib/, and the test suite carry their own CLAUDE.md
-(symlinked as AGENTS.md) describing local conventions. After changing code, before finishing the task,
+(symlinked as AGENTS.md) describing local conventions. Before changing code
+in a directory, read its CLAUDE.md and those of its parents up to app/ - they
+load automatically only when a file there is read with the Read tool, not
+through shell commands. After changing code, before finishing the task,
 check each directory you touched that has a CLAUDE.md and ask: did this change
 introduce a new pattern, break a documented one, or add a new namespace or
 convention? If yes, update that CLAUDE.md surgically - edit the affected lines
