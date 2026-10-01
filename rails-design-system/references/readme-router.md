@@ -6,7 +6,7 @@ Read this immediately before writing the top-level `README.md`. It is the router
 
 - **Protocol**: the ordered steps for building or changing a view - identify the section, read its `tokens.md` and the relevant `components/` and `patterns/` specs before writing markup, compose token-only, spec missing pieces before hand-rolling, update the spec with the change, run `bin/audit_design`.
 - **The one rule**: token utilities only - one line, since the root CLAUDE.md block and the specs carry the detail.
-- **Independence**: one line - sections never share tokens or code.
+- **Sharing model**: one line naming the model chosen in the Phase 1 plan - islands (sections share nothing), shared foundation (sections build on `shared/`), or which sections use an external library as-is (their paths are in `vendor-paths`). Maintenance runs and future agents read it from here.
 - **Index**: one row per section - name, audience, layout(s) it owns, path.
 
 ## Target shape (fictional excerpt - copy the density, never the content)
@@ -27,7 +27,7 @@ The standard every view is built against.
 5. If the change alters a documented pattern, update the spec in the same
    commit. `bin/audit_design` reports drift.
 
-Sections are independent: nothing is shared between them.
+Sharing model: islands - sections share nothing.
 
 ## Sections
 | Section | Audience | Layouts | Docs |

@@ -20,7 +20,7 @@ Plus, outside `docs/`: a design-system block in the root `CLAUDE.md` so agents l
 
 ## Philosophy
 
-- **Sections are islands.** Admin and marketing never share tokens or components; a section's component library is its only shared code. Duplication between sections is fine - coupling is the bug.
+- **Sections share only what you choose.** By default sections are islands: admin and marketing never share tokens or components, and duplication between them is fine - coupling is the bug. When every section is built on one component library or brand, the plan can instead propose a *shared foundation* (`shared/` tokens and components that sections build on), and a single section can adopt an *external library* as-is (its palette classes allowed on its paths only). The choice is made once in the plan and recorded in the design system's README; maintenance runs respect it.
 - **Three tiers, one direction.** Tokens feed components; components compose into patterns; patterns build views. Small pieces with closed contracts build larger ones.
 - **Tokens or nothing.** Views use role-token utilities only - never raw hex, palette classes, or arbitrary values. That one rule makes drift mechanically detectable: the audit is three greps.
 - **Specs, not code.** Recipes are pure HTML + Tailwind, view-layer neutral. Bundled adapter guides translate contracts into ERB partials, ViewComponents, or Phlex classes when the app uses them.

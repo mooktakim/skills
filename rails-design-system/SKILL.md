@@ -11,11 +11,17 @@ This skill is re-runnable. The first run on an app sets everything up; every lat
 
 The approval gate is a hard stop. Write nothing, add no gem, and dispatch no generation agent until I approve this run's Phase 1 plan in a reply to that plan: "approve", "yes", "go", or edits to it. These are NOT approval: a reply about something else (handle it, then show the plan's open points again and wait); approval of an earlier, broader plan that only said this skill would run; your own decision to invoke this skill in the middle of other work. Every open question in the plan - the interview for sections with no views included - needs an answer, or my explicit "use your recommendation", before Phase 2 starts. Phase 4 is a second stop: show the changes and wait for my reply before committing, on first runs and maintenance runs alike.
 
-## Sections are islands
+## Sections and sharing
 
 The design system is organised into *sections*: coherent UI contexts with their own audience, chrome, and visual voice - `admin`, `marketing`, `app`. Two sections are distinct when an element in one should be allowed to look different in the other.
 
-Sections never share anything: no shared tokens, no shared components, no shared folder, ever. A section's component library IS its shared code, shared only within that section. Duplication between sections is correct; coupling between them is the bug. If two sections genuinely converge, that is my call to make, not yours. One section named `app` is a valid outcome for a single-audience application - do not over-split.
+How sections relate is the app's *sharing model*. It is decided once, in the Phase 1 plan, and recorded in `docs/design-system/README.md`:
+
+- **Islands** (the default). Sections never share anything: no shared tokens, no shared components, no shared folder. A section's component library IS its shared code, shared only within that section. Duplication between sections is correct; coupling between them is the bug. Fits sections that genuinely differ in audience and voice.
+- **Shared foundation.** One `docs/design-system/shared/` folder holds the tokens, and any components, that every section uses. Each section keeps its own `design.md`, its patterns, and only the components and extra tokens that are truly its own. Dependencies point one way: a section may use `shared/`; `shared/` never references a section. Fits an app whose sections are all built on one component library or one brand, where islands would only duplicate it.
+- **External library** (per section). A section adopts a third-party component library as-is, in that library's own class vocabulary. Its `tokens.md` names the library and states that its palette classes are allowed, and the section's view paths are listed in `docs/design-system/vendor-paths` (one path prefix per line, e.g. `app/views/admin/`) so `bin/audit_design` skips the palette check there. Raw hex and arbitrary values are still drift. Only when I name a library as the standard for that section.
+
+Recommend a model in the plan, with its evidence (one component library or theme behind every layout points to a shared foundation), but the choice is mine. An app with no recorded model is on islands. Never change a recorded model unless I ask; a decision record in the repo (an ADR, or the README itself) outranks this skill's default. If two islands genuinely converge, that is my call to make, not yours. One section named `app` is a valid outcome for a single-audience application - do not over-split.
 
 ## Three tiers, one direction
 
@@ -31,9 +37,9 @@ Nothing points upward, and no tier restates a lower one. This is what makes the 
 
 Colour tokens are role-named, never hue-named: `surface`, `on-surface`, `muted`, `muted-surface`, `border`, `primary`, `primary-hover`, `on-primary`, `danger`, `success`, `warning`. Role names survive a re-theme; `blue-500` does not. Tokens compile to a Tailwind v4 `@theme` block - the section's `tokens.md` is the source of truth and the CSS is its compiled form; they must agree.
 
-All sections compile into the app's single Tailwind entry CSS, so role names must not collide across sections. With one section, use bare role names (`--color-primary` → `bg-primary`). With several, prefix each section's roles with its name (`--color-admin-primary` → `bg-admin-primary`); at most one section - typically the app's dominant surface - may keep the bare names. Propose the prefix assignment as part of the Phase 1 plan, and state each section's prefix at the top of its `tokens.md`.
+All sections compile into the app's single Tailwind entry CSS, so role names must not collide across sections. With one section, use bare role names (`--color-primary` → `bg-primary`). With several, prefix each section's roles with its name (`--color-admin-primary` → `bg-admin-primary`); at most one section - typically the app's dominant surface - may keep the bare names. Under a shared foundation, the shared tokens take the bare names and a section's own additions take its prefix. Propose the prefix assignment as part of the Phase 1 plan, and state each section's prefix at the top of its `tokens.md`.
 
-Everything you write - specs, recipes, proposed fixes - uses token-based Tailwind utilities only. Never a raw hex value, never a literal palette class (`bg-gray-100`, `text-indigo-600`), never an arbitrary `[...]` value. This is the rule the whole standard rests on: it makes drift mechanically detectable (`bin/audit_design` is three greps), so breaking it once makes every audit a lie. A value not on the section's scale is drift, by definition.
+Everything you write - specs, recipes, proposed fixes - uses token-based Tailwind utilities only. Never a raw hex value, never a literal palette class (`bg-gray-100`, `text-indigo-600`), never an arbitrary `[...]` value. This is the rule the whole standard rests on: it makes drift mechanically detectable (`bin/audit_design` is three greps), so breaking it once makes every audit a lie. A value not on the section's scale is drift, by definition. The one exception is a section on the External library model, whose specs use the library's own palette classes inside its recorded vendor paths.
 
 ## Specs, not code
 
@@ -49,7 +55,7 @@ Delegate steps 1-4 to one read-only subagent when the environment provides subag
 2. Locate the Tailwind entry CSS (where `@theme` lives or will live).
 3. Detect candidate sections. Evidence, strongest first: layouts in `app/views/layouts/`, controller namespaces, route namespaces. An `Api::` namespace with no HTML views is not a section. Skim representative views per candidate to judge whether its look genuinely diverges.
 4. Read `docs/design-system/` if it exists - that switches the run into maintenance mode (below).
-5. Present the plan: sections found with their evidence, and per section every file that would be written or edited, one line each on what it would say. Flag the section split explicitly - it is the expensive-to-change decision - and state how many subagents the run will use (one survey agent plus one generation agent per section), so the fan-out is approved, never a surprise. Wait for my approval.
+5. Present the plan: sections found with their evidence, the proposed sharing model with its evidence (in maintenance mode, the recorded one), and per section every file that would be written or edited, one line each on what it would say. Flag the section split explicitly - it is the expensive-to-change decision - and state how many subagents the run will use (one survey agent plus one generation agent per section), so the fan-out is approved, never a surprise. Wait for my approval.
 
 ### Re-runs: maintenance mode
 
@@ -61,13 +67,13 @@ Re-running on an app that already has `docs/design-system/` is maintenance, not 
 - **Spec-vs-realized drift**: read each spec's "Realized as" file; where code and spec contradict, propose which side changes - never let them disagree silently.
 - **Divergences ledger**: record newly collapsed variants; mark migrated ones done.
 
-Never regenerate an existing doc: every change is a surgical edit, listed in the plan and approved before writing. Section-scoped maintenance work (drift fixes, gap-fill) may be dispatched to per-section subagents exactly like Phase 2 generation, behind the same approved plan. If the app has HTML style-guide pages under `docs/design-system/` or a `docs/design-system` `@source` directive in its Tailwind entry CSS left over from an earlier version of this skill, propose deleting them - the style guide is no longer part of the system.
+Never regenerate an existing doc: every change is a surgical edit, listed in the plan and approved before writing. Read the recorded sharing model first and work within it; never propose undoing a shared foundation or an External library section that I chose. Section-scoped maintenance work (drift fixes, gap-fill) may be dispatched to per-section subagents exactly like Phase 2 generation, behind the same approved plan. If the app has HTML style-guide pages under `docs/design-system/` or a `docs/design-system` `@source` directive in its Tailwind entry CSS left over from an earlier version of this skill, propose deleting them - the style guide is no longer part of the system.
 
 ## Phase 2: Generate
 
-Sections are islands, so they generate in parallel: dispatch one subagent per approved section (run inline when subagents are unavailable, or for a single small section). Before dispatching, resolve everything that needs my input - in particular the interview for sections with no views - so each agent's prompt already carries the answers; a generation agent never asks me anything. Each agent's prompt must scope it to its section only and include: the approved file list, the section's token prefix, the interview answers, the path to this skill's directory, and the instruction to follow this Phase's rules - reading the matching `references/` guide immediately before each file, and the `catalog/` map when speccing components. When every agent has returned, check the output against the doctrine (token purity, no cross-section references) before moving on.
+Under a shared foundation, generate `shared/` first (`tokens.md`, then any shared components), inline or with one agent, and give its path to every section agent. Sections then generate in parallel: dispatch one subagent per approved section (run inline when subagents are unavailable, or for a single small section). Before dispatching, resolve everything that needs my input - in particular the interview for sections with no views - so each agent's prompt already carries the answers; a generation agent never asks me anything. Each agent's prompt must scope it to its section only and include: the approved file list, the section's token prefix, the interview answers, the path to this skill's directory, and the instruction to follow this Phase's rules - reading the matching `references/` guide immediately before each file, and the `catalog/` map when speccing components. When every agent has returned, check the output against the doctrine (token purity, no reference the sharing model does not allow) before moving on.
 
-Each section, whether dispatched or inline, is generated in dependency order: `design.md` → `tokens.md` → `components/*.md` → `patterns/*.md` → `divergences.md`. After all sections, write the shared router `docs/design-system/README.md` yourself - it is the only cross-section file.
+Each section, whether dispatched or inline, is generated in dependency order: `design.md` → `tokens.md` → `components/*.md` → `patterns/*.md` → `divergences.md`. After all sections, write the router `docs/design-system/README.md` yourself, recording the sharing model - besides `shared/` under a shared foundation, it is the only cross-section file. For any External library section, also write `docs/design-system/vendor-paths`.
 
 Generation guides ship with this skill in `references/` next to this SKILL.md - they are part of the skill, NOT files in the target app, so resolve their paths from this skill's own directory. You MUST read the matching guide immediately before generating each file (per file, not once upfront):
 
@@ -91,7 +97,8 @@ This app has a codified design system at docs/design-system/. Before building
 or changing any view, read docs/design-system/README.md, then the target
 section's tokens.md and the relevant components/ and patterns/ specs. Use
 token-based Tailwind utilities only - never raw hex, literal palette classes
-(bg-gray-100), or arbitrary [...] values. Sections never share tokens or code.
+(bg-gray-100), or arbitrary [...] values. Sections share only what the
+sharing model in docs/design-system/README.md allows.
 When a change adds or alters a documented pattern, update the affected spec
 in the same commit. If a needed
 component has no spec, spec it first rather than hand-rolling a one-off.
@@ -132,6 +139,14 @@ HEX='(^|[^0-9a-zA-Z_.&-])#([0-9a-fA-F]{6}|[0-9a-fA-F]{8}|[0-9a-fA-F]{3,4})([^0-9
 # data-[state=open]: - Tailwind grammar, not a value - and passes.
 ARB='[a-z][a-z0-9:-]*-(\[[^]]+\]|\(--[^)]+\))([^:/]|/[0-9]|$)'
 PAL='(bg|text|border|ring|divide|outline|fill|stroke|from|via|to|accent|decoration|placeholder|caret|shadow)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}'
+# Sections on the External library model: palette classes are allowed under the
+# path prefixes listed in docs/design-system/vendor-paths (one per line, # comments).
+VENDOR=""
+if [ -f docs/design-system/vendor-paths ]; then
+  VENDOR=$(grep -vE '^[[:space:]]*(#|$)' docs/design-system/vendor-paths \
+    | sed 's/[.[\*^$]/\\&/g; s/^/^/' | paste -sd'|' - || true)
+fi
+vendor() { [ -n "$VENDOR" ] && printf '%s\n' "$1" | grep -qE "$VENDOR"; }
 
 in_scope() { # in_scope <repo-relative path>
   case "$1" in
@@ -146,13 +161,15 @@ in_scope() { # in_scope <repo-relative path>
 }
 
 added_findings() { # added_findings <repo-relative path>: violating lines added since HEAD
+  local re="($HEX|$ARB|$PAL)"
+  vendor "$1" && re="($HEX|$ARB)"
   if git rev-parse -q --verify HEAD >/dev/null 2>&1 && git cat-file -e "HEAD:$1" 2>/dev/null; then
     git diff -U0 HEAD -- "$1" | awk '
       /^@@/ { split($3, a, ","); n = substr(a[1], 2) + 0; hunk = 1; next }
       hunk && /^\+/ { print n ": " substr($0, 2); n++ }'
   else
     grep -n '' -- "$1" | sed 's/:/: /'
-  fi | grep -E "($HEX|$ARB|$PAL)" | grep -v 'design-ok' | sed "s|^|  $1:|" || true
+  fi | grep -E "$re" | grep -v 'design-ok' | sed "s|^|  $1:|" || true
 }
 
 block() { # block <findings>
@@ -195,8 +212,8 @@ for d in app/views app/components app/frontend app/javascript app/assets/stylesh
 done
 [ ${#dirs[@]} -eq 0 ] && { echo "No view directories found."; exit 0; }
 total=0
-scan() { # scan <label> <extended-regex>
-  local label=$1 re=$2 out count=0
+scan() { # scan <label> <extended-regex> [skip-vendor]
+  local label=$1 re=$2 skip=${3:-} out count=0
   out=$(grep -rInE \
         --include='*.erb' --include='*.haml' --include='*.slim' --include='*.html' \
         --include='*.rb' --include='*.css' --include='*.js' \
@@ -204,6 +221,9 @@ scan() { # scan <label> <extended-regex>
         | grep -v 'design-ok' \
         | grep -vE '_mailer/|/layouts/mailer' \
         | grep -vE '(^|/)(tokens|theme)[^/]*\.css:' || true)
+  if [ -n "$skip" ] && [ -n "$VENDOR" ] && [ -n "$out" ]; then
+    out=$(printf '%s\n' "$out" | grep -vE "$VENDOR" || true)
+  fi
   [ -n "$out" ] && count=$(printf '%s\n' "$out" | wc -l | tr -d ' ')
   total=$((total + count))
   echo "== $label: $count"
@@ -212,7 +232,7 @@ scan() { # scan <label> <extended-regex>
 }
 scan "raw hex colours" "$HEX"
 scan "arbitrary values" "$ARB"
-scan "literal palette classes" "$PAL"
+scan "literal palette classes" "$PAL" skip-vendor
 if [ "$total" -eq 0 ]; then
   echo "No drift detected."
 else
@@ -254,7 +274,7 @@ Close every run - first run or maintenance - by running `bin/audit_design` and r
 
 ## Never do
 
-- Share tokens, components, or code across sections, or create any shared folder.
+- Share tokens, components, or code across sections beyond what the recorded sharing model allows, or change that model without my request.
 - Emit a raw hex value, a literal palette class, or an arbitrary `[...]` value in any spec or recipe.
 - Restate a component's markup inside a pattern - patterns compose by reference.
 - Paste a catalog entry into an app unadapted, or spec a component the section does not use.

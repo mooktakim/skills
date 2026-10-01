@@ -1,0 +1,7 @@
+# rails-design-system 0.8.0: sharing model is a Phase 1 choice
+
+- Review defect 11: "sections are islands, no shared folder, ever" was absolute. yardnote replaced it with a shared token layer (ADR-0012, shared component library); maynard admin adopted an external library as-is and hand-patched bin/audit_design to exempt admin palette classes. A maintenance re-run would have fought both.
+- Three models, chosen in the Phase 1 plan (recommended with evidence, user decides), recorded in docs/design-system/README.md: Islands (default, unchanged), Shared foundation (`shared/` tokens + components, bare token names; sections add prefixed extras; one-way deps), External library per section (library's own palette classes allowed; paths listed in `docs/design-system/vendor-paths`).
+- No recorded model = islands. Maintenance reads the model first, never proposes undoing it; a repo ADR outranks the skill default. Phase 2 generates `shared/` first. Root CLAUDE.md block, Never-do list, readme-router guide, README updated.
+- bin/audit_design reads `vendor-paths` (prefix per line, # comments): palette check skipped there in --hook, --stop and full scan; hex + arbitrary still checked. Kept as a data file so the script stays identical across apps (maintenance nudge compares scripts).
+- Tested: vendor allow/deny in hook, stop and full scan; arbitrary still blocked in vendor paths; regression cases pass; full scan output byte-identical to 0.7.1 on dinehere/yardnote/maynard without vendor-paths.
