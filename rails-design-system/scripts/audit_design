@@ -33,8 +33,10 @@
 #   vendor-paths   one path prefix per line (# comments): sections on the External
 #                  library model, where literal palette classes are allowed
 #   audit-rules    project rules promoted from design reviews, one per line as
-#                  "<label> :: <regular expression>" (# comments); they apply in
-#                  every mode and section, and "design-ok" exempts a line
+#                  "<label> :: <regular expression>", optionally followed by
+#                  " :: <path prefix> <path prefix>..." to limit the rule to one
+#                  section's files (# comments); they apply in every mode, and
+#                  "design-ok" exempts a line
 
 require "json"
 
@@ -76,18 +78,22 @@ ensure
 end
 
 RULES = data_lines("audit-rules").each_with_object([]) do |line, rules|
-  label, pattern = line.split(" :: ", 2)
+  label, pattern, scope = line.split(" :: ", 3)
   unless pattern
     warn %(audit-rules: no " :: " in "#{line}" - skipped)
     next
   end
   regexp = quietly { Regexp.new(pattern.b) } # bytes: files are read as bytes
   if regexp
-    rules << [label.strip, regexp]
+    rules << [label.strip, regexp, scope.to_s.split]
   else
     warn %(audit-rules: invalid regex for "#{label.strip}" - skipped)
   end
 end.freeze
+
+def rule_applies?(prefixes, path)
+  prefixes.empty? || prefixes.any? { |prefix| path.start_with?(prefix) }
+end
 
 def vendor?(path)
   VENDOR_PREFIXES.any? { |prefix| path.start_with?(prefix) }
@@ -142,7 +148,9 @@ def findings_for(path, base)
   token_check = vendor?(path) ? Regexp.union(HEX, ARB) : Regexp.union(HEX, ARB, PAL)
   lines = added_lines(path, base)
   token_hits = lines.select { |_, text| text.match?(token_check) }.map { |number, text| "  #{path.b}:#{number}: #{text}" }
-  rule_hits = RULES.flat_map do |label, pattern|
+  rule_hits = RULES.flat_map do |label, pattern, prefixes|
+    next [] unless rule_applies?(prefixes, path)
+
     lines.select { |_, text| text.match?(pattern) }.map { |number, text| "  #{path.b}:#{number}: #{text}   [rule: #{label.b}]" }
   end
   token_hits + rule_hits
@@ -240,12 +248,14 @@ def full_scan(strict:)
     [path, lines.reject { |_, text| text.include?("design-ok") }]
   end.compact
 
-  checks = [["raw hex colours", HEX, false], ["arbitrary values", ARB, false], ["literal palette classes", PAL, true]]
-  checks += RULES.map { |label, pattern| ["rule: #{label}", pattern, false] }
+  everywhere = ->(_path) { true }
+  checks = [["raw hex colours", HEX, everywhere], ["arbitrary values", ARB, everywhere],
+            ["literal palette classes", PAL, ->(path) { !vendor?(path) }]]
+  checks += RULES.map { |label, pattern, prefixes| ["rule: #{label}", pattern, ->(path) { rule_applies?(prefixes, path) }] }
   total = 0
-  checks.each do |label, pattern, skip_vendor|
+  checks.each do |label, pattern, applies|
     hits = files.flat_map do |path, lines|
-      next [] if skip_vendor && vendor?(path)
+      next [] unless applies.call(path)
 
       lines.select { |_, text| text.match?(pattern) }.map { |number, text| "   #{path.b}:#{number}:#{text}" }
     end

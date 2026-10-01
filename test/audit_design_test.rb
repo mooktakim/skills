@@ -181,6 +181,18 @@ class AuditDesignTest < Minitest::Test
     assert_includes run_script("audit_design").out, "== rule: no gradients (app/design.md): 1"
   end
 
+  def test_rules_can_be_limited_to_a_sections_paths
+    write "docs/design-system/audit-rules", "admin badge has no dot (admin/components/badge.md) :: rounded-full size-1\\.5 :: app/views/admin/ app/components/admin/\n"
+    write "app/views/admin/a.html.erb", %(<span class="rounded-full size-1.5"></span>\n)
+    write "app/views/site/a.html.erb", %(<span class="rounded-full size-1.5"></span>\n)
+    assert_equal 2, hook(path("app/views/admin/a.html.erb")).code
+    assert_equal 0, hook(path("app/views/site/a.html.erb")).code
+    commit "scoped"
+    out = run_script("audit_design").out
+    assert_includes out, "== rule: admin badge has no dot (admin/components/badge.md): 1"
+    refute_includes out, "app/views/site/a.html.erb"
+  end
+
   def test_rules_with_non_ascii_patterns_work
     write "docs/design-system/audit-rules", "no pound sign (conventions.md) :: £\n"
     append "app/views/x/a.html.erb", "<p>£5</p>\n"
