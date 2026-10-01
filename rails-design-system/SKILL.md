@@ -124,8 +124,13 @@ set -euo pipefail
 orig=$PWD
 cd "$(dirname "$0")/.."
 root=$PWD
-HEX='#([0-9a-fA-F]{6}|[0-9a-fA-F]{8}|[0-9a-fA-F]{3,4})([^0-9a-zA-Z]|$)'
-ARB='[a-z][a-z0-9:-]*-\[[^]]+\]'
+# A hex colour never follows a letter, digit, "_", "-", "." or "&": "cart#add" is a
+# Stimulus action, "this.#fade" a private JS field, "&#123;" an HTML entity.
+HEX='(^|[^0-9a-zA-Z_.&-])#([0-9a-fA-F]{6}|[0-9a-fA-F]{8}|[0-9a-fA-F]{3,4})([^0-9a-zA-Z_-]|$)'
+# Arbitrary values: w-[260px], bg-[var(--x)], and the v4 shorthand bg-(--x). A
+# bracket followed by ":" (or "/name:") is a variant selector such as
+# data-[state=open]: - Tailwind grammar, not a value - and passes.
+ARB='[a-z][a-z0-9:-]*-(\[[^]]+\]|\(--[^)]+\))([^:/]|/[0-9]|$)'
 PAL='(bg|text|border|ring|divide|outline|fill|stroke|from|via|to|accent|decoration|placeholder|caret|shadow)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}'
 
 in_scope() { # in_scope <repo-relative path>
