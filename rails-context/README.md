@@ -48,4 +48,5 @@ Re-running later is how you maintain the setup. A run on an app that already has
 Afterwards, day to day:
 
 - The maintenance rule in your root `CLAUDE.md` makes agents update affected context files as part of normal work, in the same commit as the change.
-- Re-run the skill periodically — or after a big refactor — to catch drift; `bin/audit_context` gives the same signal from the shell.
+- Re-run the skill periodically - or after a big refactor - to catch drift; `bin/audit_context` gives the same signal from the shell.
+- You don't have to remember: the plugin ships a `SessionStart` hook that runs `bin/audit_context` quietly when a session starts and, at most once a week per project, tells you when a maintenance run is due (oversized files, 5 or more flagged files, or an audit script older than the installed skill). It stays silent in projects without `bin/audit_context` and never starts a run on its own.

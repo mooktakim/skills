@@ -1,0 +1,7 @@
+# rails-context 0.9.0 + rails-design-system 0.7.0: weekly maintenance nudge
+
+- Review defect 7: zero maintenance runs in 7 projects; nothing prompted one. First plugin-shipped hooks in this repo: each plugin has `hooks/hooks.json` with a SessionStart (matcher `startup`) hook -> `hooks/maintenance-nudge.sh`.
+- Script: silent unless `$CLAUDE_PROJECT_DIR/bin/audit_*` exists. Runs the project's audit quietly; nudges when context: any oversized file, >= 5 flagged files, or project script != the script embedded in the installed SKILL.md (awk-extracts the ```bash block by its header comment); design: any audit finding, script differs, or settings.json lacks the `$CLAUDE_PROJECT_DIR ... --stop` hook / still has the old relative `bin/audit_design --hook`. Output: `systemMessage` (user sees it) + short `additionalContext` telling Claude the user was told and not to start a run unasked.
+- Throttle: once per 7 days per project via stamp `$CLAUDE_PLUGIN_DATA/nudge-<sha of project root>` - never writes into user repos.
+- Tested read-only against real projects: all skill projects nudge now (old scripts/hooks - correct, that is how 0.6.0/0.8.0 fixes reach them); evchargerwidget/api (no skills) and dinehere design (no design system) silent; second run silent; scratch repo with current scripts silent when clean, fires on oversize/drift.
+- Repo CLAUDE.md structure lists `hooks/hooks.json`. Note: `claude plugin validate` does not check hooks.json, so JSON validated separately.

@@ -16,6 +16,7 @@ The repo is a Claude Code plugin marketplace (named `mooktakim` — the install 
   .claude-plugin/plugin.json       # plugin manifest (name matches the directory)
   SKILL.md             # skill plugins: frontmatter + instructions, at the plugin root
   agents/<name>.md     # agent plugins: one file per subagent
+  hooks/hooks.json     # optional: plugin-shipped hooks; commands use ${CLAUDE_PLUGIN_ROOT}
   <supporting files>   # optional: scripts, templates, references
 ```
 

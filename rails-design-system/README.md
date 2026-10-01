@@ -51,3 +51,4 @@ Afterwards, day to day:
 
 - The root `CLAUDE.md` block makes agents read the standard before touching views, and update affected specs in the same commit as the change.
 - Re-run the skill periodically - or after a big UI push - to catch drift; `bin/audit_design` gives the same signal from the shell.
+- You don't have to remember: the plugin ships a `SessionStart` hook that runs `bin/audit_design` quietly when a session starts and, at most once a week per project, tells you when a maintenance run is due (audit findings, an audit script that differs from the installed skill, or missing/outdated enforcement hooks). It stays silent in projects without `bin/audit_design` and never starts a run on its own.
