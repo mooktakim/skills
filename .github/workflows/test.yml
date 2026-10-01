@@ -1,0 +1,51 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+# The plugins copy their scripts into apps that run anywhere: Linux CI with GNU
+# tools, macOS with bash 3.2 and an old system Ruby, and any Ruby from 2.6 up.
+# Each job covers one of those.
+jobs:
+  linux:
+    name: Linux, Ruby ${{ matrix.ruby }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ruby: [ "3.3", "4.0" ]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ matrix.ruby }}
+      - run: bin/test
+
+  linux-oldest-ruby:
+    name: Linux, Ruby 2.6
+    runs-on: ubuntu-latest
+    container: ruby:2.6
+    steps:
+      - uses: actions/checkout@v7
+      - run: bin/test
+
+  macos:
+    name: macOS, system bash and Ruby
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "4.0"
+      - name: Tests (scripts on the current Ruby)
+        run: bin/test
+      - name: Scripts on the system Ruby, hooks on bash 3.2
+        run: |
+          if [ -x /usr/bin/ruby ]; then
+            TEST_RUBY=/usr/bin/ruby TEST_BASH=/bin/bash bin/test
+          else
+            echo "No /usr/bin/ruby on this runner; hooks on bash 3.2 only"
+            TEST_BASH=/bin/bash bin/test
+          fi

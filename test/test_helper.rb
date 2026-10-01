@@ -12,7 +12,8 @@ REPO = File.expand_path("..", __dir__)
 # Runs the plugins' scripts as real subprocesses inside throwaway git repos, the
 # way Claude Code hooks, bin/ci, and people call them. TEST_RUBY picks the Ruby
 # that runs the audit scripts (default: the Ruby running the tests), so the suite
-# can prove compatibility with an old system Ruby too.
+# can prove compatibility with an old system Ruby too; TEST_BASH does the same for
+# the hook scripts.
 module ScriptTestHelper
   Result = Struct.new(:out, :err, :status) do
     def code
@@ -24,9 +25,15 @@ module ScriptTestHelper
     ENV.fetch("TEST_RUBY", RbConfig.ruby)
   end
 
+  # TEST_BASH=/bin/bash runs the hook scripts under macOS's bash 3.2.
+  def bash_bin
+    ENV.fetch("TEST_BASH", "bash")
+  end
+
   def setup
     @dir = File.realpath(Dir.mktmpdir("skills-test"))
-    git "init", "-q", "-b", "main"
+    git "init", "-q"
+    git "symbolic-ref", "HEAD", "refs/heads/main" # "git init -b" needs git 2.28+
     git "config", "user.email", "test@example.com"
     git "config", "user.name", "Test"
     git "config", "commit.gpgsign", "false"
@@ -74,7 +81,7 @@ module ScriptTestHelper
   end
 
   def run_bash(file, *args, stdin: "", cwd: @dir, env: {})
-    out, err, status = Open3.capture3(env, "bash", file, *args, stdin_data: stdin, chdir: cwd)
+    out, err, status = Open3.capture3(env, bash_bin, file, *args, stdin_data: stdin, chdir: cwd)
     Result.new(out, err, status)
   end
 

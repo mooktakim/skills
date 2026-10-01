@@ -10,7 +10,7 @@ A hand-authored collection of Claude Code skills, not limited to any one domain 
 
 Scripts a plugin copies into apps (`<plugin>/scripts/`, e.g. `audit_design`, `audit_context`) are plain Ruby, standard library only, compatible with Ruby 2.6+ (macOS still ships 2.6 as `/usr/bin/ruby`): every Rails app has Ruby, and one regex engine behaves the same on macOS and Linux CI. Hook scripts (`<plugin>/hooks/*.sh`) stay small `bash` wrappers. Never embed a script in a `SKILL.md`; the skill copies the file with `${CLAUDE_SKILL_DIR}`.
 
-`bin/test` runs the Minitest suite in `test/`: each test builds a throwaway git repo and runs the real scripts and hooks as subprocesses. Run it after any script or hook change, and once more as `TEST_RUBY=/usr/bin/ruby bin/test` to prove the scripts still work on the old system Ruby. Add a test for every behaviour you add or bug you fix.
+`bin/test` runs the Minitest suite in `test/`: each test builds a throwaway git repo and runs the real scripts and hooks as subprocesses. Run it after any script or hook change, and once more as `TEST_RUBY=/usr/bin/ruby bin/test` to prove the scripts still work on the old system Ruby. Add a test for every behaviour you add or bug you fix. `.github/workflows/test.yml` runs the suite on every push and pull request: Linux on current Rubies, Linux on Ruby 2.6, and macOS with the system Ruby and bash 3.2. `test/repo_test.rb` also enforces this file's structure rules (marketplace entries, README rows, frontmatter names, hook script paths).
 
 ## Repository structure
 
