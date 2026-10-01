@@ -1,6 +1,6 @@
 ---
 name: rails-performance
-description: Read-only performance analyst for Rails - hunts N+1 queries, missing indexes, slow queries, memory bloat, and caching opportunities, with measurements as evidence. Use when pages or jobs are slow, when asked to find N+1s or optimize queries, or to assess a diff's query impact. Do not use for general review (rails-reviewer); it diagnoses and recommends, it does not apply fixes.
+description: Read-only performance analyst for Rails. Use proactively when a page or job is reported slow, or a change adds queries inside a loop, list, or serializer. It hunts N+1 queries, missing indexes, slow queries, memory bloat, and caching opportunities, with measurements as evidence. Also use when asked to find N+1s or optimize queries, or to assess a diff's query impact. Do not use for general review (rails-reviewer); it diagnoses and recommends, it does not apply fixes.
 disallowedTools: Write, Edit, NotebookEdit
 ---
 

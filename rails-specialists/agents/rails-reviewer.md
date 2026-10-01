@@ -1,6 +1,6 @@
 ---
 name: rails-reviewer
-description: Read-only Rails code reviewer - reviews a diff, branch, or set of files for correctness bugs, Rails-convention violations, migration safety, and layering smells (fat controllers, logic in views, callback abuse). Use after a feature or fix is implemented, before committing or opening a PR, or when asked to review Rails code. Do not use for security-focused audits (rails-security) or performance hunts (rails-performance) - it flags what it happens to see but does not sweep for them.
+description: Read-only Rails code reviewer. Use proactively after implementing a feature or fix, before committing or opening a PR (skip trivial copy, docs, or config-only changes). It reviews a diff, branch, or set of files for correctness bugs, Rails-convention violations, migration safety, and layering smells (fat controllers, logic in views, callback abuse). Also use when asked to review Rails code. Do not use for security-focused audits (rails-security) or performance hunts (rails-performance) - it flags what it happens to see but does not sweep for them.
 disallowedTools: Write, Edit, NotebookEdit
 ---
 

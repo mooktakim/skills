@@ -1,0 +1,17 @@
+{
+  "description": "rails-specialists: in Rails projects, state when to delegate to the specialist agents",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/delegation-context.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
