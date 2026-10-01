@@ -20,6 +20,11 @@
       "name": "rails-specialists",
       "source": "./rails-specialists",
       "description": "A team of ten Rails specialist agents: models, Hotwire, tests, jobs, debugging, review, security, performance, deploy, upgrades"
+    },
+    {
+      "name": "capture",
+      "source": "./capture",
+      "description": "Record a rule you state, or a correction you make, into the one checked-in context file where it belongs"
     }
   ]
 }

@@ -121,6 +121,43 @@ class HooksTest < Minitest::Test
     refute_includes message, "differs"
   end
 
+  # -- capture: the correction hint ------------------------------------------
+
+  def prompt_hint(prompt)
+    out = hook("capture", "correction-hint.sh", stdin: JSON.generate("session_id" => "s", "prompt" => prompt)).out
+    out.empty? ? nil : JSON.parse(out).dig("hookSpecificOutput", "additionalContext")
+  end
+
+  CORRECTIONS = [
+    "no, don't use trailing slashes",
+    "Don't add icons to buttons",
+    "never commit to main",
+    "I already told you to use Phlex",
+    "from now on run the tests before committing",
+    "why did you change the header again?",
+    "you keep adding a dot to the status badge",
+    "update CLAUDE.md so you stop doing this",
+    "stop using inline styles"
+  ].freeze
+
+  NOT_CORRECTIONS = [
+    "add a pagination component to the bids page",
+    "Make the button blue",
+    "what does this method do?",
+    "/rails-context:rails-context",
+    "<command-name>/capture:capture</command-name>",
+    "nothing else, thanks"
+  ].freeze
+
+  def test_correction_hint_fires_on_corrections_and_rules
+    CORRECTIONS.each { |prompt| assert_includes prompt_hint(prompt).to_s, "capture skill", prompt }
+  end
+
+  def test_correction_hint_stays_quiet_otherwise
+    NOT_CORRECTIONS.each { |prompt| assert_nil prompt_hint(prompt), prompt }
+    assert_equal "", hook("capture", "correction-hint.sh", stdin: "not json").out
+  end
+
   # -- the delegation notes -------------------------------------------------
 
   def test_design_reviewer_note_only_in_design_system_apps
