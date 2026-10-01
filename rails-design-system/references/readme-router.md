@@ -4,7 +4,7 @@ Read this immediately before writing the top-level `README.md`. It is the router
 
 ## Questions to answer
 
-- **Protocol**: the ordered steps for building or changing a view - identify the section, read its `tokens.md` and the relevant `components/` and `patterns/` specs before writing markup, compose token-only, spec missing pieces before hand-rolling, update the spec with the change, run `bin/audit_design`.
+- **Protocol**: the ordered steps for building or changing a view - identify the section, read `conventions.md` and the section's `tokens.md` and the relevant `components/` and `patterns/` specs before writing markup, compose token-only, spec missing pieces before hand-rolling, update the spec with the change, run `bin/audit_design`.
 - **The one rule**: token utilities only - one line, since the root CLAUDE.md block and the specs carry the detail.
 - **Sharing model**: one line naming the model chosen in the Phase 1 plan - islands (sections share nothing), shared foundation (sections build on `shared/`), or which sections use an external library as-is (their paths are in `vendor-paths`). Maintenance runs and future agents read it from here.
 - **Index**: one row per section - name, audience, layout(s) it owns, path.
@@ -18,8 +18,8 @@ The standard every view is built against.
 
 ## Building a view
 1. Identify the section (by layout/namespace - see index below).
-2. Read the section's `tokens.md`, then the specs for every component and
-   pattern the view touches, before writing markup.
+2. Read `conventions.md`, the section's `tokens.md`, then the specs for every
+   component and pattern the view touches, before writing markup.
 3. Compose from specced components using token utilities only - never raw
    hex, palette classes, or arbitrary values.
 4. Missing component or pattern? Spec it first (re-run rails-design-system

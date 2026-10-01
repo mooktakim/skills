@@ -1,6 +1,6 @@
 ---
 name: rails-design-system
-description: Set up and maintain a design-system context repository at docs/design-system/ in a Rails app using Tailwind CSS v4. Detects the app's UI sections (admin, marketing, app...), then generates per-section role-token definitions, component specs, and page-pattern specs, plus a bin/audit_design drift script and an edit-time enforcement hook. Re-runnable, an app already set up gets maintenance - drift review, gap-fill - through the same approval gate. Use when asked to set up a design system, codify styles or UI conventions, keep views visually consistent, spec a component library, or audit design drift.
+description: Set up and maintain a design-system context repository at docs/design-system/ in a Rails app using Tailwind CSS v4. Detects the app's UI sections (admin, marketing, app...), then generates per-section role-token definitions, component specs, and page-pattern specs, plus a bin/audit_design drift script and an edit-time enforcement hook. Re-runnable, an app already set up gets maintenance - drift review, gap-fill - through the same approval gate. Use when asked to set up a design system, codify styles or UI conventions, keep views visually consistent, spec a component library, standardise a UI rule across every page, or audit design drift.
 ---
 
 # Rails Design System
@@ -23,13 +23,15 @@ How sections relate is the app's *sharing model*. It is decided once, in the Pha
 
 Recommend a model in the plan, with its evidence (one component library or theme behind every layout points to a shared foundation), but the choice is mine. An app with no recorded model is on islands. Never change a recorded model unless I ask; a decision record in the repo (an ADR, or the README itself) outranks this skill's default. If two islands genuinely converge, that is my call to make, not yours. One section named `app` is a valid outcome for a single-audience application - do not over-split.
 
+Under every model, `docs/design-system/conventions.md` holds the rules all sections follow: text case, how each domain state is shown, money and date formats, icon use, action wording. These are rules about wording and representation, not styling, so they couple no code and do not break islands. A rule meant for every page lives there once, instead of being fixed one section at a time.
+
 ## Three tiers, one direction
 
 Each section is built from three tiers, and dependencies point one way:
 
 - **Tokens** - role-named values, one canonical scale per dimension (colour, type, spacing, radius, shadow, motion).
 - **Components** - reusable elements (button, card, table...), each with a contract and a canonical recipe. Components consume only tokens.
-- **Patterns** - page archetypes (index page, form page, app shell...) composed from components *by reference* ("uses `page-heading` with a primary `button`"), never restating a component's markup.
+- **Patterns** - page archetypes (index page, form page, app shell...) composed from components *by reference* ("uses `page-heading` with a primary `button`"), never restating a component's markup. The app shell owns the page frame - container width, side padding, top spacing, heading alignment - and every other pattern names its frame instead of restating those classes.
 
 Nothing points upward, and no tier restates a lower one. This is what makes the system composable: small pieces with contracts build larger ones.
 
@@ -55,15 +57,16 @@ Delegate steps 1-4 to one read-only subagent when the environment provides subag
 2. Locate the Tailwind entry CSS (where `@theme` lives or will live).
 3. Detect candidate sections. Evidence, strongest first: layouts in `app/views/layouts/`, controller namespaces, route namespaces. An `Api::` namespace with no HTML views is not a section. Skim representative views per candidate to judge whether its look genuinely diverges.
 4. Read `docs/design-system/` if it exists - that switches the run into maintenance mode (below).
-5. Present the plan: sections found with their evidence, the proposed sharing model with its evidence (in maintenance mode, the recorded one), and per section every file that would be written or edited, one line each on what it would say. Flag the section split explicitly - it is the expensive-to-change decision - and state how many subagents the run will use (one survey agent plus one generation agent per section), so the fan-out is approved, never a surprise. Wait for my approval.
+5. Present the plan: sections found with their evidence, the proposed sharing model with its evidence (in maintenance mode, the recorded one), the conventions you found or that are still open questions for me, and per section every file that would be written or edited, one line each on what it would say. Flag the section split explicitly - it is the expensive-to-change decision - and state how many subagents the run will use (one survey agent plus one generation agent per section), so the fan-out is approved, never a surprise. Wait for my approval.
 
 ### Re-runs: maintenance mode
 
-Re-running on an app that already has `docs/design-system/` is maintenance, not a rewrite. The survey then also covers the existing docs, and the Phase 1 plan proposes five kinds of work:
+Re-running on an app that already has `docs/design-system/` is maintenance, not a rewrite. The survey then also covers the existing docs, and the Phase 1 plan proposes six kinds of work:
 
 - **Gap-fill**: newly detected sections; components or patterns now in use but unspecced; missing or outdated enforcement wiring (the hooks in `.claude/settings.json` must match Phase 3 of this skill version - an older entry with the relative command `bin/audit_design --hook` fails from subfolders and gets replaced).
 - **Drift review**: run `bin/audit_design` (if it is missing or differs from the script in Phase 3 of this skill version, create or update it first). Each finding becomes a proposed fix - retokenise the view, or add a missing token to the section's `tokens.md` - never a silent skip.
 - **Promotion**: the same one-off markup repeated in a section's views becomes a proposed component spec in that section's library.
+- **Conventions and frames**: rules the views now follow consistently, or that I stated since the last run (look for repeated corrections in recent commits), but `conventions.md` lacks; views that break a recorded convention; page patterns that restate the frame instead of naming it. Propose each fix across every section at once.
 - **Spec-vs-realized drift**: read each spec's "Realized as" file; where code and spec contradict, propose which side changes - never let them disagree silently.
 - **Divergences ledger**: record newly collapsed variants; mark migrated ones done.
 
@@ -71,19 +74,19 @@ Never regenerate an existing doc: every change is a surgical edit, listed in the
 
 ## Phase 2: Generate
 
-Under a shared foundation, generate `shared/` first (`tokens.md`, then any shared components), inline or with one agent, and give its path to every section agent. Sections then generate in parallel: dispatch one subagent per approved section (run inline when subagents are unavailable, or for a single small section). Before dispatching, resolve everything that needs my input - in particular the interview for sections with no views - so each agent's prompt already carries the answers; a generation agent never asks me anything. Each agent's prompt must scope it to its section only and include: the approved file list, the section's token prefix, the interview answers, the path to this skill's directory, and the instruction to follow this Phase's rules - reading the matching `references/` guide immediately before each file, and the `catalog/` map when speccing components. When every agent has returned, check the output against the doctrine (token purity, no reference the sharing model does not allow) before moving on.
+First write `docs/design-system/conventions.md` yourself, from the survey and my answers, and give its path to every section agent: section specs follow it. Under a shared foundation, then generate `shared/` (`tokens.md`, then any shared components), inline or with one agent, and give its path to every section agent. Sections then generate in parallel: dispatch one subagent per approved section (run inline when subagents are unavailable, or for a single small section). Before dispatching, resolve everything that needs my input - in particular the interview for sections with no views - so each agent's prompt already carries the answers; a generation agent never asks me anything. Each agent's prompt must scope it to its section only and include: the approved file list, the section's token prefix, the interview answers, the path to this skill's directory, and the instruction to follow this Phase's rules - reading the matching `references/` guide immediately before each file, and the `catalog/` map when speccing components. When every agent has returned, check the output against the doctrine (token purity, no reference the sharing model does not allow) before moving on.
 
-Each section, whether dispatched or inline, is generated in dependency order: `design.md` → `tokens.md` → `components/*.md` → `patterns/*.md` → `divergences.md`. After all sections, write the router `docs/design-system/README.md` yourself, recording the sharing model - besides `shared/` under a shared foundation, it is the only cross-section file. For any External library section, also write `docs/design-system/vendor-paths`.
+Each section, whether dispatched or inline, is generated in dependency order: `design.md` → `tokens.md` → `components/*.md` → `patterns/*.md` → `divergences.md`. After all sections, write the router `docs/design-system/README.md` yourself, recording the sharing model. It and `conventions.md` (plus `shared/` under a shared foundation) are the only cross-section files. For any External library section, also write `docs/design-system/vendor-paths`.
 
 Generation guides ship with this skill in `references/` next to this SKILL.md - they are part of the skill, NOT files in the target app, so resolve their paths from this skill's own directory. You MUST read the matching guide immediately before generating each file (per file, not once upfront):
 
-- `references/design.md`, `references/tokens.md`, `references/component-spec.md`, `references/pattern-spec.md`, `references/divergences.md`, `references/readme-router.md`
+- `references/conventions.md`, `references/design.md`, `references/tokens.md`, `references/component-spec.md`, `references/pattern-spec.md`, `references/divergences.md`, `references/readme-router.md`
 
 Rules that govern all generation:
 
 - Derive tokens and aesthetics from the section's existing views: collect the utilities actually used, canonicalise by frequency, and record every collapsed value in the divergences ledger. Where the section has no views yet, interview me instead of inventing a design language.
 - When speccing a component, look it up in `catalog/README.md` (beside this SKILL.md) and load the mapped catalog file as raw material. Re-shape it to the section's tokens and the app's real markup; never paste an entry unadapted. A component with no catalog entry gets its spec derived from the app's own markup using `references/component-spec.md` alone.
-- Only spec components and patterns the section actually uses or the approved plan listed. Never scaffold the whole catalog into an app.
+- Only spec components and patterns the section actually uses or the approved plan listed. Never scaffold the whole catalog into an app. The one standing exception: every section with page patterns gets `patterns/app-shell.md`, because it defines the frames the other patterns name.
 - When the Gemfile shows Phlex or ViewComponent, read the matching `adapters/` guide before writing any "Realized as" guidance, so spec contracts translate into that library's idiom.
 
 ## Phase 3: Wire up maintenance
@@ -98,7 +101,11 @@ or changing any view, read docs/design-system/README.md, then the target
 section's tokens.md and the relevant components/ and patterns/ specs. Use
 token-based Tailwind utilities only - never raw hex, literal palette classes
 (bg-gray-100), or arbitrary [...] values. Sections share only what the
-sharing model in docs/design-system/README.md allows.
+sharing model in docs/design-system/README.md allows. Every section follows
+docs/design-system/conventions.md: when the user states a rule for every page
+("standardise X everywhere"), record it there and fix every section in the
+same change, not only the one in view. Page width, padding, and top spacing
+come from the app shell's named frames - never restate them in a page.
 When a change adds or alters a documented pattern, update the affected spec
 in the same commit. If a needed
 component has no spec, spec it first rather than hand-rolling a one-off.

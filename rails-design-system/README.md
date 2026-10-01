@@ -8,12 +8,13 @@ Requires Tailwind CSS v4.
 
 In the target app, under `docs/design-system/`:
 
-- **`README.md`** - the router: the protocol agents follow before building any view, plus the section index.
+- **`README.md`** - the router: the protocol agents follow before building any view, the sharing model, plus the section index.
+- **`conventions.md`** - the rules every section follows: text case, how each state is shown, money and date formats, icons, action wording.
 - **One directory per section** (`admin/`, `marketing/`, `app/`...) - independent UI contexts detected from layouts, controller namespaces, and routes. Each holds:
   - `design.md` - the section's aesthetic direction and do/don't rules.
   - `tokens.md` - role-named tokens (`surface`, `primary`, `border`...) per dimension, compiled to a Tailwind v4 `@theme` block.
   - `components/<name>.md` - one spec per component: a closed contract (variant/size/tone axes, six mandatory states) and a canonical HTML recipe in token utilities.
-  - `patterns/<name>.md` - page archetypes (index page, form page, app shell...) composing components by reference.
+  - `patterns/<name>.md` - page archetypes (index page, form page, app shell...) composing components by reference; `app-shell.md` defines the page frames the others name.
   - `divergences.md` - the migration backlog: every off-system value found, and what it should become.
 
 Plus, outside `docs/`: a design-system block in the root `CLAUDE.md` so agents load the standard before any view work; `bin/audit_design` - a grep-based drift script that flags raw hex, arbitrary `[...]` values, and literal palette classes; and Claude Code hooks that run the same checks on new view code - a `PostToolUse` hook on every Write/Edit, plus `Stop`/`SubagentStop` hooks that catch edits made through Bash or generators - and feed violations back as blocking errors, so generated code is enforced before the work is handed back. Only lines added since the last commit are checked, so old drift never blocks an unrelated edit.
@@ -21,6 +22,7 @@ Plus, outside `docs/`: a design-system block in the root `CLAUDE.md` so agents l
 ## Philosophy
 
 - **Sections share only what you choose.** By default sections are islands: admin and marketing never share tokens or components, and duplication between them is fine - coupling is the bug. When every section is built on one component library or brand, the plan can instead propose a *shared foundation* (`shared/` tokens and components that sections build on), and a single section can adopt an *external library* as-is (its palette classes allowed on its paths only). The choice is made once in the plan and recorded in the design system's README; maintenance runs respect it.
+- **One place for rules that cross sections.** `conventions.md` holds what every section must agree on - text case, how each status is shown, money and date formats - and each section's app shell owns its page frame (width, padding, top spacing), so a rule like "status tags never show a dot" or "same top margin on every page" is one edit, not one per section.
 - **Three tiers, one direction.** Tokens feed components; components compose into patterns; patterns build views. Small pieces with closed contracts build larger ones.
 - **Tokens or nothing.** Views use role-token utilities only - never raw hex, palette classes, or arbitrary values. That one rule makes drift mechanically detectable: the audit is three greps.
 - **Specs, not code.** Recipes are pure HTML + Tailwind, view-layer neutral. Bundled adapter guides translate contracts into ERB partials, ViewComponents, or Phlex classes when the app uses them.
