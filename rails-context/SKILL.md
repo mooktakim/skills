@@ -45,7 +45,9 @@ A file may grow past 100 lines only after passing this checklist:
 2. No single namespace owns the growth - if one does, give it a nested context file and slim the parent to a pointer.
 3. Everything that remains is app-specific intent an agent would otherwise get wrong.
 
-150 lines is the review trigger: maintenance-mode size repair flags anything past it for a restructuring proposal. A file that big almost always contains a nested file waiting to be split out.
+150 lines or 10 KB, whichever comes first, is the review trigger: maintenance-mode size repair flags anything past it for a restructuring proposal. A file that big almost always contains a nested file waiting to be split out. Count bytes as well as lines: a file written in paragraph-long lines can hold 30 KB in 100 lines and never trip a line count.
+
+The root `CLAUDE.md` is different: it loads in every session, so its size is a real token cost. Aim for under 8 KB; 200 lines or 12 KB is its review trigger. The root also collects content from other tools (`/init`, other skills, the user), so root size repair never cuts what this skill did not write without asking - it proposes moving directory-specific sections down into the directory file that owns them ("one fact, one level") and flags the rest for me.
 
 ## One fact, one level
 
@@ -70,7 +72,7 @@ Re-running on an app that already has context files is maintenance, not a rewrit
 - **Gap-fill**: new files for newly qualifying directories, missing `AGENTS.md` symlinks added, real `AGENTS.md` files migrated.
 - **Drift review**: run `bin/audit_context` (if it doesn't exist yet, create it first — Phase 3). For each flagged pre-existing file, read the changed files and the current `CLAUDE.md`, then propose a surgical edit only where a documented pattern is now false or a new convention has emerged. A flagged file that is still accurate gets reported as "checked, still accurate" — never edited to look busy, and never silently skipped.
 - **One fact, one level repair**: where an existing file (the root included) states a fact that a deeper file owns — or will own after this run's gap-fill — propose slimming the ancestor to a one-line pointer.
-- **Size repair**: flag files outside the size discipline - over the 150-line review trigger, propose a restructuring (usually a nested-file split); under the 30-line floor, note whether the file is legitimately short or missing its layer's substance.
+- **Size repair**: flag files outside the size discipline (`bin/audit_context` reports them) - past the review trigger (150 lines or 10 KB; the root 200 lines or 12 KB), propose a restructuring (usually a nested-file split, or moving root content down); under the 30-line floor, note whether the file is legitimately short or missing its layer's substance.
 
 Never regenerate an existing context file: every change to one is a surgical edit, listed in the plan and approved before writing. Phase 4 then reviews only what was newly written or changed. If the app has a `.claude/commands/context-audit.md` left over from an earlier version of this skill, propose deleting it — re-running this skill is now the audit.
 
@@ -132,7 +134,10 @@ convention? If yes, update that CLAUDE.md surgically - edit the affected lines
 only, never regenerate the file. Routine changes that follow documented
 patterns need no update. If a change deliberately contradicts a CLAUDE.md,
 update the file to match the new reality and mention it. Context files
-describe intent and patterns, never file inventories. Context file edits
+describe intent and patterns, never file inventories. Keep each directory
+CLAUDE.md under 150 lines and 10 KB, and this root file under 200 lines and
+12 KB: when an update would push a file past that, cut inventory or move the
+growing part into a deeper CLAUDE.md instead of appending. Context file edits
 ship in the same commit as the code change that caused them.
 bin/audit_context reports drift; a periodic MVC Context maintenance run
 works through what it flags.
@@ -149,6 +154,17 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "not a git repo" >&2; exit 1; }
 found=0; drift=0
+size_note() { # size_note <file> <max-lines> <max-bytes>: prints a note when over the review trigger
+  local lines bytes
+  lines=$(wc -l < "$1" | tr -d ' '); bytes=$(wc -c < "$1" | tr -d ' ')
+  if [ "$lines" -gt "$2" ] || [ "$bytes" -gt "$3" ]; then
+    echo "oversized: $lines lines, $((bytes / 1024)) KB (review trigger: $2 lines or $(($3 / 1024)) KB)"
+  fi
+}
+if [ -f CLAUDE.md ]; then
+  size=$(size_note CLAUDE.md 200 12288)
+  [ -n "$size" ] && { drift=1; echo "== CLAUDE.md (root)"; echo "   $size"; echo; }
+fi
 while IFS= read -r legacy; do
   found=1; drift=1
   echo "== $legacy"
@@ -158,10 +174,12 @@ done < <(find app lib test spec -name AGENTS.md -type f 2>/dev/null | sort)
 while IFS= read -r ctx; do
   found=1
   dir=$(dirname "$ctx")
+  size=$(size_note "$ctx" 150 10240)
   last=$(git log -1 --format=%H -- "$ctx" 2>/dev/null || true)
   if [ -z "$last" ]; then
-    echo "== $ctx"; echo "   never committed - commit it or review now"; echo
-    drift=1; continue
+    echo "== $ctx"; echo "   never committed - commit it or review now"
+    [ -n "$size" ] && echo "   $size"
+    echo; drift=1; continue
   fi
   changed=$(git diff --name-only "$last"..HEAD -- "$dir" 2>/dev/null \
     | grep -v -e '/AGENTS\.md$' -e '/CLAUDE\.md$' || true)
@@ -174,10 +192,11 @@ while IFS= read -r ctx; do
   elif [ -L "$dir/AGENTS.md" ] && [ "$(readlink "$dir/AGENTS.md")" != "CLAUDE.md" ]; then
     note="AGENTS.md symlink points to $(readlink "$dir/AGENTS.md"), expected CLAUDE.md"
   fi
-  if [ -n "$all" ] || [ -n "$note" ]; then
+  if [ -n "$all" ] || [ -n "$note" ] || [ -n "$size" ]; then
     drift=1
     echo "== $ctx (last updated $(git log -1 --format=%cs -- "$ctx"))"
     [ -n "$note" ] && echo "   $note"
+    [ -n "$size" ] && echo "   $size"
     if [ -n "$all" ]; then
       echo "   $(printf "%s\n" "$all" | wc -l | tr -d ' ') file(s) changed since:"
       printf "%s\n" "$all" | sed 's/^/     - /'
@@ -191,6 +210,7 @@ if [ "$drift" -eq 0 ]; then
 else
   echo "Review flagged directories: most changes are routine and need nothing."
   echo "Edit CLAUDE.md surgically only where a documented pattern changed."
+  echo "Oversized files: cut inventory, or move a growing namespace into a nested CLAUDE.md."
 fi
 ```
 
