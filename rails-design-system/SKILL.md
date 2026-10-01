@@ -9,6 +9,8 @@ You are bootstrapping or maintaining a design-system context repository at `docs
 
 This skill is re-runnable. The first run on an app sets everything up; every later run is maintenance - drift review, gap-fill - through the same phases and the same approval gate (see "Re-runs: maintenance mode" in Phase 1).
 
+The approval gate is a hard stop. Write nothing, add no gem, and dispatch no generation agent until I approve this run's Phase 1 plan in a reply to that plan: "approve", "yes", "go", or edits to it. These are NOT approval: a reply about something else (handle it, then show the plan's open points again and wait); approval of an earlier, broader plan that only said this skill would run; your own decision to invoke this skill in the middle of other work. Every open question in the plan - the interview for sections with no views included - needs an answer, or my explicit "use your recommendation", before Phase 2 starts. Phase 4 is a second stop: show the changes and wait for my reply before committing, on first runs and maintenance runs alike.
+
 ## Sections are islands
 
 The design system is organised into *sections*: coherent UI contexts with their own audience, chrome, and visual voice - `admin`, `marketing`, `app`. Two sections are distinct when an element in one should be allowed to look different in the other.
@@ -241,7 +243,7 @@ Do not create any slash command for auditing: re-running this skill IS the audit
 
 ## Phase 4: Review
 
-Show me every generated or edited file grouped in one message. I will correct anything that misstates the design intent; my stated intent always outranks what you inferred from the views. Fold corrections in, then commit everything with a clear message.
+Show me every generated or edited file grouped in one message. I will correct anything that misstates the design intent; my stated intent always outranks what you inferred from the views. Wait for my reply. Fold corrections in, then commit everything with a clear message once I approve. If I move on without answering, tell me once that the run's files are still uncommitted.
 
 Close every run - first run or maintenance - by running `bin/audit_design` and reporting what it still flags: items I chose to defer, plus anything the run didn't cover. Nothing flagged gets silently ignored.
 
