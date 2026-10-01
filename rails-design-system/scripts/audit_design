@@ -1,186 +1,270 @@
-#!/usr/bin/env bash
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
 # Report design drift: colours and utilities that bypass the design-system tokens,
 # plus the project rules in docs/design-system/audit-rules (see below).
+# Plain Ruby, standard library only (Ruby 2.6+): no Bundler, works in any app.
 # Works from any directory: paths resolve from the repo root - the script's parent
 # directory, or $AUDIT_ROOT when set (the rails-design-system plugin runs its own
 # copy against the project this way).
 # Findings are drift signals to review, not proof of defects.
 # Mark a deliberate exception by putting "design-ok" on the same line.
 # Mailer templates are exempt: email clients require inline styles.
+#
 # Modes:
-#   bin/audit_design         scan the app and report; always exits 0
+#   bin/audit_design                    scan the app and report; always exits 0
 #   bin/audit_design --strict           the same scan; exits 1 on any finding (CI,
 #                                       for apps whose audit is already clean)
 #   bin/audit_design --changed <base>   checks only lines added since the merge
 #                                       base with <base>; exits 1 on any finding
 #                                       (CI for apps that still carry old drift)
-#   bin/audit_design --hook  Claude Code PostToolUse hook (Write|Edit): reads the
-#                            tool-call JSON from stdin and checks the edited file
-#   bin/audit_design --stop  Claude Code Stop/SubagentStop hook: checks every view
-#                            file changed in the working tree, which catches edits
-#                            made through Bash, generators, or subagents
+#   bin/audit_design --hook             Claude Code PostToolUse hook (Write|Edit):
+#                                       reads the tool-call JSON from stdin and
+#                                       checks the edited file
+#   bin/audit_design --stop             Claude Code Stop/SubagentStop hook: checks
+#                                       every view file changed in the working tree,
+#                                       which catches edits made through Bash,
+#                                       generators, or subagents
 # Both hook modes check only lines added since HEAD (the whole file if untracked),
 # so old drift elsewhere in a file never blocks an unrelated edit. They exit 2
 # with findings on stderr so the agent fixes them before moving on.
-set -euo pipefail
-orig=$PWD
-cd "${AUDIT_ROOT:-$(dirname "$0")/..}"
-root=$PWD
-BASE=HEAD # what "added" lines are measured against
+#
+# Data files (optional, read from docs/design-system/):
+#   vendor-paths   one path prefix per line (# comments): sections on the External
+#                  library model, where literal palette classes are allowed
+#   audit-rules    project rules promoted from design reviews, one per line as
+#                  "<label> :: <regular expression>" (# comments); they apply in
+#                  every mode and section, and "design-ok" exempts a line
+
+require "json"
+
+ORIGINAL_DIR = Dir.pwd
+ROOT = File.expand_path(ENV["AUDIT_ROOT"] || File.join(__dir__, ".."))
+Dir.chdir(ROOT)
+
 # A hex colour never follows a letter, digit, "_", "-", "." or "&": "cart#add" is a
 # Stimulus action, "this.#fade" a private JS field, "&#123;" an HTML entity.
-HEX='(^|[^0-9a-zA-Z_.&-])#([0-9a-fA-F]{6}|[0-9a-fA-F]{8}|[0-9a-fA-F]{3,4})([^0-9a-zA-Z_-]|$)'
+HEX = /(^|[^0-9a-zA-Z_.&-])#([0-9a-fA-F]{6}|[0-9a-fA-F]{8}|[0-9a-fA-F]{3,4})([^0-9a-zA-Z_-]|$)/.freeze
 # Arbitrary values: w-[260px], bg-[var(--x)], and the v4 shorthand bg-(--x). A
 # bracket followed by ":" (or "/name:") is a variant selector such as
 # data-[state=open]: - Tailwind grammar, not a value - and passes.
-ARB='[a-z][a-z0-9:-]*-(\[[^]]+\]|\(--[^)]+\))([^:/]|/[0-9]|$)'
-PAL='(bg|text|border|ring|divide|outline|fill|stroke|from|via|to|accent|decoration|placeholder|caret|shadow)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}'
-# Sections on the External library model: palette classes are allowed under the
-# path prefixes listed in docs/design-system/vendor-paths (one per line, # comments).
-VENDOR=""
-if [ -f docs/design-system/vendor-paths ]; then
-  VENDOR=$(grep -vE '^[[:space:]]*(#|$)' docs/design-system/vendor-paths \
-    | sed 's/[.[\*^$]/\\&/g; s/^/^/' | paste -sd'|' - || true)
-fi
-vendor() { [ -n "$VENDOR" ] && printf '%s\n' "$1" | grep -qE "$VENDOR"; }
-# Project rules promoted from design reviews: docs/design-system/audit-rules, one
-# per line as "<label> :: <extended regex>" (# comments). They apply in every mode
-# and section; "design-ok" on a line exempts it, as for the built-in checks.
-RULE_LABELS=(); RULE_RES=()
-if [ -f docs/design-system/audit-rules ]; then
-  while IFS= read -r line || [ -n "$line" ]; do
-    line="${line#"${line%%[![:space:]]*}"}"
-    case "$line" in ''|'#'*) continue ;; esac
-    label=${line%% :: *}; rule=${line#* :: }
-    [ "$label" != "$line" ] || { echo "audit-rules: no \" :: \" in \"$line\" - skipped" >&2; continue; }
-    rc=0; grep -qE "$rule" </dev/null 2>/dev/null || rc=$?
-    [ "$rc" -ne 2 ] || { echo "audit-rules: invalid regex for \"$label\" - skipped" >&2; continue; }
-    RULE_LABELS+=("$label"); RULE_RES+=("$rule")
-  done < docs/design-system/audit-rules
-fi
+ARB = %r{[a-z][a-z0-9:-]*-(\[[^\]]+\]|\(--[^)]+\))([^:/]|/[0-9]|$)}.freeze
+PAL = /(bg|text|border|ring|divide|outline|fill|stroke|from|via|to|accent|decoration|placeholder|caret|shadow)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}/.freeze
 
-in_scope() { # in_scope <repo-relative path>
-  case "$1" in
-    *_mailer/*|*layouts/mailer*|*tokens*.css|*theme*.css) return 1 ;;
-    app/views/*|app/components/*|app/frontend/*|app/javascript/*|app/assets/stylesheets/*) ;;
-    *) return 1 ;;
-  esac
-  case "$1" in
-    *.erb|*.haml|*.slim|*.html|*.rb|*.css|*.js) return 0 ;;
-    *) return 1 ;;
-  esac
-}
+VIEW_DIRS = %w[app/views app/components app/frontend app/javascript app/assets/stylesheets].freeze
+EXTENSIONS = %w[.erb .haml .slim .html .rb .css .js].freeze
 
-added_lines() { # added_lines <repo-relative path>: "<line>: <text>" per line added since $BASE
-  if git rev-parse -q --verify "$BASE" >/dev/null 2>&1 && git cat-file -e "$BASE:$1" 2>/dev/null; then
-    git diff -U0 "$BASE" -- "$1" | awk '
-      /^@@/ { split($3, a, ","); n = substr(a[1], 2) + 0; hunk = 1; next }
-      hunk && /^\+/ { print n ": " substr($0, 2); n++ }'
+def data_lines(name)
+  path = File.join("docs/design-system", name)
+  return [] unless File.file?(path)
+
+  File.readlines(path, chomp: true).map(&:strip).reject { |line| line.empty? || line.start_with?("#") }
+end
+
+VENDOR_PREFIXES = data_lines("vendor-paths").freeze
+
+# Compiles a user rule without Ruby's own warnings (grep-style "[^]]" is valid but
+# warns); nil when the pattern is invalid.
+def quietly
+  verbose = $VERBOSE
+  $VERBOSE = nil
+  yield
+rescue RegexpError
+  nil
+ensure
+  $VERBOSE = verbose
+end
+
+RULES = data_lines("audit-rules").each_with_object([]) do |line, rules|
+  label, pattern = line.split(" :: ", 2)
+  unless pattern
+    warn %(audit-rules: no " :: " in "#{line}" - skipped)
+    next
+  end
+  regexp = quietly { Regexp.new(pattern.b) } # bytes: files are read as bytes
+  if regexp
+    rules << [label.strip, regexp]
   else
-    grep -n '' -- "$1" | sed 's/:/: /'
-  fi
-}
+    warn %(audit-rules: invalid regex for "#{label.strip}" - skipped)
+  end
+end.freeze
 
-added_findings() { # added_findings <repo-relative path>: violating lines added since HEAD
-  local re="($HEX|$ARB|$PAL)" lines i=0
-  vendor "$1" && re="($HEX|$ARB)"
-  lines=$(added_lines "$1" | grep -v 'design-ok' || true)
-  [ -n "$lines" ] || return 0
-  printf '%s\n' "$lines" | grep -E "$re" | awk -v p="  $1:" '{ print p $0 }' || true
-  while [ "$i" -lt "${#RULE_RES[@]}" ]; do
-    printf '%s\n' "$lines" | grep -E "${RULE_RES[$i]}" \
-      | awk -v p="  $1:" -v l="   [rule: ${RULE_LABELS[$i]}]" '{ print p $0 l }' || true
-    i=$((i + 1))
-  done
-}
+def vendor?(path)
+  VENDOR_PREFIXES.any? { |prefix| path.start_with?(prefix) }
+end
 
-changed_findings() { # findings in every in-scope file changed since $BASE, or untracked
-  local rel found
-  while IFS= read -r rel; do
-    { [ -f "$rel" ] && in_scope "$rel"; } || continue
-    found=$(added_findings "$rel")
-    [ -z "$found" ] || printf '%s\n' "$found"
-  done < <({ git diff --name-only "$BASE" 2>/dev/null || true; git ls-files --others --exclude-standard; } | sort -u)
-}
+def exempt_path?(path)
+  path.match?(%r{_mailer/|(^|/)layouts/mailer}) || path.match?(%r{(^|/)(tokens|theme)[^/]*\.css$})
+end
 
-block() { # block <findings> [exit-code] [where]
-  {
-    echo "Design-system drift in ${3:-the lines just written}:"
-    printf '%s\n' "$1"
-    echo "Untagged lines break the token rule (no raw hex, no literal palette classes, no arbitrary [...] values): use the section's role tokens (see docs/design-system/)."
-    case "$1" in *"[rule: "*) echo "Lines tagged [rule: ...] break a project rule in docs/design-system/audit-rules: follow the spec it names." ;; esac
-    echo "For a deliberate exception, put design-ok on that line."
-  } >&2
-  exit "${2:-2}"
-}
+def in_scope?(path)
+  return false if exempt_path?(path)
+  return false unless VIEW_DIRS.any? { |dir| path.start_with?("#{dir}/") }
 
-if [ "${1:-}" = "--hook" ]; then
-  file=$(ruby -rjson -e 'puts JSON.parse($stdin.read).dig("tool_input", "file_path").to_s' 2>/dev/null || true)
-  [ -n "$file" ] || exit 0
-  case "$file" in /*) ;; *) file="$orig/$file" ;; esac
-  rel=${file#"$root"/}
-  [ "$rel" = "$file" ] && rel=${file#"$(pwd -P)"/}
-  { [ -f "$rel" ] && in_scope "$rel"; } || exit 0
-  out=$(added_findings "$rel")
-  [ -z "$out" ] || block "$out"
-  exit 0
-fi
+  EXTENSIONS.include?(File.extname(path))
+end
 
-if [ "${1:-}" = "--stop" ]; then
+def git(*args)
+  IO.popen(["git", *args], err: File::NULL, &:read)
+end
+
+def git_ok?(*args)
+  system("git", *args, out: File::NULL, err: File::NULL)
+end
+
+def text_lines(content)
+  lines = content.b.split("\n", -1)
+  lines.pop if lines.last == ""
+  lines
+end
+
+# [line_number, text] for each line added since base (every line if the file is
+# new there), without lines marked design-ok.
+def added_lines(path, base)
+  lines =
+    if git_ok?("rev-parse", "-q", "--verify", base) && git_ok?("cat-file", "-e", "#{base}:#{path}")
+      number = 0
+      text_lines(git("diff", "-U0", base, "--", path)).each_with_object([]) do |line, added|
+        if (hunk = line.match(/\A@@ -\S+ \+(\d+)/))
+          number = hunk[1].to_i
+        elsif number.positive? && line.start_with?("+")
+          added << [number, line[1..-1]]
+          number += 1
+        end
+      end
+    else
+      text_lines(File.binread(path)).each_with_index.map { |text, index| [index + 1, text] }
+    end
+  lines.reject { |_, text| text.include?("design-ok") }
+end
+
+def findings_for(path, base)
+  token_check = vendor?(path) ? Regexp.union(HEX, ARB) : Regexp.union(HEX, ARB, PAL)
+  lines = added_lines(path, base)
+  token_hits = lines.select { |_, text| text.match?(token_check) }.map { |number, text| "  #{path.b}:#{number}: #{text}" }
+  rule_hits = RULES.flat_map do |label, pattern|
+    lines.select { |_, text| text.match?(pattern) }.map { |number, text| "  #{path.b}:#{number}: #{text}   [rule: #{label.b}]" }
+  end
+  token_hits + rule_hits
+end
+
+def changed_paths(base)
+  (git("diff", "--name-only", base).split("\n") + git("ls-files", "--others", "--exclude-standard").split("\n")).uniq.sort
+end
+
+def changed_findings(base)
+  changed_paths(base).select { |path| File.file?(path) && in_scope?(path) }.flat_map { |path| findings_for(path, base) }
+end
+
+def block(findings, status: 2, where: "the lines just written")
+  message = ["Design-system drift in #{where}:", *findings]
+  message << "Untagged lines break the token rule (no raw hex, no literal palette classes, no arbitrary [...] values): use the section's role tokens (see docs/design-system/)."
+  if findings.any? { |line| line.include?("[rule: ") }
+    message << "Lines tagged [rule: ...] break a project rule in docs/design-system/audit-rules: follow the spec it names."
+  end
+  message << "For a deliberate exception, put design-ok on that line."
+  $stderr.puts(message)
+  exit status
+end
+
+# The repo-relative path of a tool-call file path, or nil when it is outside the
+# repo. Handles relative paths and symlinked roots (/tmp vs /private/tmp).
+def repo_relative(file)
+  file = File.expand_path(file, ORIGINAL_DIR)
+  real_root = File.realpath(ROOT)
+  [ROOT, real_root].each do |root|
+    return file.delete_prefix("#{root}/") if file.start_with?("#{root}/")
+  end
+  real = begin
+    File.realpath(file)
+  rescue SystemCallError
+    file
+  end
+  real.start_with?("#{real_root}/") ? real.delete_prefix("#{real_root}/") : nil
+end
+
+def read_json_stdin
+  JSON.parse($stdin.read)
+rescue JSON::ParserError
+  {}
+end
+
+def hook_mode
+  input = read_json_stdin
+  file = input.is_a?(Hash) ? input.dig("tool_input", "file_path").to_s : ""
+  return if file.empty?
+
+  path = repo_relative(file)
+  return unless path && File.file?(path) && in_scope?(path)
+
+  findings = findings_for(path, "HEAD")
+  block(findings) unless findings.empty?
+end
+
+def stop_mode
+  input = read_json_stdin
   # stop_hook_active means the agent was already sent back once: never loop.
-  if grep -qE '"stop_hook_active" *: *true'; then exit 0; fi
-  out=$(changed_findings)
-  [ -z "$out" ] || block "$out"
-  exit 0
-fi
+  return if input.is_a?(Hash) && input["stop_hook_active"] == true
 
-if [ "${1:-}" = "--changed" ]; then
-  [ -n "${2:-}" ] || { echo "usage: bin/audit_design --changed <base-branch>" >&2; exit 1; }
-  BASE=$(git merge-base "$2" HEAD 2>/dev/null) \
-    || { echo "No merge base with $2 - in CI, check out the full history (fetch-depth: 0)." >&2; exit 1; }
-  out=$(changed_findings)
-  [ -z "$out" ] || block "$out" 1 "lines added since $2"
-  echo "No design drift in lines added since $2."
-  exit 0
-fi
-STRICT=0; [ "${1:-}" = "--strict" ] && STRICT=1
+  findings = changed_findings("HEAD")
+  block(findings) unless findings.empty?
+end
 
-dirs=()
-for d in app/views app/components app/frontend app/javascript app/assets/stylesheets; do
-  [ -d "$d" ] && dirs+=("$d")
-done
-[ ${#dirs[@]} -eq 0 ] && { echo "No view directories found."; exit 0; }
-total=0
-scan() { # scan <label> <extended-regex> [skip-vendor]
-  local label=$1 re=$2 skip=${3:-} out count=0
-  out=$(grep -rInE \
-        --include='*.erb' --include='*.haml' --include='*.slim' --include='*.html' \
-        --include='*.rb' --include='*.css' --include='*.js' \
-        "$re" "${dirs[@]}" 2>/dev/null \
-        | grep -v 'design-ok' \
-        | grep -vE '_mailer/|/layouts/mailer' \
-        | grep -vE '(^|/)(tokens|theme)[^/]*\.css:' || true)
-  if [ -n "$skip" ] && [ -n "$VENDOR" ] && [ -n "$out" ]; then
-    out=$(printf '%s\n' "$out" | grep -vE "$VENDOR" || true)
-  fi
-  [ -n "$out" ] && count=$(printf '%s\n' "$out" | wc -l | tr -d ' ')
-  total=$((total + count))
-  echo "== $label: $count"
-  [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/   /'
-  echo
-}
-scan "raw hex colours" "$HEX"
-scan "arbitrary values" "$ARB"
-scan "literal palette classes" "$PAL" skip-vendor
-i=0
-while [ "$i" -lt "${#RULE_RES[@]}" ]; do
-  scan "rule: ${RULE_LABELS[$i]}" "${RULE_RES[$i]}"
-  i=$((i + 1))
-done
-if [ "$total" -eq 0 ]; then
-  echo "No drift detected."
-else
-  echo "Fix findings by retokenising the view or adding a token to the section's tokens.md."
-  echo "Never quiet a finding by weakening this script; mark deliberate exceptions with design-ok."
-  [ "$STRICT" -eq 0 ] || exit 1
-fi
+def changed_mode(base_ref)
+  abort "usage: bin/audit_design --changed <base-branch>" if base_ref.to_s.empty?
+  base = git("merge-base", base_ref, "HEAD").strip
+  abort "No merge base with #{base_ref} - in CI, check out the full history (fetch-depth: 0)." if base.empty?
+
+  findings = changed_findings(base)
+  block(findings, status: 1, where: "lines added since #{base_ref}") unless findings.empty?
+  puts "No design drift in lines added since #{base_ref}."
+end
+
+def scan_files
+  VIEW_DIRS.select { |dir| File.directory?(dir) }.flat_map do |dir|
+    Dir.glob("#{dir}/**/*").select { |path| File.file?(path) && EXTENSIONS.include?(File.extname(path)) }.sort
+  end.reject { |path| exempt_path?(path) }
+end
+
+def full_scan(strict:)
+  unless VIEW_DIRS.any? { |dir| File.directory?(dir) }
+    puts "No view directories found."
+    return
+  end
+
+  files = scan_files.map do |path|
+    content = File.binread(path)
+    next if content.include?("\0")
+
+    lines = text_lines(content).each_with_index.map { |text, index| [index + 1, text] }
+    [path, lines.reject { |_, text| text.include?("design-ok") }]
+  end.compact
+
+  checks = [["raw hex colours", HEX, false], ["arbitrary values", ARB, false], ["literal palette classes", PAL, true]]
+  checks += RULES.map { |label, pattern| ["rule: #{label}", pattern, false] }
+  total = 0
+  checks.each do |label, pattern, skip_vendor|
+    hits = files.flat_map do |path, lines|
+      next [] if skip_vendor && vendor?(path)
+
+      lines.select { |_, text| text.match?(pattern) }.map { |number, text| "   #{path.b}:#{number}:#{text}" }
+    end
+    total += hits.size
+    puts "== #{label}: #{hits.size}", *hits, ""
+  end
+
+  if total.zero?
+    puts "No drift detected."
+  else
+    puts "Fix findings by retokenising the view or adding a token to the section's tokens.md."
+    puts "Never quiet a finding by weakening this script; mark deliberate exceptions with design-ok."
+    exit 1 if strict
+  end
+end
+
+case ARGV[0]
+when "--hook" then hook_mode
+when "--stop" then stop_mode
+when "--changed" then changed_mode(ARGV[1])
+else full_scan(strict: ARGV[0] == "--strict")
+end

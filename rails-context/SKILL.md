@@ -72,7 +72,7 @@ How the chain loads matters. Claude Code loads the root `CLAUDE.md` at session s
 Re-running on an app that already has context files is maintenance, not a rewrite. The survey then also covers the existing context files, and the Phase 1 plan proposes four kinds of work:
 
 - **Gap-fill**: new files for newly qualifying directories (start from the candidates `bin/audit_context` lists), missing `AGENTS.md` symlinks added, real `AGENTS.md` files migrated. A candidate that does not qualify gets added to the root `<!-- context-skip: ... -->` line instead, so it is not proposed again.
-- **Drift review**: run `bin/audit_context` (if it doesn't exist yet, create it first - Phase 3). For each flagged pre-existing file, read the changed files and the current `CLAUDE.md`, then propose a surgical edit only where a documented pattern is now false or a new convention has emerged. Deleted files are the strongest signal: remove anything that still describes them. A flagged file that is still accurate gets reported as "checked, still accurate", and its `<!-- reviewed: YYYY-MM-DD -->` line (last line of the file; add it if missing) is set to today, so committing it resets the audit baseline and the flag clears - never edit content to look busy, and never silently skip a file.
+- **Drift review**: run `bin/audit_context` (if it doesn't exist yet or differs from `scripts/audit_context` in this skill, copy it over first - Phase 3). For each flagged pre-existing file, read the changed files and the current `CLAUDE.md`, then propose a surgical edit only where a documented pattern is now false or a new convention has emerged. Deleted files are the strongest signal: remove anything that still describes them. A flagged file that is still accurate gets reported as "checked, still accurate", and its `<!-- reviewed: YYYY-MM-DD -->` line (last line of the file; add it if missing) is set to today, so committing it resets the audit baseline and the flag clears - never edit content to look busy, and never silently skip a file.
 - **One fact, one level repair**: where an existing file (the root included) states a fact that a deeper file owns - or will own after this run's gap-fill - propose slimming the ancestor to a one-line pointer.
 - **Size repair**: flag files outside the size discipline (`bin/audit_context` reports them) - past the review trigger (150 lines or 10 KB; the root 200 lines or 12 KB), propose a restructuring (usually a nested-file split, or moving root content down); under the 30-line floor, note whether the file is legitimately short or missing its layer's substance.
 
@@ -154,104 +154,7 @@ Below the block, on its own line, record the directories you considered in Phase
 <!-- context-skip: app/helpers app/mailers -->
 ```
 
-Then create `bin/audit_context` (chmod +x) with this content:
-
-```bash
-#!/usr/bin/env bash
-# Report drift between CLAUDE.md context files and the code they describe.
-# Works from any directory: paths always resolve from the repo root.
-# Output is a drift SIGNAL, not proof of staleness.
-set -euo pipefail
-cd "$(dirname "$0")/.."
-git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "not a git repo" >&2; exit 1; }
-found=0; drift=0
-size_note() { # size_note <file> <max-lines> <max-bytes>: prints a note when over the review trigger
-  local lines bytes
-  lines=$(wc -l < "$1" | tr -d ' '); bytes=$(wc -c < "$1" | tr -d ' ')
-  if [ "$lines" -gt "$2" ] || [ "$bytes" -gt "$3" ]; then
-    echo "oversized: $lines lines, $((bytes / 1024)) KB (review trigger: $2 lines or $(($3 / 1024)) KB)"
-  fi
-}
-if [ -f CLAUDE.md ]; then
-  size=$(size_note CLAUDE.md 200 12288)
-  [ -n "$size" ] && { drift=1; echo "== CLAUDE.md (root)"; echo "   $size"; echo; }
-fi
-while IFS= read -r legacy; do
-  found=1; drift=1
-  echo "== $legacy"
-  echo "   real AGENTS.md - migrate: git mv AGENTS.md CLAUDE.md && ln -s CLAUDE.md AGENTS.md"
-  echo
-done < <(find app lib test spec -name AGENTS.md -type f 2>/dev/null | sort)
-while IFS= read -r ctx; do
-  found=1
-  dir=$(dirname "$ctx")
-  size=$(size_note "$ctx" 150 10240)
-  last=$(git log -1 --format=%H -- "$ctx" 2>/dev/null || true)
-  if [ -z "$last" ]; then
-    echo "== $ctx"; echo "   never committed - commit it or review now"
-    [ -n "$size" ] && echo "   $size"
-    echo; drift=1; continue
-  fi
-  # "<status><TAB><path>" for every change since the file was last committed
-  changes=$( { git diff --name-status "$last"..HEAD -- "$dir" 2>/dev/null \
-                 | awk -F'\t' '{ print substr($1, 1, 1) "\t" $NF }' || true
-               git status --porcelain -- "$dir" 2>/dev/null \
-                 | awk '{ s = substr($0, 1, 2); gsub(/ /, "", s); print substr(s, 1, 1) "\t" $NF }' || true; } \
-    | grep -v -e '/AGENTS\.md$' -e '/CLAUDE\.md$' || true)
-  deleted=$(printf '%s\n' "$changes" | awk -F'\t' '$1 == "D" { print $2 }' | sort -u)
-  all=$(printf '%s\n' "$changes" | awk -F'\t' '$1 != "D" && $2 != "" { print $2 }' | sort -u)
-  note=""
-  if [ ! -e "$dir/AGENTS.md" ] && [ ! -L "$dir/AGENTS.md" ]; then
-    note="missing AGENTS.md symlink - run: (cd $dir && ln -s CLAUDE.md AGENTS.md)"
-  elif [ -L "$dir/AGENTS.md" ] && [ "$(readlink "$dir/AGENTS.md")" != "CLAUDE.md" ]; then
-    note="AGENTS.md symlink points to $(readlink "$dir/AGENTS.md"), expected CLAUDE.md"
-  fi
-  if [ -n "$all" ] || [ -n "$deleted" ] || [ -n "$note" ] || [ -n "$size" ]; then
-    drift=1
-    echo "== $ctx (last updated $(git log -1 --format=%cs -- "$ctx"))"
-    [ -n "$note" ] && echo "   $note"
-    [ -n "$size" ] && echo "   $size"
-    if [ -n "$deleted" ]; then
-      echo "   $(printf "%s\n" "$deleted" | wc -l | tr -d ' ') file(s) deleted since - remove anything that still describes them:"
-      printf "%s\n" "$deleted" | sed 's/^/     - /'
-    fi
-    if [ -n "$all" ]; then
-      echo "   $(printf "%s\n" "$all" | wc -l | tr -d ' ') file(s) changed since:"
-      printf "%s\n" "$all" | sed 's/^/     - /'
-    fi
-    echo
-  fi
-done < <(find app lib test spec -name CLAUDE.md -type f 2>/dev/null | sort)
-# Directories that may deserve a context file: 5+ source files, no CLAUDE.md in
-# their tree, not covered by name in the parent's CLAUDE.md, and not listed in a
-# "<!-- context-skip: app/helpers app/models/concerns -->" line in the root CLAUDE.md.
-skip=" $( { sed -n 's/.*<!-- *context-skip: *\(.*\)-->.*/\1/p' CLAUDE.md 2>/dev/null || true; } | tr '\n' ' ' | sed 's#/ # #g') "
-candidates=""
-while IFS= read -r d; do
-  [ -n "$(find "$d" -name CLAUDE.md -print -quit)" ] && continue
-  case "$skip" in *" $d "*) continue ;; esac
-  parent=$(dirname "$d")
-  [ -f "$parent/CLAUDE.md" ] && grep -qF "$(basename "$d")/" "$parent/CLAUDE.md" && continue
-  n=$(find "$d" -type f \( -name '*.rb' -o -name '*.erb' -o -name '*.js' -o -name '*.ts' -o -name '*.rake' \) | wc -l | tr -d ' ')
-  [ "$n" -ge 5 ] && candidates+="     - $d ($n files)"$'\n'
-done < <( { find app lib -mindepth 1 -maxdepth 1 -type d || true
-            find app/models app/services app/controllers app/components app/jobs \
-              -mindepth 1 -maxdepth 1 -type d || true
-          } 2>/dev/null | grep -v '^app/assets' | sort -u)
-if [ -n "$candidates" ]; then
-  echo "Directories with 5+ files and no context file - give each one a CLAUDE.md, or"
-  echo "list it in a <!-- context-skip: ... --> line in the root CLAUDE.md if it needs none:"
-  printf '%s\n' "$candidates"
-fi
-[ "$found" -eq 0 ] && { echo "No context files found under app/, lib/, test/, or spec/."; exit 0; }
-if [ "$drift" -eq 0 ]; then
-  echo "No drift detected."
-else
-  echo "Review flagged directories: most changes are routine and need nothing."
-  echo "Edit CLAUDE.md surgically only where a documented pattern changed."
-  echo "Oversized files: cut inventory, or move a growing namespace into a nested CLAUDE.md."
-fi
-```
+Then copy the audit script this skill ships into the app and make it executable: `cp "${CLAUDE_SKILL_DIR}/scripts/audit_context" bin/audit_context && chmod +x bin/audit_context` (`${CLAUDE_SKILL_DIR}` is this skill's directory; resolve it yourself if the variable is not expanded). It is plain Ruby with no gem dependencies. Copy it unchanged, so every app runs the same checks and an outdated copy is a plain file difference; read its header comment for what it reports. Run it once from a subfolder (`cd app && ../bin/audit_context`) to confirm it works.
 
 Do not create any slash command for auditing: re-running this skill IS the audit (see "Re-runs: maintenance mode").
 

@@ -4,7 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repository is
 
-A hand-authored collection of Claude Code skills, not limited to any one domain — each skill's name and description convey what it is for (Rails, etc.). There is no application code, build step, or test suite — every deliverable is a skill directory containing markdown instructions for Claude.
+A hand-authored collection of Claude Code skills, not limited to any one domain — each skill's name and description convey what it is for (Rails, etc.). There is no application code or build step - every deliverable is a plugin directory: markdown instructions for Claude, plus the scripts and hooks some plugins ship.
+
+## Scripts and tests
+
+Scripts a plugin copies into apps (`<plugin>/scripts/`, e.g. `audit_design`, `audit_context`) are plain Ruby, standard library only, compatible with Ruby 2.6+ (macOS still ships 2.6 as `/usr/bin/ruby`): every Rails app has Ruby, and one regex engine behaves the same on macOS and Linux CI. Hook scripts (`<plugin>/hooks/*.sh`) stay small `bash` wrappers. Never embed a script in a `SKILL.md`; the skill copies the file with `${CLAUDE_SKILL_DIR}`.
+
+`bin/test` runs the Minitest suite in `test/`: each test builds a throwaway git repo and runs the real scripts and hooks as subprocesses. Run it after any script or hook change, and once more as `TEST_RUBY=/usr/bin/ruby bin/test` to prove the scripts still work on the old system Ruby. Add a test for every behaviour you add or bug you fix.
 
 ## Repository structure
 

@@ -1,0 +1,9 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Runs the test suite: bin/test [files...]. TEST_RUBY=/path/to/ruby runs the audit
+# scripts under another Ruby (e.g. TEST_RUBY=/usr/bin/ruby for macOS's old system
+# Ruby) while the tests themselves run under this one.
+$LOAD_PATH.unshift(File.expand_path("../test", __dir__))
+files = ARGV.empty? ? Dir.glob(File.expand_path("../test/**/*_test.rb", __dir__)).sort : ARGV.map { |f| File.expand_path(f) }
+files.each { |file| require file }

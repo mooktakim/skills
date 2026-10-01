@@ -16,14 +16,9 @@ out=$("$audit" 2>/dev/null) || exit 0
 oversized=$(grep -c 'oversized:' <<<"$out")
 flagged=$(grep -c '^== ' <<<"$out")
 candidates=$(grep -cE '^     - .* \([0-9]+ files\)$' <<<"$out")
-skill="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}/SKILL.md"
+plugin="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"
 outdated=0
-if [ -f "$skill" ]; then
-  current=$(awk '/^```bash$/ { b = ""; inb = 1; next }
-    inb && /^```$/ { inb = 0; if (b ~ /Report drift between/) { printf "%s", b; exit } }
-    inb { b = b $0 "\n" }' "$skill")
-  [ -n "$current" ] && [ "$current" != "$(cat "$audit")" ] && outdated=1
-fi
+[ -f "$plugin/scripts/audit_context" ] && ! cmp -s "$plugin/scripts/audit_context" "$audit" && outdated=1
 
 reasons=()
 [ "$oversized" -gt 0 ] && reasons+=("$oversized context file(s) over the size limit")

@@ -1,0 +1,9 @@
+# Audit scripts rewritten in Ruby + Minitest suite (rails-design-system 0.13.0, rails-context 0.11.0)
+
+- User asked after the bash/BSD-vs-GNU risk was raised (CI on Ubuntu had never run the bash scripts). Benchmark first: Ruby itself is not slower - the cost is the asdf shim (~150 ms/start); bash --hook was already 124 ms because it shelled out to Ruby for JSON. Ruby direct: 17-40 ms.
+- `rails-design-system/scripts/audit_design` and new `rails-context/scripts/audit_context`: plain Ruby, stdlib only, Ruby 2.6+ (macOS /usr/bin/ruby). Same CLI, modes, data files and output format (nudges parse it). Files read as bytes; user rules compiled as byte regexps; `quietly` silences Ruby's warning for grep-style `[^]]` (bug found by the tests: Kernel#warn prints nothing while $VERBOSE is nil). Output now sorted by bytes (bash `sort` was locale-dependent); otherwise identical.
+- rails-context SKILL.md: embedded bash block replaced by `cp "${CLAUDE_SKILL_DIR}/scripts/audit_context"`; nudge compares with `cmp`. Both skills now ship scripts as files.
+- enforce.sh: resolves the project's Ruby through the shim once, caches the binary path in CLAUDE_PLUGIN_DATA (cksum of root), re-resolves if the cached binary vanished; runs `--disable-gems`. Hook latency on maynard: 39 ms (was 124 ms).
+- Test suite: `bin/test` + test/{audit_design,audit_context,hooks}_test.rb, 62 tests / 168 assertions, throwaway git repos, real subprocesses. `TEST_RUBY` picks the script Ruby. Green on Ruby 4.0 (macOS), Ruby 2.6 (/usr/bin/ruby), and Ruby 3.3 on Debian Linux in Docker (GNU tools).
+- Parity: full-scan output for both audits matches the bash versions on dinehere, yardnote, maynard, miraj, lifeadmin (sorted compare; context also byte-identical on 4 of them, rest differ only in sort order).
+- Repo CLAUDE.md: new "Scripts and tests" section (Ruby stdlib 2.6+, no scripts embedded in SKILL.md, run bin/test + TEST_RUBY=/usr/bin/ruby, add a test per behaviour/bug).

@@ -1,0 +1,170 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Report drift between CLAUDE.md context files and the code they describe.
+# Plain Ruby, standard library only (Ruby 2.6+): no Bundler, works in any app.
+# Works from any directory: paths resolve from the repo root (the script's parent
+# directory, or $AUDIT_ROOT when set).
+# Output is a drift SIGNAL, not proof of staleness. It reports:
+#   - an oversized root CLAUDE.md (over 200 lines or 12 KB)
+#   - real AGENTS.md files that should be symlinks to CLAUDE.md
+#   - per context file: files changed or deleted since the file was last
+#     committed, a missing or wrong AGENTS.md symlink, and size over the review
+#     trigger (150 lines or 10 KB). Committing a "<!-- reviewed: YYYY-MM-DD -->"
+#     line in a still-accurate file moves its baseline and clears the flag.
+#   - candidate directories: 5+ source files, no CLAUDE.md in their tree, not
+#     named as "<dir>/" in the parent's CLAUDE.md, and not listed in a
+#     "<!-- context-skip: app/helpers app/mailers -->" line in the root CLAUDE.md
+
+ROOT = File.expand_path(ENV["AUDIT_ROOT"] || File.join(__dir__, ".."))
+Dir.chdir(ROOT)
+
+TREES = %w[app lib test spec].freeze
+NAMESPACE_PARENTS = %w[app/models app/services app/controllers app/components app/jobs].freeze
+SOURCE_EXTENSIONS = %w[.rb .erb .js .ts .rake].freeze
+
+def git(*args)
+  IO.popen(["git", *args], err: File::NULL, &:read)
+end
+
+def size_note(path, max_lines, max_bytes)
+  content = File.binread(path)
+  lines = content.count("\n")
+  return nil unless lines > max_lines || content.bytesize > max_bytes
+
+  "oversized: #{lines} lines, #{content.bytesize / 1024} KB (review trigger: #{max_lines} lines or #{max_bytes / 1024} KB)"
+end
+
+# Regular files (not symlinks) with this name anywhere under the trees, sorted.
+def find_regular(name)
+  TREES.select { |tree| File.directory?(tree) }
+       .flat_map { |tree| Dir.glob("#{tree}/**/#{name}") }
+       .select { |path| File.file?(path) && !File.symlink?(path) }
+       .sort
+end
+
+def context_file?(path)
+  path.end_with?("/AGENTS.md", "/CLAUDE.md")
+end
+
+# [status letter, path] for every change in dir since the commit, committed or not.
+def changes_since(commit, dir)
+  committed = git("diff", "--name-status", "-z", "#{commit}..HEAD", "--", dir).split("\0")
+  changes = []
+  until committed.empty?
+    status = committed.shift
+    paths = status.start_with?("R", "C") ? committed.shift(2) : committed.shift(1)
+    changes << [status[0], paths.last]
+  end
+  working = git("status", "--porcelain", "-z", "--", dir).split("\0")
+  until working.empty?
+    entry = working.shift
+    status = entry[0, 2].delete(" ")[0]
+    working.shift if entry[0] == "R" || entry[0] == "C" # the original path follows
+    changes << [status, entry[3..-1]]
+  end
+  changes.reject { |_, path| path.nil? || path.empty? || context_file?(path) }
+end
+
+def symlink_note(dir)
+  agents = File.join(dir, "AGENTS.md")
+  if !File.exist?(agents) && !File.symlink?(agents)
+    "missing AGENTS.md symlink - run: (cd #{dir} && ln -s CLAUDE.md AGENTS.md)"
+  elsif File.symlink?(agents) && File.readlink(agents) != "CLAUDE.md"
+    "AGENTS.md symlink points to #{File.readlink(agents)}, expected CLAUDE.md"
+  end
+end
+
+def listed(header, paths)
+  ["   #{paths.size} file(s) #{header}", *paths.map { |path| "     - #{path}" }]
+end
+
+def skip_list
+  return [] unless File.file?("CLAUDE.md")
+
+  File.read("CLAUDE.md").scan(/<!--\s*context-skip:\s*(.*?)-->/).flatten.flat_map(&:split).map { |dir| dir.chomp("/") }
+end
+
+def candidates
+  skips = skip_list
+  dirs = (%w[app lib] + NAMESPACE_PARENTS).select { |dir| File.directory?(dir) }
+                                          .flat_map { |dir| Dir.glob("#{dir}/*/").map { |sub| sub.chomp("/") } }
+                                          .uniq.sort
+  dirs = dirs.reject { |dir| dir.start_with?("app/assets") || File.symlink?(dir) }
+  dirs.map do |dir|
+    next if Dir.glob("#{dir}/**/CLAUDE.md").any?
+    next if skips.include?(dir)
+
+    parent = File.join(File.dirname(dir), "CLAUDE.md")
+    next if File.file?(parent) && File.read(parent).include?("#{File.basename(dir)}/")
+
+    count = Dir.glob("#{dir}/**/*").count { |path| File.file?(path) && !File.symlink?(path) && SOURCE_EXTENSIONS.include?(File.extname(path)) }
+    "     - #{dir} (#{count} files)" if count >= 5
+  end.compact
+end
+
+unless system("git", "rev-parse", "--is-inside-work-tree", out: File::NULL, err: File::NULL)
+  warn "not a git repo"
+  exit 1
+end
+
+found = false
+drift = false
+
+if File.file?("CLAUDE.md") && (note = size_note("CLAUDE.md", 200, 12_288))
+  drift = true
+  puts "== CLAUDE.md (root)", "   #{note}", ""
+end
+
+find_regular("AGENTS.md").each do |legacy|
+  found = drift = true
+  puts "== #{legacy}", "   real AGENTS.md - migrate: git mv AGENTS.md CLAUDE.md && ln -s CLAUDE.md AGENTS.md", ""
+end
+
+find_regular("CLAUDE.md").each do |context|
+  found = true
+  dir = File.dirname(context)
+  size = size_note(context, 150, 10_240)
+  last = git("log", "-1", "--format=%H", "--", context).strip
+  if last.empty?
+    drift = true
+    puts "== #{context}", "   never committed - commit it or review now"
+    puts "   #{size}" if size
+    puts ""
+    next
+  end
+
+  changes = changes_since(last, dir)
+  deleted = changes.select { |status, _| status == "D" }.map(&:last).uniq.sort
+  changed = changes.reject { |status, _| status == "D" }.map(&:last).uniq.sort
+  note = symlink_note(dir)
+  next if deleted.empty? && changed.empty? && note.nil? && size.nil?
+
+  drift = true
+  puts "== #{context} (last updated #{git('log', '-1', '--format=%cs', '--', context).strip})"
+  puts "   #{note}" if note
+  puts "   #{size}" if size
+  puts listed("deleted since - remove anything that still describes them:", deleted) unless deleted.empty?
+  puts listed("changed since:", changed) unless changed.empty?
+  puts ""
+end
+
+list = candidates
+unless list.empty?
+  puts "Directories with 5+ files and no context file - give each one a CLAUDE.md, or"
+  puts "list it in a <!-- context-skip: ... --> line in the root CLAUDE.md if it needs none:"
+  puts list, ""
+end
+
+unless found
+  puts "No context files found under app/, lib/, test/, or spec/."
+  exit 0
+end
+
+if drift
+  puts "Review flagged directories: most changes are routine and need nothing."
+  puts "Edit CLAUDE.md surgically only where a documented pattern changed."
+  puts "Oversized files: cut inventory, or move a growing namespace into a nested CLAUDE.md."
+else
+  puts "No drift detected."
+end
