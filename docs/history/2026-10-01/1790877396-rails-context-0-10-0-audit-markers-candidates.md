@@ -1,0 +1,8 @@
+# rails-context 0.10.0: reviewed marker, deleted files, candidate directories
+
+- Review defect 13: audit_context only checked staleness of existing files. "Checked, still accurate" files stayed flagged forever (dinehere app/components flagged by pre-setup changes, never clearable), deletions were mixed with routine changes (restaurantwebsitebuilder kept describing deleted rrweb controllers), and new qualifying dirs were invisible (miraj app/models/library, app/controllers/admin never got files).
+- Reviewed marker: maintenance sets a `<!-- reviewed: YYYY-MM-DD -->` last line on a still-accurate file; committing it moves the git baseline, so no script logic needed. HTML comments are stripped from context (verified in docs) - zero tokens.
+- Deletions: `git diff --name-status` + porcelain status split into "deleted since - remove anything that still describes them" vs "changed since".
+- Candidates: dirs at app|lib depth 1 and models/services/controllers/components/jobs depth 2 with 5+ source files, no CLAUDE.md anywhere in their tree, not named as `<name>/` in the parent's CLAUDE.md, and not in a root `<!-- context-skip: ... -->` line (Phase 3 now writes it for dirs judged not to qualify). Printed after the per-file blocks, not counted as drift; the SessionStart nudge reports them as a reason.
+- Bug found while testing: under `set -e`, a failing `find` (missing lib/) killed the process-substitution subshell before the second find - fixed with `|| true` per find.
+- Tested in scratch repo (marker clears flag, skip with trailing slash, parent-named namespace excluded, deletions committed + uncommitted, rename, subfolder cwd) and read-only on real projects: miraj lists exactly the dirs the review found missing.

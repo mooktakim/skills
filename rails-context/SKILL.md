@@ -69,8 +69,8 @@ Context files form a chain — root → `app/<dir>/` → nested namespace — an
 
 Re-running on an app that already has context files is maintenance, not a rewrite. The survey then also covers the existing context files, and the Phase 1 plan proposes four kinds of work:
 
-- **Gap-fill**: new files for newly qualifying directories, missing `AGENTS.md` symlinks added, real `AGENTS.md` files migrated.
-- **Drift review**: run `bin/audit_context` (if it doesn't exist yet, create it first — Phase 3). For each flagged pre-existing file, read the changed files and the current `CLAUDE.md`, then propose a surgical edit only where a documented pattern is now false or a new convention has emerged. A flagged file that is still accurate gets reported as "checked, still accurate" — never edited to look busy, and never silently skipped.
+- **Gap-fill**: new files for newly qualifying directories (start from the candidates `bin/audit_context` lists), missing `AGENTS.md` symlinks added, real `AGENTS.md` files migrated. A candidate that does not qualify gets added to the root `<!-- context-skip: ... -->` line instead, so it is not proposed again.
+- **Drift review**: run `bin/audit_context` (if it doesn't exist yet, create it first — Phase 3). For each flagged pre-existing file, read the changed files and the current `CLAUDE.md`, then propose a surgical edit only where a documented pattern is now false or a new convention has emerged. Deleted files are the strongest signal: remove anything that still describes them. A flagged file that is still accurate gets reported as "checked, still accurate", and its `<!-- reviewed: YYYY-MM-DD -->` line (last line of the file; add it if missing) is set to today, so committing it resets the audit baseline and the flag clears — never edit content to look busy, and never silently skip a file.
 - **One fact, one level repair**: where an existing file (the root included) states a fact that a deeper file owns — or will own after this run's gap-fill — propose slimming the ancestor to a one-line pointer.
 - **Size repair**: flag files outside the size discipline (`bin/audit_context` reports them) - past the review trigger (150 lines or 10 KB; the root 200 lines or 12 KB), propose a restructuring (usually a nested-file split, or moving root content down); under the 30-line floor, note whether the file is legitimately short or missing its layer's substance.
 
@@ -143,6 +143,12 @@ bin/audit_context reports drift; a periodic MVC Context maintenance run
 works through what it flags.
 ```
 
+Below the block, on its own line, record the directories you considered in Phase 1 and decided need no file, so the audit does not keep proposing them (Claude Code strips HTML comments from loaded context, so the line costs no tokens):
+
+```markdown
+<!-- context-skip: app/helpers app/mailers -->
+```
+
 Then create `bin/audit_context` (chmod +x) with this content:
 
 ```bash
@@ -181,22 +187,29 @@ while IFS= read -r ctx; do
     [ -n "$size" ] && echo "   $size"
     echo; drift=1; continue
   fi
-  changed=$(git diff --name-only "$last"..HEAD -- "$dir" 2>/dev/null \
+  # "<status><TAB><path>" for every change since the file was last committed
+  changes=$( { git diff --name-status "$last"..HEAD -- "$dir" 2>/dev/null \
+                 | awk -F'\t' '{ print substr($1, 1, 1) "\t" $NF }' || true
+               git status --porcelain -- "$dir" 2>/dev/null \
+                 | awk '{ s = substr($0, 1, 2); gsub(/ /, "", s); print substr(s, 1, 1) "\t" $NF }' || true; } \
     | grep -v -e '/AGENTS\.md$' -e '/CLAUDE\.md$' || true)
-  uncommitted=$( { git status --porcelain -- "$dir" 2>/dev/null || true; } \
-    | awk '{print $NF}' | grep -v -e '/AGENTS\.md$' -e '/CLAUDE\.md$' || true)
-  all=$(printf "%s\n%s" "$changed" "$uncommitted" | sed '/^$/d' | sort -u)
+  deleted=$(printf '%s\n' "$changes" | awk -F'\t' '$1 == "D" { print $2 }' | sort -u)
+  all=$(printf '%s\n' "$changes" | awk -F'\t' '$1 != "D" && $2 != "" { print $2 }' | sort -u)
   note=""
   if [ ! -e "$dir/AGENTS.md" ] && [ ! -L "$dir/AGENTS.md" ]; then
     note="missing AGENTS.md symlink - run: (cd $dir && ln -s CLAUDE.md AGENTS.md)"
   elif [ -L "$dir/AGENTS.md" ] && [ "$(readlink "$dir/AGENTS.md")" != "CLAUDE.md" ]; then
     note="AGENTS.md symlink points to $(readlink "$dir/AGENTS.md"), expected CLAUDE.md"
   fi
-  if [ -n "$all" ] || [ -n "$note" ] || [ -n "$size" ]; then
+  if [ -n "$all" ] || [ -n "$deleted" ] || [ -n "$note" ] || [ -n "$size" ]; then
     drift=1
     echo "== $ctx (last updated $(git log -1 --format=%cs -- "$ctx"))"
     [ -n "$note" ] && echo "   $note"
     [ -n "$size" ] && echo "   $size"
+    if [ -n "$deleted" ]; then
+      echo "   $(printf "%s\n" "$deleted" | wc -l | tr -d ' ') file(s) deleted since - remove anything that still describes them:"
+      printf "%s\n" "$deleted" | sed 's/^/     - /'
+    fi
     if [ -n "$all" ]; then
       echo "   $(printf "%s\n" "$all" | wc -l | tr -d ' ') file(s) changed since:"
       printf "%s\n" "$all" | sed 's/^/     - /'
@@ -204,6 +217,27 @@ while IFS= read -r ctx; do
     echo
   fi
 done < <(find app lib test spec -name CLAUDE.md -type f 2>/dev/null | sort)
+# Directories that may deserve a context file: 5+ source files, no CLAUDE.md in
+# their tree, not covered by name in the parent's CLAUDE.md, and not listed in a
+# "<!-- context-skip: app/helpers app/models/concerns -->" line in the root CLAUDE.md.
+skip=" $( { sed -n 's/.*<!-- *context-skip: *\(.*\)-->.*/\1/p' CLAUDE.md 2>/dev/null || true; } | tr '\n' ' ' | sed 's#/ # #g') "
+candidates=""
+while IFS= read -r d; do
+  [ -n "$(find "$d" -name CLAUDE.md -print -quit)" ] && continue
+  case "$skip" in *" $d "*) continue ;; esac
+  parent=$(dirname "$d")
+  [ -f "$parent/CLAUDE.md" ] && grep -qF "$(basename "$d")/" "$parent/CLAUDE.md" && continue
+  n=$(find "$d" -type f \( -name '*.rb' -o -name '*.erb' -o -name '*.js' -o -name '*.ts' -o -name '*.rake' \) | wc -l | tr -d ' ')
+  [ "$n" -ge 5 ] && candidates+="     - $d ($n files)"$'\n'
+done < <( { find app lib -mindepth 1 -maxdepth 1 -type d || true
+            find app/models app/services app/controllers app/components app/jobs \
+              -mindepth 1 -maxdepth 1 -type d || true
+          } 2>/dev/null | grep -v '^app/assets' | sort -u)
+if [ -n "$candidates" ]; then
+  echo "Directories with 5+ files and no context file - give each one a CLAUDE.md, or"
+  echo "list it in a <!-- context-skip: ... --> line in the root CLAUDE.md if it needs none:"
+  printf '%s\n' "$candidates"
+fi
 [ "$found" -eq 0 ] && { echo "No context files found under app/, lib/, test/, or spec/."; exit 0; }
 if [ "$drift" -eq 0 ]; then
   echo "No drift detected."

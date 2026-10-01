@@ -43,7 +43,7 @@ What to expect:
 2. The files are generated from your actual code, with the `AGENTS.md` symlinks created alongside, and the maintenance rule and `bin/audit_context` wired up.
 3. Claude shows you every generated file in one message. Correct anything that misstates intent — your word outranks whatever was inferred from the code — then it commits.
 
-Re-running later is how you maintain the setup. A run on an app that already has context files proposes (behind the same approval gate): new files for newly qualifying directories, missing symlinks, drift fixes for files `bin/audit_context` flags (surgical edits where a documented pattern changed, "checked, still accurate" where it didn't), and slimming of any ancestor file that repeats a fact a deeper file owns. Existing files are never regenerated.
+Re-running later is how you maintain the setup. A run on an app that already has context files proposes (behind the same approval gate): new files for newly qualifying directories, missing symlinks, drift fixes for files `bin/audit_context` flags (surgical edits where a documented pattern changed or a described file was deleted; "checked, still accurate" where it didn't, recorded with a `<!-- reviewed: YYYY-MM-DD -->` line so the flag clears), context files for the candidate directories the audit lists (5+ files, no context file; ones that need none go in a root `<!-- context-skip: ... -->` line), and slimming of any ancestor file that repeats a fact a deeper file owns. Existing files are never regenerated.
 
 Afterwards, day to day:
 

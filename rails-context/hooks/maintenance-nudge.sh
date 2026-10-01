@@ -15,6 +15,7 @@ stamp="$data/nudge-$(printf '%s' "$root" | shasum | cut -c1-16)"
 out=$("$audit" 2>/dev/null) || exit 0
 oversized=$(grep -c 'oversized:' <<<"$out")
 flagged=$(grep -c '^== ' <<<"$out")
+candidates=$(grep -cE '^     - .* \([0-9]+ files\)$' <<<"$out")
 skill="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}/SKILL.md"
 outdated=0
 if [ -f "$skill" ]; then
@@ -27,6 +28,7 @@ fi
 reasons=()
 [ "$oversized" -gt 0 ] && reasons+=("$oversized context file(s) over the size limit")
 [ "$flagged" -ge 5 ] && reasons+=("$flagged context file(s) flagged by bin/audit_context")
+[ "$candidates" -gt 0 ] && reasons+=("$candidates director(ies) may need a context file")
 [ "$outdated" -eq 1 ] && reasons+=("bin/audit_context differs from the installed skill version")
 [ ${#reasons[@]} -eq 0 ] && exit 0
 
