@@ -63,8 +63,8 @@ Delegate steps 1-4 to one read-only subagent when the environment provides subag
 
 Re-running on an app that already has `docs/design-system/` is maintenance, not a rewrite. The survey then also covers the existing docs, and the Phase 1 plan proposes six kinds of work:
 
-- **Gap-fill**: newly detected sections; components or patterns now in use but unspecced; missing or outdated enforcement wiring (the hooks in `.claude/settings.json` must match Phase 3 of this skill version - an older entry with the relative command `bin/audit_design --hook` fails from subfolders and gets replaced).
-- **Drift review**: run `bin/audit_design` (if it is missing or differs from the script in Phase 3 of this skill version, create or update it first). Each finding becomes a proposed fix - retokenise the view, or add a missing token to the section's `tokens.md` - never a silent skip.
+- **Gap-fill**: newly detected sections; components or patterns now in use but unspecced; missing or outdated enforcement wiring (the hooks in `.claude/settings.json` must match Phase 3 of this skill version - an older entry with the relative command `bin/audit_design --hook` fails from subfolders and gets replaced; a gitignored `.claude/settings.json` gets reported, as in Phase 3).
+- **Drift review**: run `bin/audit_design` (if it is missing or differs from the script in Phase 3 of this skill version, create or update it first, then run the Phase 3 smoke test). Each finding becomes a proposed fix - retokenise the view, or add a missing token to the section's `tokens.md` - never a silent skip.
 - **Promotion**: the same one-off markup repeated in a section's views becomes a proposed component spec in that section's library.
 - **Conventions and frames**: rules the views now follow consistently, or that I stated since the last run (look for repeated corrections in recent commits), but `conventions.md` lacks; views that break a recorded convention; page patterns that restate the frame instead of naming it. Propose each fix across every section at once.
 - **Spec-vs-realized drift**: read each spec's "Realized as" file; where code and spec contradict, propose which side changes - never let them disagree silently.
@@ -88,6 +88,7 @@ Rules that govern all generation:
 - When speccing a component, look it up in `catalog/README.md` (beside this SKILL.md) and load the mapped catalog file as raw material. Re-shape it to the section's tokens and the app's real markup; never paste an entry unadapted. A component with no catalog entry gets its spec derived from the app's own markup using `references/component-spec.md` alone.
 - Only spec components and patterns the section actually uses or the approved plan listed. Never scaffold the whole catalog into an app. The one standing exception: every section with page patterns gets `patterns/app-shell.md`, because it defines the frames the other patterns name.
 - When the Gemfile shows Phlex or ViewComponent, read the matching `adapters/` guide before writing any "Realized as" guidance, so spec contracts translate into that library's idiom.
+- A new gem (a component library, say) is added only when the approved plan lists it, with `bundle add <gem>`. Then confirm `Gemfile.lock` changed and `bundle check` passes before going on. Never hand-edit a version in the `Gemfile` without running `bundle install` after it: a stale lockfile fails every CI job.
 
 ## Phase 3: Wire up maintenance
 
@@ -115,7 +116,7 @@ in new code; a periodic design-system maintenance run works through what the
 audit flags.
 ```
 
-2. Create `bin/audit_design` (chmod +x) with this content:
+2. Create `bin/audit_design` with this content:
 
 ```bash
 #!/usr/bin/env bash
@@ -248,7 +249,22 @@ else
 fi
 ```
 
-3. Wire generation-time enforcement: add these hooks to the app's `.claude/settings.json` (create the file if missing; if it exists, merge the entries without duplicating them and without touching unrelated hooks; replace any older `bin/audit_design --hook` entry that uses a relative command):
+3. Make the script executable and prove it works before any hook points at it. A hook wired to a missing or non-executable script fails on every edit. Run this from the repo root; it exercises both hook modes from a subfolder, the way the harness will call them, and removes its test file:
+
+```bash
+chmod +x bin/audit_design
+f="$PWD/app/views/audit_smoke_test.html.erb"
+printf '<p class="bg-gray-100">x</p>\n' > "$f"
+(cd app && printf '{"tool_input":{"file_path":"%s"}}' "$f" | "$OLDPWD/bin/audit_design" --hook 2>/dev/null); echo "hook, violation: $? (expect 2)"
+(cd app && printf '{}' | "$OLDPWD/bin/audit_design" --stop 2>/dev/null); echo "stop, violation: $? (expect 2)"
+printf '<p class="bg-surface">x</p>\n' > "$f"
+(cd app && printf '{"tool_input":{"file_path":"%s"}}' "$f" | "$OLDPWD/bin/audit_design" --hook); echo "hook, clean: $? (expect 0)"
+rm "$f"
+```
+
+Any result other than the expected one: stop, find the cause, and fix it before step 4. Report the three results in Phase 4.
+
+4. Wire generation-time enforcement: add these hooks to the app's `.claude/settings.json` (create the file if missing; if it exists, merge the entries without duplicating them and without touching unrelated hooks; replace any older `bin/audit_design --hook` entry that uses a relative command):
 
 ```json
 {
@@ -270,6 +286,8 @@ fi
 ```
 
 The harness runs hooks in the session's current directory, which moves whenever the agent `cd`s, so the command must be anchored on `$CLAUDE_PROJECT_DIR` - a relative `bin/audit_design` fails from any subfolder. The PostToolUse hook checks each Write/Edit the moment it lands. Agents also write views through Bash (heredocs, `sed -i`, scripts) and generators, which no tool matcher sees, so the Stop and SubagentStop hooks check every changed view file in the working tree before a turn ends. Both modes check only lines added since HEAD, and a violation is fed back to the agent as a blocking error, so it gets fixed before the work is handed back - even by an agent that never read the context files.
+
+Then run `git check-ignore -q .claude/settings.json`. If it succeeds, the file is gitignored and the hooks exist only on this machine - no teammate, worktree, or fresh clone gets them. Tell me, and propose un-ignoring it (a `!.claude/settings.json` line in `.gitignore`); never change `.gitignore` without my approval.
 
 Do not create any slash command for auditing: re-running this skill IS the audit (see "Re-runs: maintenance mode").
 
