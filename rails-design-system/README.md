@@ -16,7 +16,7 @@ In the target app, under `docs/design-system/`:
   - `patterns/<name>.md` - page archetypes (index page, form page, app shell...) composing components by reference.
   - `divergences.md` - the migration backlog: every off-system value found, and what it should become.
 
-Plus, outside `docs/`: a design-system block in the root `CLAUDE.md` so agents load the standard before any view work; `bin/audit_design` - a grep-based drift script that flags raw hex, arbitrary `[...]` values, and literal palette classes; and a Claude Code `PostToolUse` hook that runs the same checks on every agent edit to view code and feeds violations back as blocking errors, so generated code is enforced at the moment it is written.
+Plus, outside `docs/`: a design-system block in the root `CLAUDE.md` so agents load the standard before any view work; `bin/audit_design` - a grep-based drift script that flags raw hex, arbitrary `[...]` values, and literal palette classes; and Claude Code hooks that run the same checks on new view code - a `PostToolUse` hook on every Write/Edit, plus `Stop`/`SubagentStop` hooks that catch edits made through Bash or generators - and feed violations back as blocking errors, so generated code is enforced before the work is handed back. Only lines added since the last commit are checked, so old drift never blocks an unrelated edit.
 
 ## Philosophy
 
@@ -31,7 +31,7 @@ A curated component catalog ships with the skill (buttons, forms, tables, naviga
 
 1. **Survey and plan** - detects Tailwind v4 (hard requirement), the view layer, and the candidate sections, then proposes the section split and every file it would write. Nothing is written until you approve.
 2. **Generate** - derives each section's tokens and aesthetics from its actual views (interviewing you where none exist) and specs the components and patterns in use. Sections are independent, so they generate in parallel - one subagent per section, with the agent count declared in the plan you approved.
-3. **Wire up maintenance** - root `CLAUDE.md` block, `bin/audit_design`, and the `PostToolUse` enforcement hook.
+3. **Wire up maintenance** - root `CLAUDE.md` block, `bin/audit_design`, and the enforcement hooks.
 4. **Review** - shows you everything; your stated design intent outranks anything inferred. Commits after corrections, and closes with an audit report.
 
 Re-running later is how you maintain it: drift review, gap-fill for new sections and components, and promotion of repeated one-offs into specs - all behind the same approval gate. Existing docs are never regenerated, only surgically edited.

@@ -1,0 +1,8 @@
+# rails-design-system 0.6.0: robust enforcement hooks
+
+- Trigger: 2026-10-01 field review of real usage (miraj, maynard, yardnote, dinehere). The edit hook was mostly dead: relative command `bin/audit_design --hook` failed (exit 127) whenever the agent had cd'd into a subfolder (221 errors in miraj); `rel=${file#"$PWD"/}` meant an absolute command would pass violations SILENTLY from a subfolder; `Write|Edit` matcher missed 84-87% of view writes (agents write views via Bash heredocs / sed -i / python).
+- Script: `cd "$(dirname "$0")/.."` so all modes work from any cwd; hook resolves relative and /tmp-vs-/private/tmp paths. New `--stop` mode for Stop + SubagentStop hooks: checks every changed/untracked view file in the working tree. Honors `stop_hook_active` (one forced fix pass, never loops).
+- Both hook modes now check only lines added since HEAD (`git diff -U0`, whole file if untracked) - old drift no longer blocks unrelated edits (fixes review defect 9 as a side effect; needed so the Stop hook is usable on legacy apps like dinehere's ~3,300 palette findings).
+- Phase 3 hook JSON uses `"$CLAUDE_PROJECT_DIR"/bin/audit_design`; maintenance gap-fill replaces old relative entries. Root CLAUDE.md block + README updated.
+- Verified in a scratch repo: 16 cases (subfolder cwd, relative/absolute/symlinked paths, legacy-drift-untouched, design-ok, mailer exempt, sed -i and heredoc writes, stop_hook_active). Existing apps get the fix only via a maintenance run (script + settings are copied into each app).
+- Not yet done from the review: regex false positives (Stimulus #add, data-[..]: variants, bg-(--x) gap), Phase 3 chmod/smoke-test order, settings.json gitignore check, shipping hooks from the plugin itself.

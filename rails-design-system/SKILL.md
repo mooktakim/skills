@@ -53,7 +53,7 @@ Delegate steps 1-4 to one read-only subagent when the environment provides subag
 
 Re-running on an app that already has `docs/design-system/` is maintenance, not a rewrite. The survey then also covers the existing docs, and the Phase 1 plan proposes five kinds of work:
 
-- **Gap-fill**: newly detected sections; components or patterns now in use but unspecced; missing enforcement wiring (the PostToolUse hook in `.claude/settings.json`).
+- **Gap-fill**: newly detected sections; components or patterns now in use but unspecced; missing or outdated enforcement wiring (the hooks in `.claude/settings.json` must match Phase 3 of this skill version - an older entry with the relative command `bin/audit_design --hook` fails from subfolders and gets replaced).
 - **Drift review**: run `bin/audit_design` (if it is missing or differs from the script in Phase 3 of this skill version, create or update it first). Each finding becomes a proposed fix - retokenise the view, or add a missing token to the section's `tokens.md` - never a silent skip.
 - **Promotion**: the same one-off markup repeated in a section's views becomes a proposed component spec in that section's library.
 - **Spec-vs-realized drift**: read each spec's "Realized as" file; where code and spec contradict, propose which side changes - never let them disagree silently.
@@ -93,9 +93,10 @@ token-based Tailwind utilities only - never raw hex, literal palette classes
 When a change adds or alters a documented pattern, update the affected spec
 in the same commit. If a needed
 component has no spec, spec it first rather than hand-rolling a one-off.
-bin/audit_design reports drift, and a PostToolUse hook (bin/audit_design
---hook) blocks token violations at edit time; a periodic design-system
-maintenance run works through what the audit flags.
+bin/audit_design reports drift, and Claude Code hooks (bin/audit_design
+--hook after each edit, --stop before each turn ends) block token violations
+in new code; a periodic design-system maintenance run works through what the
+audit flags.
 ```
 
 2. Create `bin/audit_design` (chmod +x) with this content:
@@ -103,40 +104,82 @@ maintenance run works through what the audit flags.
 ```bash
 #!/usr/bin/env bash
 # Report design drift: colours and utilities that bypass the design-system tokens.
-# Run from the repo root. Findings are drift signals to review, not proof of defects.
+# Works from any directory: paths always resolve from the repo root.
+# Findings are drift signals to review, not proof of defects.
 # Mark a deliberate exception by putting "design-ok" on the same line.
 # Mailer templates are exempt: email clients require inline styles.
 # Modes:
 #   bin/audit_design         scan the app and report; always exits 0
-#   bin/audit_design --hook  Claude Code PostToolUse hook: reads the tool-call JSON
-#                            from stdin, checks only the edited file, exits 2 with
-#                            findings on stderr so the agent fixes them immediately
+#   bin/audit_design --hook  Claude Code PostToolUse hook (Write|Edit): reads the
+#                            tool-call JSON from stdin and checks the edited file
+#   bin/audit_design --stop  Claude Code Stop/SubagentStop hook: checks every view
+#                            file changed in the working tree, which catches edits
+#                            made through Bash, generators, or subagents
+# Both hook modes check only lines added since HEAD (the whole file if untracked),
+# so old drift elsewhere in a file never blocks an unrelated edit. They exit 2
+# with findings on stderr so the agent fixes them before moving on.
 set -euo pipefail
+orig=$PWD
+cd "$(dirname "$0")/.."
+root=$PWD
 HEX='#([0-9a-fA-F]{6}|[0-9a-fA-F]{8}|[0-9a-fA-F]{3,4})([^0-9a-zA-Z]|$)'
 ARB='[a-z][a-z0-9:-]*-\[[^]]+\]'
 PAL='(bg|text|border|ring|divide|outline|fill|stroke|from|via|to|accent|decoration|placeholder|caret|shadow)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}'
 
-if [ "${1:-}" = "--hook" ]; then
-  file=$(ruby -rjson -e 'puts JSON.parse($stdin.read).dig("tool_input", "file_path").to_s' 2>/dev/null || true)
-  { [ -n "$file" ] && [ -f "$file" ]; } || exit 0
-  rel=${file#"$PWD"/}
-  case "$rel" in
-    *_mailer/*|*layouts/mailer*|*tokens*.css|*theme*.css) exit 0 ;;
+in_scope() { # in_scope <repo-relative path>
+  case "$1" in
+    *_mailer/*|*layouts/mailer*|*tokens*.css|*theme*.css) return 1 ;;
     app/views/*|app/components/*|app/frontend/*|app/javascript/*|app/assets/stylesheets/*) ;;
-    *) exit 0 ;;
+    *) return 1 ;;
   esac
-  case "$rel" in
-    *.erb|*.haml|*.slim|*.html|*.rb|*.css|*.js) ;;
-    *) exit 0 ;;
+  case "$1" in
+    *.erb|*.haml|*.slim|*.html|*.rb|*.css|*.js) return 0 ;;
+    *) return 1 ;;
   esac
-  out=$(grep -nE "($HEX|$ARB|$PAL)" "$file" | grep -v 'design-ok' || true)
-  [ -z "$out" ] && exit 0
+}
+
+added_findings() { # added_findings <repo-relative path>: violating lines added since HEAD
+  if git rev-parse -q --verify HEAD >/dev/null 2>&1 && git cat-file -e "HEAD:$1" 2>/dev/null; then
+    git diff -U0 HEAD -- "$1" | awk '
+      /^@@/ { split($3, a, ","); n = substr(a[1], 2) + 0; hunk = 1; next }
+      hunk && /^\+/ { print n ": " substr($0, 2); n++ }'
+  else
+    grep -n '' -- "$1" | sed 's/:/: /'
+  fi | grep -E "($HEX|$ARB|$PAL)" | grep -v 'design-ok' | sed "s|^|  $1:|" || true
+}
+
+block() { # block <findings>
   {
-    echo "Design-system drift in $rel - token utilities only (no raw hex, no literal palette classes, no arbitrary [...] values):"
-    printf '%s\n' "$out" | sed 's/^/  /'
+    echo "Design-system drift - token utilities only (no raw hex, no literal palette classes, no arbitrary [...] values):"
+    printf '%s\n' "$1"
     echo "Use the section's role tokens instead (see docs/design-system/). For a deliberate exception, put design-ok on that line."
   } >&2
   exit 2
+}
+
+if [ "${1:-}" = "--hook" ]; then
+  file=$(ruby -rjson -e 'puts JSON.parse($stdin.read).dig("tool_input", "file_path").to_s' 2>/dev/null || true)
+  [ -n "$file" ] || exit 0
+  case "$file" in /*) ;; *) file="$orig/$file" ;; esac
+  rel=${file#"$root"/}
+  [ "$rel" = "$file" ] && rel=${file#"$(pwd -P)"/}
+  { [ -f "$rel" ] && in_scope "$rel"; } || exit 0
+  out=$(added_findings "$rel")
+  [ -z "$out" ] || block "$out"
+  exit 0
+fi
+
+if [ "${1:-}" = "--stop" ]; then
+  # stop_hook_active means the agent was already sent back once: never loop.
+  if grep -qE '"stop_hook_active" *: *true'; then exit 0; fi
+  out=""
+  while IFS= read -r rel; do
+    { [ -f "$rel" ] && in_scope "$rel"; } || continue
+    found=$(added_findings "$rel")
+    [ -z "$found" ] || out+="$found"$'\n'
+  done < <({ git diff --name-only HEAD 2>/dev/null || true; git ls-files --others --exclude-standard; } | sort -u)
+  [ -z "$out" ] || block "${out%$'\n'}"
+  exit 0
 fi
 
 dirs=()
@@ -171,7 +214,7 @@ else
 fi
 ```
 
-3. Wire generation-time enforcement: add this hook to the app's `.claude/settings.json` (create the file if missing; if it exists, merge the entry without duplicating it and without touching existing hooks):
+3. Wire generation-time enforcement: add these hooks to the app's `.claude/settings.json` (create the file if missing; if it exists, merge the entries without duplicating them and without touching unrelated hooks; replace any older `bin/audit_design --hook` entry that uses a relative command):
 
 ```json
 {
@@ -179,14 +222,20 @@ fi
     "PostToolUse": [
       {
         "matcher": "Write|Edit",
-        "hooks": [{ "type": "command", "command": "bin/audit_design --hook" }]
+        "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/bin/audit_design --hook" }]
       }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/bin/audit_design --stop" }] }
+    ],
+    "SubagentStop": [
+      { "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/bin/audit_design --stop" }] }
     ]
   }
 }
 ```
 
-The harness runs the hook after every agent file edit. Non-view files exit instantly; a token violation in view code is fed back to the agent as a blocking error, so it gets fixed the moment it is written - even by an agent that never read the context files.
+The harness runs hooks in the session's current directory, which moves whenever the agent `cd`s, so the command must be anchored on `$CLAUDE_PROJECT_DIR` - a relative `bin/audit_design` fails from any subfolder. The PostToolUse hook checks each Write/Edit the moment it lands. Agents also write views through Bash (heredocs, `sed -i`, scripts) and generators, which no tool matcher sees, so the Stop and SubagentStop hooks check every changed view file in the working tree before a turn ends. Both modes check only lines added since HEAD, and a violation is fed back to the agent as a blocking error, so it gets fixed before the work is handed back - even by an agent that never read the context files.
 
 Do not create any slash command for auditing: re-running this skill IS the audit (see "Re-runs: maintenance mode").
 
