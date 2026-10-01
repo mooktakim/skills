@@ -65,7 +65,7 @@ Re-running on an app that already has `docs/design-system/` is maintenance, not 
 
 - **Gap-fill**: newly detected sections; components or patterns now in use but unspecced; missing or outdated enforcement wiring (the hooks in `.claude/settings.json` must match Phase 3 of this skill version - an older entry with the relative command `bin/audit_design --hook` fails from subfolders and gets replaced; a gitignored `.claude/settings.json` gets reported, as in Phase 3).
 - **Drift review**: run `bin/audit_design` (if it is missing or differs from the script in Phase 3 of this skill version, create or update it first, then run the Phase 3 smoke test). Each finding becomes a proposed fix - retokenise the view, or add a missing token to the section's `tokens.md` - never a silent skip.
-- **Promotion**: the same one-off markup repeated in a section's views becomes a proposed component spec in that section's library.
+- **Promotion**: the same one-off markup repeated in a section's views becomes a proposed component spec in that section's library; a design-reviewer finding that recurs and that a regular expression catches reliably becomes a proposed `docs/design-system/audit-rules` line (the agent reports these under "Promote to the audit").
 - **Conventions and frames**: rules the views now follow consistently, or that I stated since the last run (look for repeated corrections in recent commits), but `conventions.md` lacks; views that break a recorded convention; page patterns that restate the frame instead of naming it. Find them with the `design-reviewer` agent this plugin ships: one agent per section in sweep mode, dispatched during the survey and counted in the plan's fan-out. Propose each fix across every section at once.
 - **Spec-vs-realized drift**: read each spec's "Realized as" file; where code and spec contradict, propose which side changes - never let them disagree silently.
 - **Divergences ledger**: record newly collapsed variants; mark migrated ones done.
@@ -106,7 +106,9 @@ sharing model in docs/design-system/README.md allows. Every section follows
 docs/design-system/conventions.md: when the user states a rule for every page
 ("standardise X everywhere"), record it there and fix every section in the
 same change, not only the one in view. Page width, padding, and top spacing
-come from the app shell's named frames - never restate them in a page.
+come from the app shell's named frames - never restate them in a page. When
+a design review finds the same violation again and a grep could catch it, propose
+a rule for docs/design-system/audit-rules so the hooks enforce it from then on.
 When a change adds or alters a documented pattern, update the affected spec
 in the same commit. If a needed
 component has no spec, spec it first rather than hand-rolling a one-off.
@@ -120,7 +122,8 @@ audit flags.
 
 ```bash
 #!/usr/bin/env bash
-# Report design drift: colours and utilities that bypass the design-system tokens.
+# Report design drift: colours and utilities that bypass the design-system tokens,
+# plus the project rules in docs/design-system/audit-rules (see below).
 # Works from any directory: paths always resolve from the repo root.
 # Findings are drift signals to review, not proof of defects.
 # Mark a deliberate exception by putting "design-ok" on the same line.
@@ -155,6 +158,21 @@ if [ -f docs/design-system/vendor-paths ]; then
     | sed 's/[.[\*^$]/\\&/g; s/^/^/' | paste -sd'|' - || true)
 fi
 vendor() { [ -n "$VENDOR" ] && printf '%s\n' "$1" | grep -qE "$VENDOR"; }
+# Project rules promoted from design reviews: docs/design-system/audit-rules, one
+# per line as "<label> :: <extended regex>" (# comments). They apply in every mode
+# and section; "design-ok" on a line exempts it, as for the built-in checks.
+RULE_LABELS=(); RULE_RES=()
+if [ -f docs/design-system/audit-rules ]; then
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line#"${line%%[![:space:]]*}"}"
+    case "$line" in ''|'#'*) continue ;; esac
+    label=${line%% :: *}; rule=${line#* :: }
+    [ "$label" != "$line" ] || { echo "audit-rules: no \" :: \" in \"$line\" - skipped" >&2; continue; }
+    rc=0; grep -qE "$rule" </dev/null 2>/dev/null || rc=$?
+    [ "$rc" -ne 2 ] || { echo "audit-rules: invalid regex for \"$label\" - skipped" >&2; continue; }
+    RULE_LABELS+=("$label"); RULE_RES+=("$rule")
+  done < docs/design-system/audit-rules
+fi
 
 in_scope() { # in_scope <repo-relative path>
   case "$1" in
@@ -168,23 +186,36 @@ in_scope() { # in_scope <repo-relative path>
   esac
 }
 
-added_findings() { # added_findings <repo-relative path>: violating lines added since HEAD
-  local re="($HEX|$ARB|$PAL)"
-  vendor "$1" && re="($HEX|$ARB)"
+added_lines() { # added_lines <repo-relative path>: "<line>: <text>" per line added since HEAD
   if git rev-parse -q --verify HEAD >/dev/null 2>&1 && git cat-file -e "HEAD:$1" 2>/dev/null; then
     git diff -U0 HEAD -- "$1" | awk '
       /^@@/ { split($3, a, ","); n = substr(a[1], 2) + 0; hunk = 1; next }
       hunk && /^\+/ { print n ": " substr($0, 2); n++ }'
   else
     grep -n '' -- "$1" | sed 's/:/: /'
-  fi | grep -E "$re" | grep -v 'design-ok' | sed "s|^|  $1:|" || true
+  fi
+}
+
+added_findings() { # added_findings <repo-relative path>: violating lines added since HEAD
+  local re="($HEX|$ARB|$PAL)" lines i=0
+  vendor "$1" && re="($HEX|$ARB)"
+  lines=$(added_lines "$1" | grep -v 'design-ok' || true)
+  [ -n "$lines" ] || return 0
+  printf '%s\n' "$lines" | grep -E "$re" | awk -v p="  $1:" '{ print p $0 }' || true
+  while [ "$i" -lt "${#RULE_RES[@]}" ]; do
+    printf '%s\n' "$lines" | grep -E "${RULE_RES[$i]}" \
+      | awk -v p="  $1:" -v l="   [rule: ${RULE_LABELS[$i]}]" '{ print p $0 l }' || true
+    i=$((i + 1))
+  done
 }
 
 block() { # block <findings>
   {
-    echo "Design-system drift - token utilities only (no raw hex, no literal palette classes, no arbitrary [...] values):"
+    echo "Design-system drift in the lines just written:"
     printf '%s\n' "$1"
-    echo "Use the section's role tokens instead (see docs/design-system/). For a deliberate exception, put design-ok on that line."
+    echo "Untagged lines break the token rule (no raw hex, no literal palette classes, no arbitrary [...] values): use the section's role tokens (see docs/design-system/)."
+    case "$1" in *"[rule: "*) echo "Lines tagged [rule: ...] break a project rule in docs/design-system/audit-rules: follow the spec it names." ;; esac
+    echo "For a deliberate exception, put design-ok on that line."
   } >&2
   exit 2
 }
@@ -241,6 +272,11 @@ scan() { # scan <label> <extended-regex> [skip-vendor]
 scan "raw hex colours" "$HEX"
 scan "arbitrary values" "$ARB"
 scan "literal palette classes" "$PAL" skip-vendor
+i=0
+while [ "$i" -lt "${#RULE_RES[@]}" ]; do
+  scan "rule: ${RULE_LABELS[$i]}" "${RULE_RES[$i]}"
+  i=$((i + 1))
+done
 if [ "$total" -eq 0 ]; then
   echo "No drift detected."
 else
@@ -286,6 +322,8 @@ Any result other than the expected one: stop, find the cause, and fix it before 
 ```
 
 The harness runs hooks in the session's current directory, which moves whenever the agent `cd`s, so the command must be anchored on `$CLAUDE_PROJECT_DIR` - a relative `bin/audit_design` fails from any subfolder. The PostToolUse hook checks each Write/Edit the moment it lands. Agents also write views through Bash (heredocs, `sed -i`, scripts) and generators, which no tool matcher sees, so the Stop and SubagentStop hooks check every changed view file in the working tree before a turn ends. Both modes check only lines added since HEAD, and a violation is fed back to the agent as a blocking error, so it gets fixed before the work is handed back - even by an agent that never read the context files.
+
+`bin/audit_design` also enforces project rules from `docs/design-system/audit-rules`, one per line as `<label> :: <extended regex>` - for example `no gradients (app/design.md) :: (^|[^a-z-])bg-(gradient|linear|radial|conic)-`. Do not create the file on a first run; rules arrive by promotion, from design-reviewer findings that recur. Only add a rule whose regex matches the violations and nothing legitimate in the current code, and name the spec rule it enforces in its label. Keeping rules in a data file keeps the script itself identical across apps.
 
 Then run `git check-ignore -q .claude/settings.json`. If it succeeds, the file is gitignored and the hooks exist only on this machine - no teammate, worktree, or fresh clone gets them. Tell me, and propose un-ignoring it (a `!.claude/settings.json` line in `.gitignore`); never change `.gitignore` without my approval.
 

@@ -45,6 +45,7 @@ Re-running later is how you maintain it: drift review, gap-fill for new sections
 - **When:** a `SessionStart` note (only in apps with `docs/design-system/`) tells the main session to delegate a review after view changes, before committing or opening a PR.
 - **Code by default, screenshots on request:** give it a running dev server URL and ask for a visual check, and it screenshots the affected pages at desktop and phone width with `agent-browser` to compare frames and spacing.
 - **Sweep mode:** maintenance runs dispatch it per section to find convention and frame drift across the whole app.
+- **Promote to the audit:** when a finding recurs and a regular expression can catch it (a forbidden gradient class, money formatted without the helper), the agent proposes a rule for `docs/design-system/audit-rules`, tested against the current code. `bin/audit_design` and its hooks enforce those rules from then on, at no token cost. The agent finds new kinds of drift; the script stops them for free.
 
 ## Install
 

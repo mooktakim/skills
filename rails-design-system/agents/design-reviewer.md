@@ -58,4 +58,6 @@ Findings ranked by impact (a convention broken across many pages first), each wi
 - The rule it breaks: spec path and the rule.
 - Suggested direction (one sentence - the fix belongs to the caller).
 
+Then **Promote to the audit**: for each finding a regular expression can catch reliably - a forbidden class, helper, or element, not a judgment about layout - propose a rule line for `docs/design-system/audit-rules` in the form `<label naming the spec rule> :: <extended regex>`. Before proposing one, run it with `grep -rnE` over the section's views and components and report what it matches: the violations you found, and anything else it hits. A rule that also hits legitimate code is not ready - say so, or tighten it. Read the existing `audit-rules` file first and never propose a duplicate. Skip this section when nothing qualifies.
+
 Then: stale specs to update, the `bin/audit_design` result in one line, any "Not in the specs" questions, and a short close - scope reviewed, verdict (conforms / fix-first), and the top thing to fix. If nothing survived verification, say exactly that.
