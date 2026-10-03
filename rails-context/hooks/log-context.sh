@@ -6,6 +6,7 @@
 # blocks, and only active in projects set up with rails-context (bin/audit_context).
 # Modes (one per hook event):
 #   start  SessionStart                 the HEAD the session started from
+#   compact SessionStart (compact)      context compacted: earlier loads are gone
 #   load   InstructionsLoaded           a CLAUDE.md or rule file loaded into context
 #   read   PostToolUse (Read)           Claude read a CLAUDE.md or AGENTS.md itself
 #   stop   Stop                         files changed since the session started,
@@ -28,6 +29,9 @@ emit() { printf '{"t":"%s","s":"%s",%s}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(e
 case "${1:-}" in
   start)
     emit "\"e\":\"start\",\"head\":\"$(git -C "$root" rev-parse -q --verify HEAD 2>/dev/null)\""
+    ;;
+  compact)
+    emit "\"e\":\"compact\""
     ;;
   load)
     file=$(field file_path)

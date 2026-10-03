@@ -9,7 +9,8 @@
 # For each directory context file it shows:
 #   Worked   sessions that changed code the file owns (by any tool, Bash included)
 #   Reached  sessions where the file reached Claude - loaded automatically
-#            (nested, path rule, include, after compaction) or read on purpose
+#            (nested, path rule, include, after compaction), read on purpose,
+#            or handed over by the plugin's hook after a shell read or edit
 #   Gap      worked minus reached: sessions that changed this code without its
 #            context file reaching Claude - the number that matters
 # A code file is owned by the nearest context file above it; the root CLAUDE.md
@@ -64,6 +65,8 @@ events.each do |event|
     (file = context_for(event["f"])) && session[:reached][file] << event["r"].to_s
   when "read"
     (file = context_for(event["f"])) && session[:reached][file] << "read"
+  when "inject"
+    (file = context_for(event["f"])) && session[:reached][file] << "hook"
   when "changed"
     session[:changed] |= Array(event["files"])
   end

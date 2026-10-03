@@ -186,6 +186,82 @@ class HooksTest < Minitest::Test
     assert_includes report("--days", "0").out, "No sessions logged"
   end
 
+  # -- rails-context: directory context for code touched without Read ----------
+
+  def tool_call(tool, tool_input, session: "s1", cwd: @dir)
+    hook("rails-context", "inject-context.sh",
+         stdin: JSON.generate("session_id" => session, "cwd" => cwd, "tool_name" => tool, "tool_input" => tool_input))
+  end
+
+  def injected(result)
+    result.out.empty? ? nil : JSON.parse(result.out).dig("hookSpecificOutput", "additionalContext")
+  end
+
+  def test_inject_context_is_silent_without_rails_context
+    write "app/models/CLAUDE.md", "# models\n"
+    write "app/models/user.rb", "class User; end\n"
+    commit
+    result = tool_call("Bash", { "command" => "cat app/models/user.rb" })
+    assert_equal 0, result.code
+    assert_equal "", result.out
+  end
+
+  def test_inject_context_hands_over_the_chain_once_per_session
+    context_app
+    write "app/CLAUDE.md", "# app\n"
+    write "app/models/concerns/CLAUDE.md", "# concerns\n"
+
+    context = injected(tool_call("Bash", { "command" => %(sed -i '' 's/User/Person/' "app/models/user.rb" && echo done) }))
+    assert_includes context, "Contents of #{@dir}/app/CLAUDE.md:\n\n# app"
+    assert_includes context, "Contents of #{@dir}/app/models/CLAUDE.md:\n\n# models"
+    refute_includes context, "# root", "the root file loads at session start"
+    refute_includes context, "# concerns", "only ancestors of the touched path"
+    assert_operator context.index("# app"), :<, context.index("# models"), "outermost first"
+
+    assert_nil injected(tool_call("Bash", { "command" => "grep -n User app/models/user.rb:1" })), "once per session"
+    refute_nil injected(tool_call("Bash", { "command" => "cat app/models/user.rb" }, session: "s2")), "a new session gets it again"
+
+    log_event("compact", "s1")
+    refute_nil injected(tool_call("Bash", { "command" => "cat app/models/user.rb" })), "and again after a compaction"
+  end
+
+  def test_inject_context_skips_files_that_already_reached_claude
+    context_app
+    log_event("start", "s1")
+    log_event("load", "s1", "file_path" => path("app/models/CLAUDE.md"), "load_reason" => "nested_traversal")
+    assert_nil injected(tool_call("Edit", { "file_path" => path("app/models/user.rb") }))
+
+    # A context file read through the shell is logged as read, not handed over again.
+    assert_nil injected(tool_call("Bash", { "command" => "cat app/services/AGENTS.md" }))
+    assert_nil injected(tool_call("Bash", { "command" => "cat app/services/pay.rb" }))
+    assert_includes File.read(path(".git/claude-context-log.jsonl")), %("s":"s1","e":"read","f":"app/services/CLAUDE.md")
+  end
+
+  def test_inject_context_finds_paths_from_every_tool
+    context_app
+    assert_includes injected(tool_call("Write", { "file_path" => path("app/services/refund.rb") }, session: "w")), "# services"
+    assert_includes injected(tool_call("Grep", { "path" => "app/helpers" }, session: "g")), "# helpers"
+    assert_includes injected(tool_call("Bash", { "command" => "cat > app/services/new.rb <<'RUBY'\nclass New; end\nRUBY" }, session: "h")),
+                    "# services", "a new file in an existing directory"
+    assert_includes injected(tool_call("Bash", { "command" => "cat user.rb" }, session: "c", cwd: path("app/models"))),
+                    "# models", "paths relative to the shell's directory"
+    assert_includes injected(tool_call("Bash", { "command" => "rg --glob=app/models/*.rb User" }, session: "f")), "# models"
+
+    assert_nil injected(tool_call("Bash", { "command" => "echo hello world && git status" }, session: "n"))
+    assert_nil injected(tool_call("Bash", { "command" => "cat README CLAUDE.md /etc/hosts" }, session: "n"))
+    assert_nil injected(tool_call("Bash", { "command" => "cat user.rb" }, session: "n", cwd: path("app/services"))),
+               "a missing file without a slash is just a word"
+  end
+
+  def test_context_report_counts_hook_hand_overs_as_reach
+    context_app
+    log_event("start", "s1")
+    tool_call("Bash", { "command" => "sed -i '' 's/Pay/Payment/' app/services/pay.rb" })
+    append "app/services/pay.rb", "# edit\n"
+    log_event("stop", "s1")
+    assert_match(%r{app/services/CLAUDE.md\s+1\s+1\s+0\s+hook 1}, report.out)
+  end
+
   # -- capture: the correction hint ------------------------------------------
 
   def prompt_hint(prompt)

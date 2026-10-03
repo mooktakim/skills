@@ -1,0 +1,103 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# PostToolUse hook (Bash, Write, Edit, Grep): give Claude the directory context
+# files for the code a tool call just touched. Claude Code loads a directory's
+# CLAUDE.md only when the Read tool reads a file there; shell reads and edits,
+# Grep, and a new file written into a directory nothing was read from bypass it.
+# This closes that gap: it finds the paths the call touched, walks each one up to
+# the project root, and returns every CLAUDE.md on the way (root excluded - it
+# loads at session start) that has not reached Claude in this session yet.
+#
+# Run by hooks/inject-context.sh with the hook input on stdin. Plain Ruby,
+# standard library only (Ruby 2.6+). What reached Claude comes from the local log
+# that hooks/log-context.sh keeps (.git/claude-context-log.jsonl); each file this
+# hook hands over is logged there too ("inject"), so it is given once per session,
+# and again after a compaction.
+
+require "json"
+
+ROOTS = %w[app lib test spec].freeze # the directories rails-context writes context files in
+
+root = File.realpath(ENV.fetch("CLAUDE_PROJECT_DIR", "")) rescue exit(0)
+input = JSON.parse($stdin.read) rescue exit(0)
+tool = input["tool_name"].to_s
+tool_input = input["tool_input"].is_a?(Hash) ? input["tool_input"] : {}
+session = input["session_id"].to_s
+cwd = input["cwd"].to_s.empty? ? Dir.pwd : input["cwd"].to_s
+
+# The paths the call touched. For Bash, every word that names an existing file or
+# directory, or has a slash and an existing parent (a new file); globs, flags
+# (--path=x), and grep-style file:line suffixes are split off first.
+candidates =
+  case tool
+  when "Write", "Edit" then [tool_input["file_path"]]
+  when "Grep" then [tool_input["path"]]
+  when "Bash"
+    tool_input["command"].to_s.split(%r{[\s;|&<>()`'"=:,{}*?\[\]]+}).reject { |word| word.empty? || word.start_with?("-") }
+  else []
+  end
+paths = candidates.compact.map(&:to_s).reject(&:empty?).map do |word|
+  full = File.expand_path(word, cwd)
+  next full if File.exist?(full)
+  next full if word.include?("/") && File.directory?(File.dirname(full))
+end.compact
+
+relative = lambda do |full|
+  full.start_with?("#{root}/") ? full[(root.length + 1)..-1] : nil
+end
+
+# Context files read through the shell (cat app/models/CLAUDE.md) reached Claude already.
+read, touched = paths.map(&relative).compact.partition { |rel| rel =~ %r{(\A|/)(CLAUDE|AGENTS)\.md\z} }
+read.map! { |rel| rel.sub(/AGENTS\.md\z/, "CLAUDE.md") }
+
+wanted = []
+touched.each do |rel|
+  next unless ROOTS.include?(rel.split("/").first)
+
+  dir = File.directory?(File.join(root, rel)) ? rel : File.dirname(rel)
+  chain = []
+  until dir == "." || dir.empty?
+    file = "#{dir}/CLAUDE.md"
+    chain.unshift(file) if File.file?(File.join(root, file))
+    dir = File.dirname(dir)
+  end
+  wanted |= chain
+end
+exit 0 if wanted.empty? && read.empty?
+
+git_dir = IO.popen(["git", "-C", root, "rev-parse", "--git-common-dir"], err: File::NULL, &:read).strip
+exit 0 if git_dir.empty?
+log = File.expand_path("claude-context-log.jsonl", File.expand_path(git_dir, root))
+
+# What reached Claude since this session started or last compacted.
+reached = []
+if File.file?(log)
+  File.foreach(log) do |line|
+    next unless line.include?(%("s":#{JSON.generate(session)}))
+
+    event = JSON.parse(line) rescue next
+    case event["e"]
+    when "start", "compact" then reached.clear
+    when "load", "read", "inject" then reached << event["f"].to_s.sub(/AGENTS\.md\z/, "CLAUDE.md")
+    end
+  end
+end
+
+read -= reached
+wanted -= reached + read
+stamp = Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+File.open(log, "a") do |out|
+  read.each { |file| out.puts(JSON.generate("t" => stamp, "s" => session, "e" => "read", "f" => file)) }
+  wanted.each { |file| out.puts(JSON.generate("t" => stamp, "s" => session, "e" => "inject", "f" => file)) }
+end
+exit 0 if wanted.empty?
+
+context = wanted.map { |file| "Contents of #{root}/#{file}:\n\n#{File.read(File.join(root, file)).strip}" }
+puts JSON.generate(
+  "hookSpecificOutput" => {
+    "hookEventName" => "PostToolUse",
+    "additionalContext" => "Directory context for the code this #{tool} call touched (Claude Code loads it " \
+                           "automatically only on Read). Follow it like any CLAUDE.md:\n\n#{context.join("\n\n")}"
+  }
+)
