@@ -1,6 +1,6 @@
 ---
 name: rails-security
-description: Read-only security auditor for Rails apps. Use proactively when a change touches authentication, authorization, payments or money, file uploads, or secrets, and before a production deploy. It runs Brakeman and dependency audits, then manually reviews authentication, authorization, mass assignment, injection, file handling, and secrets. Also use before a release, when asked to check security, or on any other diff that touches something security-sensitive. Do not use for general code review (rails-reviewer) - and it reports findings only, it never patches them.
+description: Read-only security auditor for Rails apps. Use proactively when a change touches authentication, authorization, payments or money, file uploads, or secrets, and before a production deploy. Launch it in the same message as the other reviewers that apply, and pass it the changed files or commit range plus the change's intent. It runs Brakeman and dependency audits, then manually reviews authentication, authorization, mass assignment, injection, file handling, and secrets. Also use before a release, when asked to check security, or on any other diff that touches something security-sensitive. Do not use for general code review (rails-reviewer) - and it reports findings only, it never patches them.
 disallowedTools: Write, Edit, NotebookEdit
 ---
 

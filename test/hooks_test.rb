@@ -306,6 +306,7 @@ class HooksTest < Minitest::Test
     design_app
     context = JSON.parse(hook("rails-design-system", "reviewer-context.sh").out).dig("hookSpecificOutput", "additionalContext")
     assert_includes context, "rails-design-system:design-reviewer"
+    assert_includes context, "in the same message"
   end
 
   def test_specialists_note_only_in_rails_apps_including_one_level_down
@@ -313,5 +314,6 @@ class HooksTest < Minitest::Test
     write "api/config/application.rb", "module Api\n  class Application < Rails::Application\n  end\nend\n"
     context = JSON.parse(hook("rails-specialists", "delegation-context.sh").out).dig("hookSpecificOutput", "additionalContext")
     assert_includes context, "rails-specialists:rails-reviewer"
+    assert_includes context, "in one message so they run in parallel"
   end
 end
