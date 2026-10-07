@@ -1,0 +1,78 @@
+{
+  "name": "toolsmith-history-add",
+  "intent": "Add one new entry file to the project's docs/history log.",
+  "usage": "toolsmith-history-add [--no-stage] \"<title>\" <<'EOF' ... EOF",
+  "use_when": [
+    "You finished a unit of work and the project history log procedure says to record it before committing.",
+    "You would otherwise build the docs/history/<date>/<timestamp>-<slug>.md path with date, mkdir and a heredoc."
+  ],
+  "not_for": [
+    "Reading or searching the log: use find, cat or grep on docs/history.",
+    "Changing an existing entry: entries are immutable.",
+    "Migrating a legacy single-file log (docs/HISTORY.md): that needs its own numbered file names."
+  ],
+  "input": "The title as the first argument: a short headline for the entry, made into the file's slug (lowercase letters, digits and single hyphens, at most 60 characters). The entry text on stdin: standalone markdown, written exactly as given, with a final newline added when missing. Empty text is refused.",
+  "options": [
+    { "flag": "--no-stage", "text": "Write the file but do not run `git add` on it." }
+  ],
+  "output": "Stdout is the new file's path, relative to the current directory. The file goes in the docs/history of the nearest directory at or above the current one that has docs/history; when none has, in a new docs/history at the git repository root. Its name is docs/history/<YYYY-MM-DD>/<unix-time>-<slug>.md with today's local date. An existing file is never overwritten. Inside a git repository the file is staged with `git add`, so it lands in the next commit with the work it describes.",
+  "exit_codes": [
+    { "code": 0, "text": "The entry was written (and staged, inside a git repository)." },
+    { "code": 1, "text": "No entry, or an unstaged one: no project found, the file exists, or a write or `git add` failed." },
+    { "code": 2, "text": "Nothing written: the title, the text or the arguments are wrong." }
+  ],
+  "examples": [
+    {
+      "title": "Add an entry at the repository root",
+      "git": true,
+      "args": ["SEO review of staging"],
+      "stdin": "- Crawled staging: 557 URLs, 3 broken internal links fixed.\n",
+      "exit": 0,
+      "stdout_regex": "\\Adocs/history/\\d{4}-\\d{2}-\\d{2}/\\d+-seo-review-of-staging\\.md\\n\\z",
+      "stdout_sample": "docs/history/2026-10-07/1791400321-seo-review-of-staging.md\n",
+      "files_after": { "docs/history/*/*-seo-review-of-staging.md": "- Crawled staging: 557 URLs, 3 broken internal links fixed.\n" },
+      "staged": ["docs/history/*/*-seo-review-of-staging.md"]
+    },
+    {
+      "title": "From deep inside an app that has its own docs/history",
+      "git": true,
+      "files": {
+        "apps/web/docs/history/2026-01-01/0000000001-start.md": "- Start.\n",
+        "apps/web/app/models/user.rb": "class User; end\n"
+      },
+      "cwd": "apps/web/app/models",
+      "args": ["User model clean-up"],
+      "stdin": "- Removed the unused legacy_name column.",
+      "exit": 0,
+      "stdout_regex": "\\A\\.\\./\\.\\./docs/history/\\d{4}-\\d{2}-\\d{2}/\\d+-user-model-clean-up\\.md\\n\\z",
+      "stdout_sample": "../../docs/history/2026-10-07/1791400321-user-model-clean-up.md\n",
+      "files_after": {
+        "apps/web/docs/history/2026-01-01/0000000001-start.md": "- Start.\n",
+        "apps/web/app/models/user.rb": "class User; end\n",
+        "apps/web/docs/history/*/*-user-model-clean-up.md": "- Removed the unused legacy_name column.\n"
+      },
+      "staged": ["apps/web/docs/history/*/*-user-model-clean-up.md"]
+    },
+    {
+      "title": "Outside any project",
+      "git": false,
+      "args": ["Notes"],
+      "stdin": "- Something.\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "toolsmith-history-add: no docs/history directory above here and not inside a git repository; run this from inside the project\n"
+    },
+    {
+      "title": "Empty entry text is refused",
+      "git": true,
+      "args": ["Nothing to say"],
+      "stdin": "",
+      "exit": 2,
+      "stdout": "",
+      "stderr": "toolsmith-history-add: the entry text on stdin is empty\nRun `toolsmith-history-add --help` for usage, or `toolsmith-history-add --llm` for the full guide.\n"
+    }
+  ],
+  "family": "history-write",
+  "mode": "remind",
+  "added": "2026-10-07"
+}

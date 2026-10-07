@@ -1,0 +1,80 @@
+{
+  "about": "Repeated Bash patterns found in Claude Code transcripts. scripts/analyse counts them, and a tool whose tool.json names a family takes it over: the PreToolUse hook reminds Claude of the tool when a Bash command matches the family. A command matches when every regex of any one rule matches (Ruby regex syntax). The toolsmith skill adds families as scans find new patterns.",
+  "families": [
+    {
+      "id": "literal-replace",
+      "title": "a script that finds text in a file and replaces it",
+      "rules": [
+        ["\\bpython3?\\b", "open\\([^)]*,\\s*['\"][wa]|write_text|\\.write\\(", "\\.replace\\(|re\\.sub"],
+        ["\\bruby\\b", "File\\.write|IO\\.write|File\\.open\\([^)]*['\"]w", "\\.sub!?[ (]|gsub!?[ (]"],
+        ["\\bsed\\s+(-[a-zA-Z]*\\s+)*-i"],
+        ["\\bperl\\s+-\\w*i"]
+      ]
+    },
+    {
+      "id": "history-write",
+      "title": "writing a docs/history log entry by hand",
+      "rules": [
+        ["docs/history/", "cat\\s*>|mkdir|>\\s*\"?\\$"]
+      ]
+    },
+    {
+      "id": "multi-file-heredoc",
+      "title": "writing several files with heredocs in one command",
+      "rules": [
+        ["cat\\s*>\\s*\\S+\\s*<<(?:.|\\n)*cat\\s*>\\s*\\S+\\s*<<"]
+      ]
+    },
+    {
+      "id": "ci-wait",
+      "title": "polling a pull request's CI checks",
+      "rules": [
+        ["gh pr checks|gh run (watch|view|list)"]
+      ]
+    },
+    {
+      "id": "pr-land",
+      "title": "merging a pull request and cleaning up the branch",
+      "rules": [
+        ["gh pr merge"]
+      ]
+    },
+    {
+      "id": "commit-chain",
+      "title": "staging, committing and pushing in one command",
+      "rules": [
+        ["git commit", "git add"]
+      ]
+    },
+    {
+      "id": "image-prep",
+      "title": "resizing, cropping or stitching images",
+      "rules": [
+        ["\\bmagick\\b|\\bsips\\b|\\bcwebp\\b"]
+      ]
+    },
+    {
+      "id": "structured-set",
+      "title": "changing a value in a JSON or YAML file with a script",
+      "rules": [
+        ["\\bjq\\b", ">\\s*\\S+\\.json|mv \\S+ \\S+\\.json"],
+        ["json\\.load", "json\\.dump\\("],
+        ["\\bYAML\\b|\\byaml\\b", "File\\.write|open\\([^)]*,\\s*['\"]w"]
+      ]
+    },
+    {
+      "id": "line-range-read",
+      "title": "reading line ranges of files with sed -n",
+      "rules": [
+        ["sed -n\\s+\\S*\\d+,\\d+p"]
+      ]
+    },
+    {
+      "id": "test-output-trim",
+      "title": "running tests or lint and cutting the output with tail, grep or head",
+      "rules": [
+        ["(rails test|bin/ci|rspec|rubocop|audit_\\w+)[^|\\n]*\\|\\s*(tail|grep|head)"]
+      ]
+    }
+  ]
+}

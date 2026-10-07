@@ -7,7 +7,10 @@ on:
 
 # The plugins copy their scripts into apps that run anywhere: Linux CI with GNU
 # tools, macOS with bash 3.2 and an old system Ruby, and any Ruby from 2.6 up.
-# Each job covers one of those.
+# Each job covers one of those. The toolsmith plugin's Rust tools need cargo,
+# which the hosted Linux and macOS runners have; REQUIRE_CARGO makes those
+# jobs fail instead of skipping the tool tests. The Ruby 2.6 container has no
+# cargo, so there the tool tests skip and the Ruby scripts are still tested.
 jobs:
   linux:
     name: Linux, Ruby ${{ matrix.ruby }}
@@ -22,6 +25,8 @@ jobs:
         with:
           ruby-version: ${{ matrix.ruby }}
       - run: bin/test
+        env:
+          REQUIRE_CARGO: "1"
 
   linux-oldest-ruby:
     name: Linux, Ruby 2.6
@@ -34,6 +39,8 @@ jobs:
   macos:
     name: macOS, system bash and Ruby
     runs-on: macos-latest
+    env:
+      REQUIRE_CARGO: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: ruby/setup-ruby@v1

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Runs a toolsmith tool: shim <tool> [args...]. Builds the tool's binary first
+# when it is missing or older than its source, so a plugin update or a new tool
+# needs no install step. Called by the one-line scripts in bin/.
+set -u
+tool=$1
+shift
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+crate=$root/crates/${tool#toolsmith-}
+target=${TOOLSMITH_TARGET_DIR:-$root/target}
+binary=$target/release/$tool
+
+if [ ! -f "$crate/Cargo.toml" ]; then
+  echo "toolsmith: there is no tool named $tool" >&2
+  exit 127
+fi
+if [ ! -x "$binary" ] || [ -n "$(find "$crate" "$root/crates/common" "$root/Cargo.toml" "$root/Cargo.lock" -newer "$binary" 2>/dev/null | head -n 1)" ]; then
+  if ! command -v cargo >/dev/null 2>&1; then
+    echo "toolsmith: $tool must be built, but cargo is not installed. Install Rust (https://rustup.rs), then run the command again." >&2
+    exit 127
+  fi
+  if ! CARGO_TARGET_DIR=$target cargo build --release --quiet --manifest-path "$root/Cargo.toml" -p "$tool" >&2; then
+    echo "toolsmith: building $tool failed" >&2
+    exit 127
+  fi
+  touch "$binary"
+fi
+exec "$binary" "$@"

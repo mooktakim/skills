@@ -1,0 +1,275 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Reads Claude Code transcripts and reports repeated Bash patterns, so the
+# toolsmith skill can choose the next tool and check that the existing tools
+# are used.
+#
+#   analyse scan      [--metrics FILE] [--top N]     families by calls, and
+#                                                    frequent commands in no family
+#   analyse examples  (--family ID | --match REGEX) [--limit N]
+#                                                    recent commands, for design work
+#   analyse adoption  [--metrics FILE] [--log FILE]  per tool and week: tool calls
+#                                                    vs old-pattern calls, plus the
+#                                                    usage log
+#
+# Every command takes --projects DIR (default ~/.claude/projects). --metrics
+# FILE keeps weekly counts, never command text, merged by taking the larger
+# value per week: Claude Code deletes transcripts after cleanupPeriodDays (30
+# by default), so the snapshot is what keeps the trend. Ruby 2.6+, standard
+# library only. $TOOLSMITH_ROOT overrides the plugin root that holds
+# families.json and the tool manifests, for tests.
+
+require "json"
+require "optparse"
+require "time"
+
+ROOT = ENV.fetch("TOOLSMITH_ROOT", File.expand_path("..", __dir__))
+SHELL_WORDS = %w[done fi esac for case in function].freeze
+TOOL_NAME = /(?:\A|[\s;&|(`])(toolsmith-[a-z0-9]+(?:-[a-z0-9]+)*)/.freeze
+
+Call = Struct.new(:id, :command, :time, :session, :project, :error) do
+  def week
+    time.strftime("%G-W%V")
+  end
+
+  def tools
+    command.scan(TOOL_NAME).flatten.uniq
+  end
+end
+
+def families
+  JSON.parse(File.read(File.join(ROOT, "families.json"))).fetch("families").map do |family|
+    family.merge("regexes" => family.fetch("rules").map { |rule| rule.map { |re| Regexp.new(re) } })
+  end
+end
+
+def tools
+  Dir.glob(File.join(ROOT, "crates/*/tool.json")).sort.map { |file| JSON.parse(File.read(file)) }
+end
+
+def matches?(family, command)
+  family["regexes"].any? { |rule| rule.all? { |re| re.match?(command) } }
+end
+
+def parse(line)
+  JSON.parse(line)
+rescue StandardError
+  nil
+end
+
+def blocks(record)
+  content = record && record["message"].is_a?(Hash) ? record["message"]["content"] : nil
+  content.is_a?(Array) ? content.select { |block| block.is_a?(Hash) } : []
+end
+
+# Every Bash call in the transcripts, with whether its result was an error.
+# Lines are only parsed when they can hold a Bash call or an error result.
+def load_calls(dir)
+  calls = {}
+  errors = {}
+  Dir.glob(File.join(dir, "**", "*.jsonl")).sort.each do |file|
+    project = file.sub("#{dir}/", "").split("/").first
+    File.foreach(file, encoding: "UTF-8") do |line|
+      line = line.scrub
+      if line.include?('"tool_use"') && line.include?('"Bash"')
+        record = parse(line)
+        blocks(record).each do |block|
+          next unless block["type"] == "tool_use" && block["name"] == "Bash"
+
+          command = block["input"].is_a?(Hash) ? block["input"]["command"] : nil
+          next unless command.is_a?(String) && record["timestamp"]
+
+          calls[block["id"]] ||= Call.new(block["id"], command, Time.parse(record["timestamp"]).utc, record["sessionId"], project, false)
+        end
+      end
+      next unless line.include?('"is_error":true')
+
+      blocks(parse(line)).each { |block| errors[block["tool_use_id"]] = true if block["type"] == "tool_result" && block["is_error"] }
+    end
+  end
+  calls.each_value { |call| call.error = errors.key?(call.id) }
+  calls.values.sort_by(&:time)
+end
+
+def bump(hash, key, field, by = 1)
+  hash[key] ||= Hash.new(0)
+  hash[key][field] += by
+end
+
+# Weekly counts: Bash calls; per family, calls that match it and use no tool;
+# per tool, calls that use it.
+def weekly(calls, all_families)
+  weeks = {}
+  calls.each do |call|
+    week = (weeks[call.week] ||= { "bash_calls" => 0, "families" => {}, "tools" => {} })
+    week["bash_calls"] += 1
+    used = call.tools
+    used.each do |tool|
+      bump(week["tools"], tool, "calls")
+      bump(week["tools"], tool, "errors") if call.error
+    end
+    next unless used.empty?
+
+    all_families.each do |family|
+      next unless matches?(family, call.command)
+
+      bump(week["families"], family["id"], "calls")
+      bump(week["families"], family["id"], "errors") if call.error
+      bump(week["families"], family["id"], "chars", call.command.length)
+    end
+  end
+  weeks
+end
+
+def deep_max(a, b)
+  return [a, b].max if a.is_a?(Integer) && b.is_a?(Integer)
+  return b unless a.is_a?(Hash) && b.is_a?(Hash)
+
+  (a.keys | b.keys).map { |key| [key, b.key?(key) && a.key?(key) ? deep_max(a[key], b[key]) : (b.key?(key) ? b[key] : a[key])] }.to_h
+end
+
+def read_metrics(file)
+  file && File.exist?(file) ? JSON.parse(File.read(file)) : { "weeks" => {} }
+end
+
+def merged_weeks(file, weeks)
+  deep_max(read_metrics(file).fetch("weeks", {}), JSON.parse(JSON.generate(weeks)))
+end
+
+def write_metrics(file, weeks)
+  merged = merged_weeks(file, weeks)
+  data = { "last_scan" => Time.now.strftime("%Y-%m-%d"), "weeks" => merged.sort.to_h }
+  Dir.mkdir(File.dirname(file)) unless File.directory?(File.dirname(file))
+  File.write(file, JSON.pretty_generate(data) + "\n")
+end
+
+def table(rows)
+  widths = rows.transpose.map { |column| column.map { |cell| cell.to_s.length }.max }
+  rows.map { |row| row.each_with_index.map { |cell, i| i == row.size - 1 ? cell.to_s : cell.to_s.ljust(widths[i]) }.join("  ").rstrip }
+end
+
+# "program first-word" for each simple command in a pipeline or list, with
+# heredoc bodies, shell keywords, leading cd and VAR=value words removed.
+def leading_words(command)
+  body = command.gsub(/<<-?\s*['"]?(\w+)['"]?\n.*?\n\1\b/m, "<<HEREDOC")
+  body.split(/&&|\|\||;|\n|\|/).map(&:strip).reject(&:empty?).map do |segment|
+    segment = segment.sub(/\A(?:(?:do|then|else|elif|if|while|until|time|!|cd\s+\S+|\w+=\S+)(?:\s+|\z))+/, "").strip
+    words = segment.split(/\s+/)
+    next if words.empty? || words[0] !~ /\A[\w.\/-]+\z/ || SHELL_WORDS.include?(words[0])
+
+    [File.basename(words[0]), words[1]].compact.join(" ")
+  end.compact
+end
+
+def scan(options)
+  calls = load_calls(options[:projects])
+  all_families = families
+  owners = tools.map { |tool| [tool["family"], tool["name"]] }.to_h
+  if calls.empty?
+    puts "No Bash calls found under #{options[:projects]}."
+    return
+  end
+  puts "Claude Code history: #{calls.size} Bash calls in #{calls.map(&:session).uniq.size} sessions, " \
+       "#{calls.map(&:project).uniq.size} projects, #{calls.first.time.strftime('%Y-%m-%d')} to #{calls.last.time.strftime('%Y-%m-%d')}."
+  puts
+  puts "Families, most calls first (calls that already use a toolsmith command are not counted):"
+  rows = [%w[calls sessions projects errors avg-chars family covered-by]]
+  stats = all_families.map do |family|
+    hits = calls.select { |call| call.tools.empty? && matches?(family, call.command) }
+    avg = hits.empty? ? 0 : hits.sum { |call| call.command.length } / hits.size
+    [hits.size, hits.map(&:session).uniq.size, hits.map(&:project).uniq.size, hits.count(&:error), avg, family["id"], owners[family["id"]] || "-"]
+  end
+  rows.concat(stats.sort_by { |row| -row[0] })
+  table(rows).each { |line| puts "  #{line}" }
+  puts
+  outside = calls.reject { |call| all_families.any? { |family| matches?(family, call.command) } || !call.tools.empty? }
+  counts = Hash.new(0)
+  outside.each { |call| leading_words(call.command).uniq.each { |words| counts[words] += 1 } }
+  puts "Frequent commands in calls that match no family (calls containing each), top #{options[:top]}:"
+  table(counts.sort_by { |words, n| [-n, words] }.first(options[:top]).map { |words, n| [n, words] }).each { |line| puts "  #{line}" }
+  return unless options[:metrics]
+
+  write_metrics(options[:metrics], weekly(calls, all_families))
+  puts
+  puts "Weekly counts saved to #{options[:metrics]}."
+end
+
+def examples(options)
+  calls = load_calls(options[:projects])
+  if options[:family]
+    family = families.find { |f| f["id"] == options[:family] } or abort("analyse: no family #{options[:family]}")
+    hits = calls.select { |call| call.tools.empty? && matches?(family, call.command) }
+  elsif options[:match]
+    regex = Regexp.new(options[:match])
+    hits = calls.select { |call| regex.match?(call.command) }
+  else
+    abort("analyse examples: give --family ID or --match REGEX")
+  end
+  puts "#{hits.size} matching calls; the #{[options[:limit], hits.size].min} most recent:"
+  hits.last(options[:limit]).reverse_each do |call|
+    text = call.command.length > 1500 ? "#{call.command[0, 1500]}\n[... #{call.command.length - 1500} more characters]" : call.command
+    puts
+    puts "===== #{call.time.strftime('%Y-%m-%d')} #{call.project}#{call.error ? ' (error)' : ''}"
+    puts text
+  end
+end
+
+def usage_log(file)
+  return [] unless file && File.exist?(file)
+
+  File.foreach(file).map { |line| parse(line) }.compact
+end
+
+def adoption(options)
+  all_families = families
+  weeks = merged_weeks(options[:metrics], weekly(load_calls(options[:projects]), all_families))
+  events = usage_log(options[:log])
+  tools.each do |tool|
+    name = tool["name"]
+    puts "#{name} (replaces #{tool['family']}, added #{tool['added']}, mode #{tool['mode']})"
+    rows = [["week", "tool calls", "tool errors", "old-pattern calls", "share"]]
+    weeks.keys.sort.each do |week|
+      used = weeks[week].dig("tools", name) || {}
+      old = (weeks[week].dig("families", tool["family"]) || {})["calls"].to_i
+      calls = used["calls"].to_i
+      share = calls + old > 0 ? "#{(100.0 * calls / (calls + old)).round}%" : "-"
+      rows << [week, calls, used["errors"].to_i, old, share]
+    end
+    table(rows).each { |line| puts "  #{line}" }
+    runs = events.select { |e| e["event"] == "run" && e["tool"] == name }
+    real = runs.select { |e| e["mode"] == "run" }
+    nudges = events.select { |e| e["event"] == "nudge" && e["tool"] == name }
+    followed = nudges.count { |n| real.any? { |r| r["ts"].to_i.between?(n["ts"].to_i, n["ts"].to_i + 600) } }
+    puts "  Usage log: #{real.size} runs, #{real.count { |e| e['exit'].to_i != 0 }} failed, " \
+         "#{runs.count { |e| e['mode'] == 'llm' }} guide reads, #{nudges.size} reminders, " \
+         "#{followed} reminders followed by a run within 10 minutes."
+    puts
+  end
+end
+
+def default_log
+  return ENV["TOOLSMITH_LOG"] if ENV.key?("TOOLSMITH_LOG")
+
+  state = ENV["XDG_STATE_HOME"].to_s.empty? ? File.join(Dir.home, ".local/state") : ENV["XDG_STATE_HOME"]
+  File.join(state, "toolsmith/usage.jsonl")
+end
+
+options = { projects: File.join(Dir.home, ".claude/projects"), top: 30, limit: 10, log: default_log }
+command = ARGV.shift
+OptionParser.new do |o|
+  o.on("--projects DIR") { |v| options[:projects] = File.expand_path(v) }
+  o.on("--metrics FILE") { |v| options[:metrics] = File.expand_path(v) }
+  o.on("--log FILE") { |v| options[:log] = File.expand_path(v) }
+  o.on("--top N", Integer) { |v| options[:top] = v }
+  o.on("--limit N", Integer) { |v| options[:limit] = v }
+  o.on("--family ID") { |v| options[:family] = v }
+  o.on("--match REGEX") { |v| options[:match] = v }
+end.parse!(ARGV)
+
+case command
+when "scan" then scan(options)
+when "examples" then examples(options)
+when "adoption" then adoption(options)
+else abort("usage: analyse (scan | examples | adoption) [options]; see the comment at the top of this file")
+end

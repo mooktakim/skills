@@ -25,6 +25,11 @@
       "name": "capture",
       "source": "./capture",
       "description": "Record a rule you state, or a correction you make, into the one checked-in context file where it belongs"
+    },
+    {
+      "name": "toolsmith",
+      "source": "./toolsmith",
+      "description": "Small single-purpose Rust commands that replace shell patterns Claude repeats, found by scanning your Claude Code history, with usage tracking"
     }
   ]
 }

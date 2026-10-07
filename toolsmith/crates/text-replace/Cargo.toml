@@ -1,0 +1,13 @@
+[package]
+name = "toolsmith-text-replace"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "toolsmith-text-replace"
+path = "src/main.rs"
+
+[dependencies]
+toolsmith-common = { path = "../common" }

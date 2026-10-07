@@ -1,0 +1,117 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# The toolsmith plugin's hook logic, run by the bash wrappers in hooks/.
+#
+#   registry context   SessionStart: print the tool list for Claude, leaving out
+#                      any tool whose name another command on PATH already has
+#   registry check     PreToolUse (Bash): read the hook event on stdin; when the
+#                      command matches a family a tool replaces, remind Claude of
+#                      the tool (mode "remind") or deny the command (mode "block")
+#
+# Reads crates/*/tool.json, families.json and metrics/weekly.json from the
+# plugin root ($TOOLSMITH_ROOT overrides it, for tests). Ruby 2.6+, standard
+# library only. Never fails a hook: any error exits 0 silently.
+
+require "json"
+require "time"
+
+ROOT = ENV.fetch("TOOLSMITH_ROOT", File.expand_path("..", __dir__))
+SCAN_DUE_DAYS = 7
+
+def tools
+  Dir.glob(File.join(ROOT, "crates/*/tool.json")).sort.map { |file| JSON.parse(File.read(file)) }
+end
+
+def families
+  JSON.parse(File.read(File.join(ROOT, "families.json"))).fetch("families").map { |f| [f["id"], f] }.to_h
+end
+
+def matches?(family, command)
+  family.fetch("rules").any? { |rule| rule.all? { |re| Regexp.new(re).match?(command) } }
+end
+
+def log_path
+  return (ENV["TOOLSMITH_LOG"].empty? ? nil : ENV["TOOLSMITH_LOG"]) if ENV.key?("TOOLSMITH_LOG")
+
+  state = ENV["XDG_STATE_HOME"].to_s.empty? ? File.join(Dir.home, ".local/state") : ENV["XDG_STATE_HOME"]
+  File.join(state, "toolsmith/usage.jsonl")
+end
+
+def log(event)
+  path = log_path or return
+  Dir.mkdir(File.dirname(path)) unless File.directory?(File.dirname(path))
+  File.open(path, "a") { |file| file.write(JSON.generate({ "ts" => Time.now.to_i }.merge(event)) + "\n") }
+rescue StandardError
+  nil
+end
+
+# Another executable with this name on PATH, outside the plugin's bin/.
+def clash(name)
+  own = File.expand_path("../bin", __dir__)
+  ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).each do |dir|
+    next if dir.empty? || (File.directory?(dir) && File.realpath(dir) == File.realpath(own))
+
+    candidate = File.join(dir, name)
+    return candidate if File.file?(candidate) && File.executable?(candidate)
+  end
+  nil
+end
+
+def scan_note
+  file = File.join(ROOT, "metrics/weekly.json")
+  last = File.exist?(file) ? JSON.parse(File.read(file))["last_scan"] : nil
+  days = last ? ((Time.now - Time.parse(last)) / 86_400).floor : nil
+  return if days && days < SCAN_DUE_DAYS
+
+  status = days ? "the last scan of the Claude Code history for new tool ideas was #{days} days ago" : "the Claude Code history has not been scanned for new tool ideas yet"
+  "toolsmith: #{status}. Mention once, at a natural break, that the toolsmith skill can run a scan."
+end
+
+def context
+  listed, clashed = tools.partition { |tool| clash(tool["name"]).nil? }
+  lines = []
+  unless listed.empty?
+    lines << "toolsmith: these commands are on PATH. Each does one job; run `<command> --llm` once in a session before you first use one."
+    all_families = families
+    listed.each do |tool|
+      family = all_families[tool["family"]]
+      instead = family ? " Use it instead of #{family['title']}." : ""
+      lines << "- #{tool['name']}: #{tool['intent']}#{instead}"
+    end
+  end
+  clashed.each do |tool|
+    lines << "toolsmith: #{tool['name']} is not available: #{clash(tool['name'])} has the same name and comes first on PATH. Tell the user."
+  end
+  note = scan_note
+  lines << note if note
+  puts lines unless lines.empty?
+end
+
+def check
+  event = JSON.parse($stdin.read)
+  command = event.dig("tool_input", "command").to_s
+  return if command.empty? || command.include?("toolsmith-")
+
+  all_families = families
+  tool = tools.find { |t| (family = all_families[t["family"]]) && matches?(family, command) } or return
+  family = all_families[tool["family"]]
+  log("event" => "nudge", "tool" => tool["name"], "mode" => tool["mode"], "cwd" => event["cwd"].to_s)
+  message = "toolsmith: this command looks like #{family['title']}. `#{tool['name']}` exists for that: " \
+            "#{tool['intent']} Run `#{tool['name']} --llm` for how to use it."
+  output = if tool["mode"] == "block"
+             { "permissionDecision" => "deny", "permissionDecisionReason" => "#{message} Use it instead of this command." }
+           else
+             { "additionalContext" => "#{message} Use it next time unless it does not fit; if it does not fit, say why in one line." }
+           end
+  puts JSON.generate("hookSpecificOutput" => { "hookEventName" => "PreToolUse" }.merge(output))
+end
+
+begin
+  case ARGV.first
+  when "context" then context
+  when "check" then check
+  end
+rescue StandardError, SyntaxError
+  nil
+end

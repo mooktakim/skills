@@ -1,0 +1,354 @@
+{
+  "last_scan": "2026-10-07",
+  "weeks": {
+    "2026-W34": {
+      "bash_calls": 373,
+      "families": {
+        "line-range-read": {
+          "calls": 54,
+          "chars": 43158,
+          "errors": 3
+        },
+        "multi-file-heredoc": {
+          "calls": 48,
+          "chars": 399944
+        },
+        "history-write": {
+          "calls": 17,
+          "chars": 41546
+        },
+        "literal-replace": {
+          "calls": 154,
+          "chars": 515012,
+          "errors": 3
+        },
+        "commit-chain": {
+          "calls": 54,
+          "chars": 129212,
+          "errors": 2
+        },
+        "test-output-trim": {
+          "calls": 109,
+          "chars": 277292,
+          "errors": 1
+        },
+        "structured-set": {
+          "calls": 2,
+          "chars": 9051
+        }
+      },
+      "tools": {
+      }
+    },
+    "2026-W36": {
+      "bash_calls": 1601,
+      "families": {
+        "line-range-read": {
+          "calls": 344,
+          "chars": 120643,
+          "errors": 5
+        },
+        "history-write": {
+          "calls": 62,
+          "chars": 287520
+        },
+        "commit-chain": {
+          "calls": 50,
+          "chars": 96444
+        },
+        "literal-replace": {
+          "calls": 324,
+          "chars": 1373720,
+          "errors": 15
+        },
+        "multi-file-heredoc": {
+          "calls": 49,
+          "chars": 526140,
+          "errors": 1
+        },
+        "structured-set": {
+          "calls": 2,
+          "chars": 16095
+        },
+        "test-output-trim": {
+          "calls": 196,
+          "chars": 517595,
+          "errors": 3
+        }
+      },
+      "tools": {
+      }
+    },
+    "2026-W37": {
+      "bash_calls": 7854,
+      "families": {
+        "line-range-read": {
+          "calls": 949,
+          "chars": 336849,
+          "errors": 25
+        },
+        "literal-replace": {
+          "calls": 792,
+          "chars": 1985125,
+          "errors": 12
+        },
+        "structured-set": {
+          "calls": 27,
+          "chars": 46019,
+          "errors": 1
+        },
+        "image-prep": {
+          "calls": 97,
+          "chars": 77084,
+          "errors": 1
+        },
+        "multi-file-heredoc": {
+          "calls": 37,
+          "chars": 306849
+        },
+        "history-write": {
+          "calls": 60,
+          "chars": 274306
+        },
+        "commit-chain": {
+          "calls": 101,
+          "chars": 146700
+        },
+        "test-output-trim": {
+          "calls": 700,
+          "chars": 972383,
+          "errors": 7
+        },
+        "pr-land": {
+          "calls": 22,
+          "chars": 7237
+        },
+        "ci-wait": {
+          "calls": 58,
+          "chars": 10763,
+          "errors": 2
+        }
+      },
+      "tools": {
+      }
+    },
+    "2026-W38": {
+      "bash_calls": 4363,
+      "families": {
+        "structured-set": {
+          "calls": 40,
+          "chars": 161649,
+          "errors": 1
+        },
+        "line-range-read": {
+          "calls": 457,
+          "chars": 270520,
+          "errors": 17
+        },
+        "test-output-trim": {
+          "calls": 377,
+          "chars": 588890,
+          "errors": 2
+        },
+        "history-write": {
+          "calls": 102,
+          "chars": 346608
+        },
+        "commit-chain": {
+          "calls": 146,
+          "chars": 254757,
+          "errors": 1
+        },
+        "ci-wait": {
+          "calls": 106,
+          "chars": 40884,
+          "errors": 5
+        },
+        "pr-land": {
+          "calls": 61,
+          "chars": 17265,
+          "errors": 1
+        },
+        "image-prep": {
+          "calls": 43,
+          "chars": 51205,
+          "errors": 2
+        },
+        "literal-replace": {
+          "calls": 426,
+          "chars": 1237731,
+          "errors": 2
+        },
+        "multi-file-heredoc": {
+          "calls": 34,
+          "chars": 279874
+        }
+      },
+      "tools": {
+      }
+    },
+    "2026-W39": {
+      "bash_calls": 4001,
+      "families": {
+        "line-range-read": {
+          "calls": 510,
+          "chars": 358271,
+          "errors": 15
+        },
+        "history-write": {
+          "calls": 144,
+          "chars": 776875,
+          "errors": 1
+        },
+        "ci-wait": {
+          "calls": 97,
+          "chars": 55574
+        },
+        "pr-land": {
+          "calls": 80,
+          "chars": 26558
+        },
+        "literal-replace": {
+          "calls": 719,
+          "chars": 3295459,
+          "errors": 14
+        },
+        "test-output-trim": {
+          "calls": 479,
+          "chars": 1532870,
+          "errors": 16
+        },
+        "commit-chain": {
+          "calls": 192,
+          "chars": 385976,
+          "errors": 1
+        },
+        "multi-file-heredoc": {
+          "calls": 142,
+          "chars": 1714881,
+          "errors": 5
+        },
+        "structured-set": {
+          "calls": 30,
+          "chars": 115905,
+          "errors": 2
+        },
+        "image-prep": {
+          "calls": 68,
+          "chars": 67010,
+          "errors": 5
+        }
+      },
+      "tools": {
+      }
+    },
+    "2026-W40": {
+      "bash_calls": 8516,
+      "families": {
+        "structured-set": {
+          "calls": 55,
+          "chars": 141147,
+          "errors": 1
+        },
+        "line-range-read": {
+          "calls": 1484,
+          "chars": 797243,
+          "errors": 21
+        },
+        "multi-file-heredoc": {
+          "calls": 175,
+          "chars": 957069,
+          "errors": 1
+        },
+        "history-write": {
+          "calls": 284,
+          "chars": 656721
+        },
+        "commit-chain": {
+          "calls": 301,
+          "chars": 522988,
+          "errors": 3
+        },
+        "ci-wait": {
+          "calls": 202,
+          "chars": 84542,
+          "errors": 4
+        },
+        "pr-land": {
+          "calls": 117,
+          "chars": 37576,
+          "errors": 1
+        },
+        "literal-replace": {
+          "calls": 1917,
+          "errors": 14,
+          "chars": 4052246
+        },
+        "test-output-trim": {
+          "calls": 1007,
+          "chars": 1436045,
+          "errors": 6
+        },
+        "image-prep": {
+          "calls": 92,
+          "chars": 110942
+        }
+      },
+      "tools": {
+      }
+    },
+    "2026-W41": {
+      "bash_calls": 3150,
+      "families": {
+        "line-range-read": {
+          "calls": 572,
+          "chars": 222858,
+          "errors": 6
+        },
+        "literal-replace": {
+          "calls": 578,
+          "chars": 1242634,
+          "errors": 4
+        },
+        "test-output-trim": {
+          "calls": 365,
+          "chars": 460851,
+          "errors": 3
+        },
+        "history-write": {
+          "calls": 99,
+          "chars": 254774,
+          "errors": 1
+        },
+        "commit-chain": {
+          "calls": 123,
+          "chars": 232146
+        },
+        "ci-wait": {
+          "calls": 107,
+          "chars": 42561,
+          "errors": 2
+        },
+        "pr-land": {
+          "calls": 56,
+          "chars": 21803,
+          "errors": 1
+        },
+        "multi-file-heredoc": {
+          "calls": 44,
+          "chars": 222354
+        },
+        "image-prep": {
+          "calls": 26,
+          "chars": 25696
+        },
+        "structured-set": {
+          "calls": 21,
+          "chars": 25876
+        }
+      },
+      "tools": {
+      }
+    }
+  }
+}
