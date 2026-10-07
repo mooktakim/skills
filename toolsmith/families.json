@@ -54,12 +54,19 @@
       ]
     },
     {
-      "id": "structured-set",
-      "title": "changing a value in a JSON or YAML file with a script",
+      "id": "json-edit",
+      "title": "changing a value in a JSON file with a script",
       "rules": [
         ["\\bjq\\b", ">\\s*\\S+\\.json|mv \\S+ \\S+\\.json"],
         ["json\\.load", "json\\.dump\\("],
-        ["\\bYAML\\b|\\byaml\\b", "File\\.write|open\\([^)]*,\\s*['\"]w"]
+        ["JSON\\.parse", "JSON\\.(pretty_)?generate", "File\\.write"]
+      ]
+    },
+    {
+      "id": "yaml-edit",
+      "title": "changing a YAML file with a script",
+      "rules": [
+        ["\\bYAML\\b|\\byaml\\b|\\.ya?ml\\b", "File\\.write|open\\([^)]*,\\s*['\"]w"]
       ]
     },
     {

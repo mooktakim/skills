@@ -17,7 +17,7 @@
   "options": [
     { "flag": "--dry-run", "text": "Check every edit and print the changes, but write nothing." }
   ],
-  "output": "On success, stdout shows each edit as 'path:line' with the whole changed lines before ('- ') and after ('+ '), then 'Done: N replacements in M files.' For --all or --count, all match lines are listed and the first change is shown. Files are written only after every edit matched, each through a temporary file that is renamed over the original, keeping its permissions. On failure, nothing is written and stderr names each failed edit with its spec line, the match count, and the closest text in the file: where a multi-line match breaks, or the most similar lines.",
+  "output": "On success, stdout shows each edit as 'path:line' with the whole changed lines before ('- ') and after ('+ '; a side longer than 6 lines shows its first 3 and last 2), then 'Done: N replacements in M files.' For --all or --count, all match lines are listed and the first change is shown. Files are written only after every edit matched, each through a temporary file that is renamed over the original, keeping its permissions. On failure, nothing is written and stderr names each failed edit with its spec line, the match count, and the closest text in the file: where a multi-line match breaks, or the most similar lines.",
   "exit_codes": [
     { "code": 0, "text": "Every edit matched and was applied (or, with --dry-run, would be)." },
     { "code": 1, "text": "Nothing written: an edit matched the wrong number of times, or a file could not be read." },

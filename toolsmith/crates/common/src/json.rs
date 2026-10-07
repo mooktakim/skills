@@ -1,11 +1,14 @@
-//! A small JSON reader for the tool manifests, plus string quoting for the
-//! usage log. Standard library only, so tools build without network access.
+//! A small JSON reader and writer for the tool manifests, the usage log and
+//! tools that edit JSON files. Numbers keep their source text, so a file
+//! written back keeps them exactly. Standard library only, so tools build
+//! without network access.
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Null,
     Bool(bool),
-    Number(f64),
+    /// The number's text as written, e.g. "1.50" or "1e3".
+    Number(String),
     String(String),
     Array(Vec<Value>),
     /// Keys keep their file order, so guides list sections as written.
@@ -53,8 +56,65 @@ impl Value {
 
     pub fn as_i64(&self) -> Option<i64> {
         match self {
-            Value::Number(n) if n.fract() == 0.0 => Some(*n as i64),
+            Value::Number(n) => n.parse().ok(),
             _ => None,
+        }
+    }
+
+    /// Compact JSON on one line, without spaces.
+    pub fn to_compact(&self) -> String {
+        let mut out = String::new();
+        write(self, None, 0, &mut out);
+        out
+    }
+
+    /// Pretty JSON: one member per line, nested by `indent`, "key": value.
+    pub fn to_pretty(&self, indent: &str) -> String {
+        let mut out = String::new();
+        write(self, Some(indent), 0, &mut out);
+        out
+    }
+}
+
+fn write(value: &Value, indent: Option<&str>, depth: usize, out: &mut String) {
+    let newline = |out: &mut String, depth: usize| {
+        if let Some(unit) = indent {
+            out.push('\n');
+            out.push_str(&unit.repeat(depth));
+        }
+    };
+    match value {
+        Value::Null => out.push_str("null"),
+        Value::Bool(b) => out.push_str(if *b { "true" } else { "false" }),
+        Value::Number(n) => out.push_str(n),
+        Value::String(s) => out.push_str(&quote(s)),
+        Value::Array(items) if items.is_empty() => out.push_str("[]"),
+        Value::Object(pairs) if pairs.is_empty() => out.push_str("{}"),
+        Value::Array(items) => {
+            out.push('[');
+            for (i, item) in items.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                newline(out, depth + 1);
+                write(item, indent, depth + 1, out);
+            }
+            newline(out, depth);
+            out.push(']');
+        }
+        Value::Object(pairs) => {
+            out.push('{');
+            for (i, (key, item)) in pairs.iter().enumerate() {
+                if i > 0 {
+                    out.push(',');
+                }
+                newline(out, depth + 1);
+                out.push_str(&quote(key));
+                out.push_str(if indent.is_some() { ": " } else { ":" });
+                write(item, indent, depth + 1, out);
+            }
+            newline(out, depth);
+            out.push('}');
         }
     }
 }
@@ -227,7 +287,10 @@ impl<'a> Parser<'a> {
             self.pos += 1;
         }
         let text = std::str::from_utf8(&self.bytes[start..self.pos]).unwrap_or("");
-        text.parse::<f64>().map(Value::Number).map_err(|_| self.error("invalid number"))
+        match text.parse::<f64>() {
+            Ok(_) => Ok(Value::Number(text.to_string())),
+            Err(_) => Err(self.error("invalid number")),
+        }
     }
 }
 
@@ -241,7 +304,7 @@ mod tests {
         let keys: Vec<&str> = v.as_object().unwrap().iter().map(|(k, _)| k.as_str()).collect();
         assert_eq!(keys, ["b", "a"]);
         assert_eq!(v.get("b").unwrap().as_array().unwrap()[0].as_i64(), Some(1));
-        assert_eq!(v.get("b").unwrap().as_array().unwrap()[1], Value::Number(-2.5));
+        assert_eq!(v.get("b").unwrap().as_array().unwrap()[1], Value::Number("-2.5".into()));
         assert_eq!(v.get("a").unwrap().get("x").unwrap().as_str(), Some("y"));
     }
 
@@ -257,6 +320,15 @@ mod tests {
         assert!(Value::parse("[1 2]").is_err());
         assert!(Value::parse("\"open").is_err());
         assert!(Value::parse("{} x").is_err());
+    }
+
+    #[test]
+    fn writes_pretty_and_compact_json_keeping_number_text() {
+        let text = "{\n  \"a\": [\n    1.50,\n    {}\n  ],\n  \"b\": {\n    \"c\": \"x\\\"y\"\n  },\n  \"d\": []\n}";
+        let v = Value::parse(text).unwrap();
+        assert_eq!(v.to_pretty("  "), text);
+        assert_eq!(v.to_compact(), r#"{"a":[1.50,{}],"b":{"c":"x\"y"},"d":[]}"#);
+        assert_eq!(Value::parse("[1e3]").unwrap().to_pretty("\t"), "[\n\t1e3\n]");
     }
 
     #[test]

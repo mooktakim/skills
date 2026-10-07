@@ -1,0 +1,61 @@
+{
+  "name": "toolsmith-json-set",
+  "intent": "Set one value in a JSON file, keeping its existing layout.",
+  "usage": "toolsmith-json-set [--string] <file> <path> <value>",
+  "use_when": [
+    "You change, add or append one value in a JSON file such as settings.json, package.json or a manifest.",
+    "You would otherwise write a jq, Python or Ruby script that loads the JSON, changes a key and dumps it back."
+  ],
+  "not_for": [
+    "YAML, TOML or JSON with comments (JSONC): those are not JSON.",
+    "Deleting keys, or several changes at once: run it once per change, or edit the file.",
+    "Reading values: use jq or the Read tool."
+  ],
+  "input": "Three arguments. The file. The path: keys joined by '.', array items as [N] (from 0), [] at the end to append to an array, and \"double quotes\" around a key that holds '.', '[' or '\"' (for example '\"a.b\".c'). The value: JSON, so a string needs its quotes ('\"text\"'); with --string the value is taken as a plain string. Missing objects on the path are created, and a missing array before []; a missing array before [N] is an error.",
+  "options": [
+    { "flag": "--string", "text": "Take the value as a plain string, without JSON quotes." }
+  ],
+  "output": "'<file>: <path> = <value>', with '(was <old value>)' when a value was replaced; 'already <value>; file unchanged' when it was already set. The file keeps its key order, its indent (detected from the file) and its final newline, and is written through a temporary file and a rename. The whole file is written in the standard pretty style; if that changed other lines (for example arrays kept on one line), a note says so.",
+  "exit_codes": [
+    { "code": 0, "text": "The value is set (or already was)." },
+    { "code": 1, "text": "Nothing written: the file is missing or not valid JSON, or the path does not fit the data." },
+    { "code": 2, "text": "Nothing written: the path, the value or the arguments are wrong." }
+  ],
+  "examples": [
+    {
+      "title": "Append to an array",
+      "files": { ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(git status)\"\n    ]\n  },\n  \"model\": \"opus\"\n}\n" },
+      "args": [".claude/settings.json", "permissions.allow[]", "\"Bash(bin/ci)\""],
+      "exit": 0,
+      "stdout": ".claude/settings.json: permissions.allow[] = \"Bash(bin/ci)\"\n",
+      "files_after": { ".claude/settings.json": "{\n  \"permissions\": {\n    \"allow\": [\n      \"Bash(git status)\",\n      \"Bash(bin/ci)\"\n    ]\n  },\n  \"model\": \"opus\"\n}\n" }
+    },
+    {
+      "title": "Replace a value with a plain string",
+      "files": { "package.json": "{\n  \"name\": \"shop\",\n  \"scripts\": {\n    \"test\": \"bin/test\"\n  }\n}\n" },
+      "args": ["--string", "package.json", "scripts.test", "bin/test --fast"],
+      "exit": 0,
+      "stdout": "package.json: scripts.test = \"bin/test --fast\" (was \"bin/test\")\n",
+      "files_after": { "package.json": "{\n  \"name\": \"shop\",\n  \"scripts\": {\n    \"test\": \"bin/test --fast\"\n  }\n}\n" }
+    },
+    {
+      "title": "A path that does not fit the data",
+      "files": { "package.json": "{\n  \"name\": \"shop\"\n}\n" },
+      "args": ["package.json", "name.first", "\"x\""],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "toolsmith-json-set: package.json: name: is a string, so it has no key \"first\"\n"
+    },
+    {
+      "title": "A string value without its JSON quotes",
+      "files": { "package.json": "{\n  \"name\": \"shop\"\n}\n" },
+      "args": ["package.json", "name", "store"],
+      "exit": 2,
+      "stdout": "",
+      "stderr": "toolsmith-json-set: the value store is not JSON; quote a string as '\"text\"', or add --string\nRun `toolsmith-json-set --help` for usage, or `toolsmith-json-set --llm` for the full guide.\n"
+    }
+  ],
+  "family": "json-edit",
+  "mode": "remind",
+  "added": "2026-10-07"
+}

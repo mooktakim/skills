@@ -1,0 +1,56 @@
+{
+  "name": "toolsmith-check-run",
+  "intent": "Run a check command, printing only its outcome with any failures.",
+  "usage": "toolsmith-check-run [--lines N] [--] <command> [args...]",
+  "use_when": [
+    "You run tests, a linter or an audit and only need to know whether it passed and, if not, what failed.",
+    "You would otherwise pipe the command into `tail`, `head` or `grep` to cut its output."
+  ],
+  "not_for": [
+    "Commands whose full output you need to read: run them directly.",
+    "Interactive commands: stdin is closed.",
+    "Shell syntax in the command (pipes, &&, VAR=value): pass it as `sh -c '...'`."
+  ],
+  "input": "The command and its arguments after the options, run directly (not through a shell) in the current directory, with stdin closed. Put `--` before the command when it starts with '-'.",
+  "options": [
+    { "flag": "--lines", "text": "When a failed command's output has no recognised failure blocks, show this many last lines (default 40)." }
+  ],
+  "output": "First line: 'PASSED in <seconds>: <command>' or 'FAILED (exit N) in <seconds>: <command>'. On success, the last 2 non-blank output lines (usually the summary). On failure, each failure block (Minitest Failure/Error, RSpec Failure/Error, Go FAIL, Rust panics and compiler errors, Python tracebacks, RuboCop-style 'path:line:col: C:' offenses), up to 25 lines each and 200 in all, then the last non-blank line; when no block is recognised, the last 40 lines. Last line: 'Full output: <log file> (N lines)'. The combined stdout and stderr, colours removed, stay in that log file under $TMPDIR/toolsmith-check-run/, so read it instead of running the command again.",
+  "exit_codes": [
+    { "code": 0, "text": "The command succeeded." },
+    { "code": 1, "text": "The command failed (its own exit code is in the first line), or it could not start." },
+    { "code": 2, "text": "The arguments are wrong." }
+  ],
+  "examples": [
+    {
+      "title": "A passing test run",
+      "files": {
+        "bin/check": "#!/bin/sh\necho 'Run options: --seed 1234'\necho\necho '# Running:'\necho\necho '....'\necho\necho 'Finished in 0.012s, 333.3 runs/s'\necho\necho '4 runs, 9 assertions, 0 failures, 0 errors, 0 skips'\n"
+      },
+      "args": ["--", "sh", "bin/check"],
+      "exit": 0,
+      "stdout_regex": "\\APASSED in \\d+\\.\\ds: sh bin/check\\nFinished in 0\\.012s, 333\\.3 runs/s\\n4 runs, 9 assertions, 0 failures, 0 errors, 0 skips\\nFull output: \\S+/toolsmith-check-run/\\d+-\\d+\\.log \\(9 lines\\)\\n\\z",
+      "stdout_sample": "PASSED in 0.0s: sh bin/check\nFinished in 0.012s, 333.3 runs/s\n4 runs, 9 assertions, 0 failures, 0 errors, 0 skips\nFull output: /tmp/toolsmith-check-run/1791400321-4242.log (9 lines)\n"
+    },
+    {
+      "title": "A failing test run shows only the failures and the summary",
+      "files": {
+        "bin/check": "#!/bin/sh\ncat <<'OUT'\nRun options: --seed 42\n\n# Running:\n\n.F.E\n\nFinished in 0.02s\n\n  1) Failure:\nUserTest#test_name_is_required [test/models/user_test.rb:12]:\nExpected true to be falsy.\n\n  2) Error:\nUserTest#test_email:\nNoMethodError: undefined method `downcase' for nil\n    app/models/user.rb:8:in `normalise'\n\n4 runs, 5 assertions, 1 failures, 1 errors, 0 skips\nOUT\nexit 1\n"
+      },
+      "args": ["sh", "bin/check"],
+      "exit": 1,
+      "stdout_regex": "\\AFAILED \\(exit 1\\) in \\d+\\.\\ds: sh bin/check\\n\\n  1\\) Failure:\\nUserTest#test_name_is_required \\[test/models/user_test\\.rb:12\\]:\\nExpected true to be falsy\\.\\n\\n  2\\) Error:\\nUserTest#test_email:\\nNoMethodError: undefined method `downcase' for nil\\n    app/models/user\\.rb:8:in `normalise'\\n\\n4 runs, 5 assertions, 1 failures, 1 errors, 0 skips\\nFull output: \\S+/toolsmith-check-run/\\d+-\\d+\\.log \\(18 lines\\)\\n\\z",
+      "stdout_sample": "FAILED (exit 1) in 0.0s: sh bin/check\n\n  1) Failure:\nUserTest#test_name_is_required [test/models/user_test.rb:12]:\nExpected true to be falsy.\n\n  2) Error:\nUserTest#test_email:\nNoMethodError: undefined method `downcase' for nil\n    app/models/user.rb:8:in `normalise'\n\n4 runs, 5 assertions, 1 failures, 1 errors, 0 skips\nFull output: /tmp/toolsmith-check-run/1791400321-4242.log (18 lines)\n"
+    },
+    {
+      "title": "A command that does not exist",
+      "args": ["--", "bin/missing"],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "toolsmith-check-run: could not start bin/missing: No such file or directory (os error 2)\n"
+    }
+  ],
+  "family": "test-output-trim",
+  "mode": "remind",
+  "added": "2026-10-07"
+}

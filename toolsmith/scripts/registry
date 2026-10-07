@@ -98,12 +98,14 @@ def check
   return if command.empty? || command.include?("toolsmith-")
 
   all_families = families
-  tool = tools.find { |t| (family = all_families[t["family"]]) && matches?(family, command) } or return
-  family = all_families[tool["family"]]
-  log("event" => "nudge", "tool" => tool["name"], "mode" => tool["mode"], "cwd" => event["cwd"].to_s)
-  message = "toolsmith: this command looks like #{family['title']}. `#{tool['name']}` exists for that: " \
-            "#{tool['intent']} Run `#{tool['name']} --llm` for how to use it."
-  output = if tool["mode"] == "block"
+  found = tools.select { |t| (family = all_families[t["family"]]) && matches?(family, command) }
+  return if found.empty?
+
+  found.each { |tool| log("event" => "nudge", "tool" => tool["name"], "mode" => tool["mode"], "cwd" => event["cwd"].to_s) }
+  message = "toolsmith: " + found.map do |tool|
+    "this command looks like #{all_families[tool['family']]['title']}; `#{tool['name']}` exists for that: #{tool['intent']}"
+  end.join(" Also, ") + " Run `<command> --llm` for how to use one."
+  output = if found.any? { |tool| tool["mode"] == "block" }
              { "permissionDecision" => "deny", "permissionDecisionReason" => "#{message} Use it instead of this command." }
            else
              { "additionalContext" => "#{message} Use it next time unless it does not fit; if it does not fit, say why in one line." }

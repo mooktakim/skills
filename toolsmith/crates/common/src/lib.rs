@@ -6,8 +6,11 @@
 //! `handle_guide_flags`, does its one job, and leaves through `Tool::exit` so
 //! the run is logged.
 
+pub mod fsutil;
 mod guide;
 pub mod json;
+pub mod process;
+pub mod text;
 mod usage;
 
 use std::time::Instant;

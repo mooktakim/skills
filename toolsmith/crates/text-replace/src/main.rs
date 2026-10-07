@@ -11,6 +11,7 @@ use std::fs;
 use std::io::{IsTerminal, Read};
 use std::path::PathBuf;
 
+use toolsmith_common::fsutil::write_atomically;
 use toolsmith_common::{Tool, EXIT_FAILED, EXIT_OK};
 
 /// Exit code when a write failed after others succeeded.
@@ -145,6 +146,19 @@ fn totals(replacements: usize, files: usize) -> String {
     format!("{} in {}", plural(replacements, "replacement"), plural(files, "file"))
 }
 
+/// Lines shown per side of a change; longer sides show their start and end.
+const SHOWN_LINES: usize = 6;
+
+fn shorten(lines: &[String]) -> Vec<String> {
+    if lines.len() <= SHOWN_LINES {
+        return lines.to_vec();
+    }
+    let mut out = lines[..3].to_vec();
+    out.push(format!("... ({} more lines)", lines.len() - 5));
+    out.extend_from_slice(&lines[lines.len() - 2..]);
+    out
+}
+
 fn describe(path: &str, change: &edit::Change) -> String {
     let lines: Vec<String> = change.lines.iter().map(usize::to_string).collect();
     let mut out = if change.lines.len() == 1 {
@@ -152,26 +166,23 @@ fn describe(path: &str, change: &edit::Change) -> String {
     } else {
         format!("{}:{} ({} replacements, first shown)\n", path, lines.join(","), change.lines.len())
     };
-    for line in &change.before {
+    for line in shorten(&change.before) {
         out.push_str(&format!("- {}\n", line));
     }
-    for line in &change.after {
+    for line in shorten(&change.after) {
         out.push_str(&format!("+ {}\n", line));
     }
     out
 }
 
-/// Writes through a temporary file in the same directory and renames it over
-/// the original, keeping the original's permissions.
-fn write_atomically(path: &PathBuf, contents: &[u8]) -> std::io::Result<()> {
-    let permissions = fs::metadata(path)?.permissions();
-    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    let temp = path.with_file_name(format!(".{}.toolsmith-{}", name, std::process::id()));
-    let result = fs::write(&temp, contents)
-        .and_then(|_| fs::set_permissions(&temp, permissions))
-        .and_then(|_| fs::rename(&temp, path));
-    if result.is_err() {
-        let _ = fs::remove_file(&temp);
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn long_changes_show_their_start_and_end() {
+        let lines: Vec<String> = (1..=10).map(|n| n.to_string()).collect();
+        assert_eq!(shorten(&lines), vec!["1", "2", "3", "... (5 more lines)", "9", "10"]);
+        assert_eq!(shorten(&lines[..6]), lines[..6].to_vec());
     }
-    result
 }

@@ -99,7 +99,8 @@ fn count_error(buf: &[u8], edit: &Edit, expect: Expect, lines: &[usize]) -> Stri
         Expect::AtLeastOne => "expected at least 1".to_string(),
     };
     if !lines.is_empty() {
-        let mut message = format!("found {} matches (lines {}), {}.", lines.len(), join_lines(lines), wanted);
+        let found = if lines.len() == 1 { "1 match (line".to_string() } else { format!("{} matches (lines", lines.len()) };
+        let mut message = format!("found {} {}), {}.", found, join_lines(lines), wanted);
         if expect == Expect::Exactly(1) {
             message.push_str(&format!(
                 "\n  Add surrounding text to the '-' lines to make the match unique, or put --all or --count {} on the '@@' line.",
@@ -238,6 +239,8 @@ mod tests {
         assert!(many.contains("--count 2"));
         let count = apply(b"x\nx\n", &e("x", "y"), Expect::Exactly(3)).err().unwrap();
         assert!(count.starts_with("found 2 matches (lines 1, 2), expected 3."));
+        let one = apply(b"x\n", &e("x", "y"), Expect::Exactly(2)).err().unwrap();
+        assert!(one.starts_with("found 1 match (line 1), expected 2."), "{}", one);
         let none = apply(b"a\n", &e("x", "y"), Expect::AtLeastOne).err().unwrap();
         assert!(none.starts_with("found 0 matches, expected at least 1."));
     }

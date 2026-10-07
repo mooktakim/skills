@@ -95,6 +95,9 @@ fn files_text(files: &Value) -> String {
 
 fn example_text(name: &str, number: usize, e: &Value) -> String {
     let mut out = format!("\n### {}. {}\n", number, text(e, "title"));
+    if let Some(situation) = e.get("situation").and_then(Value::as_str) {
+        out.push_str(&format!("\n{}\n", situation));
+    }
     if let Some(files) = e.get("files") {
         out.push_str(&format!("\nFiles before:\n```\n{}```\n", files_text(files)));
     }
@@ -122,11 +125,12 @@ fn example_text(name: &str, number: usize, e: &Value) -> String {
     out.push_str(&format!("\nExit code: {}\n", exit));
     let stdout = e.get("stdout").or_else(|| e.get("stdout_sample")).and_then(Value::as_str).unwrap_or("");
     if !stdout.is_empty() {
-        let label = if e.get("stdout").is_some() { "Output" } else { "Output (sample; the date and time vary)" };
+        let label = if e.get("stdout").is_some() { "Output" } else { "Output (sample; times, dates and IDs vary)" };
         out.push_str(&format!("\n{}:\n```\n{}```\n", label, stdout));
     }
-    if let Some(stderr) = e.get("stderr").and_then(Value::as_str) {
-        out.push_str(&format!("\nError output:\n```\n{}```\n", stderr));
+    if let Some(stderr) = e.get("stderr").or_else(|| e.get("stderr_sample")).and_then(Value::as_str) {
+        let label = if e.get("stderr").is_some() { "Error output" } else { "Error output (sample; details vary)" };
+        out.push_str(&format!("\n{}:\n```\n{}```\n", label, stderr));
     }
     if let Some(files) = e.get("files_after") {
         out.push_str(&format!("\nFiles after:\n```\n{}```\n", files_text(files)));

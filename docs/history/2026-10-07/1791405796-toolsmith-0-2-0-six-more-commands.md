@@ -1,0 +1,10 @@
+# toolsmith 0.2.0: six more commands
+
+- User approved building the six recommended tools. Read real examples first (`analyse examples`); two design changes from the proposal: wait tool covers any commit (half the CI waits were branch runs via `gh run list --branch`, not PRs) so it is `toolsmith-ci-wait` with `--pr N`; YAML edits split from JSON (`yaml-edit` family, 430 calls, uncovered) because json-set must not be suggested for YAML.
+- New: `toolsmith-file-lines` (line-range-read, 4,374 calls), `toolsmith-check-run` (test-output-trim, 3,233; full log kept in $TMPDIR/toolsmith-check-run/), `toolsmith-ci-wait` (583; waits for `gh run list --commit`, prints failed jobs' log tails, BOM/timestamp/ANSI stripped), `toolsmith-files-write` (530), `toolsmith-pr-land` (337; own clean-up, not `gh --delete-branch`; lists `git rebase --onto` + `gh pr edit` for children), `toolsmith-json-set` (171; keeps key order, number text, detected indent).
+- Common crate: process (run gh/git), text (strip_ansi, last_nonblank), fsutil (write_atomically, moved from text-replace), JSON writer; Number now keeps source text.
+- Contract/harness: examples may use `setup` (bash; git remote under .git/test-origin), `fake_commands` (fake gh on PATH) with a required `situation`; `stderr_regex`/`stderr_sample`; unknown example keys fail. Hook names every tool a command matches (python json+replace -> json-set and text-replace).
+- text-replace: diff sides capped at 6 lines (first 3, last 2) - it echoed whole large edits; "found 1 match (line N)" grammar.
+- Bugs found by tests/trials: empty input split into one line (file-lines, files-write); file-lines searches with ':' or spaces (now split at first ":/", unquoted text explains quoting).
+- Real trials: check-run on bin/test, ci-wait on real GitHub (6152ad3 passed), json-set on a copy of ~/.claude/settings.json (one key added, nothing else changed), files-write. pr-land not tried for real: no open PR; covered only by fake-gh examples.
+- 97 tests green on Ruby 4.0 and 2.6 + bash 3.2. Metrics rescanned with the new families.

@@ -18,6 +18,8 @@ class ToolsmithTest < Minitest::Test
   REQUIRED = %w[name intent usage use_when not_for input options output exit_codes examples family mode added].freeze
   SECTIONS = ["Use it when", "Do not use it for", "Input", "Options", "Output", "Exit codes", "Examples"].freeze
   SHIM_LINE = %(exec "$(dirname "${BASH_SOURCE[0]}")/../libexec/shim" %s "$@"\n)
+  EXAMPLE_KEYS = %w[title situation setup fake_commands git files cwd args stdin exit stdout stdout_regex stdout_sample
+                    stderr stderr_regex stderr_sample files_after staged].freeze
 
   def setup
     super
@@ -114,10 +116,14 @@ class ToolsmithTest < Minitest::Test
     assert examples.any? { |e| e["exit"].to_i != 0 }, "#{name}: an example of a failure"
     examples.each do |e|
       refute_empty e["title"].to_s
+      assert_empty e.keys - EXAMPLE_KEYS, "#{name}: '#{e['title']}' has unknown keys"
+      refute_empty e["situation"].to_s, "#{name}: '#{e['title']}' has a setup or fake commands, so its situation explains them" if e["setup"] || e["fake_commands"]
       assert e.key?("exit"), "#{name}: '#{e['title']}' gives its exit code"
       assert e.key?("stdout") || e.key?("stdout_regex"), "#{name}: '#{e['title']}' gives its output"
-      if e["stdout_regex"]
-        assert_match Regexp.new(e["stdout_regex"]), e["stdout_sample"].to_s, "#{name}: '#{e['title']}' stdout_sample must match stdout_regex"
+      %w[stdout stderr].each do |stream|
+        next unless e["#{stream}_regex"]
+
+        assert_match Regexp.new(e["#{stream}_regex"]), e["#{stream}_sample"].to_s, "#{name}: '#{e['title']}' #{stream}_sample must match #{stream}_regex"
       end
       refute_match(/^EOF$/, e["stdin"].to_s, "#{name}: '#{e['title']}' stdin cannot hold a line EOF, the guide's heredoc end")
     end
@@ -152,12 +158,23 @@ class ToolsmithTest < Minitest::Test
       Open3.capture3("git", "init", "-q", dir)
       Open3.capture3("git", "-C", dir, "config", "user.email", "test@example.com")
     end
+    if example["setup"]
+      out, status = Open3.capture2e(bash_bin, "-c", example["setup"], chdir: dir)
+      assert status.success?, "#{label} setup failed: #{out}"
+    end
     (example["files"] || {}).each do |rel, content|
       FileUtils.mkdir_p(File.dirname(File.join(dir, rel)))
       File.write(File.join(dir, rel), content)
     end
+    before = tree(dir)
+    fakes = Dir.mktmpdir("fakes", @state)
+    (example["fake_commands"] || {}).each do |command, script|
+      File.write(File.join(fakes, command), script)
+      File.chmod(0o755, File.join(fakes, command))
+    end
     cwd = File.join(dir, example["cwd"] || ".")
-    result = run_tool(name, *example["args"], stdin: example["stdin"].to_s, cwd: cwd)
+    env = { "PATH" => "#{fakes}:#{ENV['PATH']}", "TMPDIR" => @state }
+    result = run_tool(name, *example["args"], stdin: example["stdin"].to_s, cwd: cwd, env: env)
     assert_equal example["exit"], result.code, "#{label} exit code; stderr: #{result.err}"
     if example["stdout_regex"]
       assert_match Regexp.new(example["stdout_regex"]), result.out, label
@@ -165,7 +182,8 @@ class ToolsmithTest < Minitest::Test
       assert_equal example["stdout"], result.out, label
     end
     assert_equal example["stderr"], result.err, label if example.key?("stderr")
-    expected = resolve(dir, example["files_after"] || example["files"] || {})
+    assert_match Regexp.new(example["stderr_regex"]), result.err, label if example.key?("stderr_regex")
+    expected = example["files_after"] ? resolve(dir, example["files_after"]) : before
     assert_equal expected, tree(dir), "#{label} must change exactly the files it says"
     (example["staged"] || []).each do |pattern|
       staged, = Open3.capture3("git", "-C", dir, "diff", "--cached", "--name-only")
@@ -357,6 +375,14 @@ class ToolsmithTest < Minitest::Test
     end
     assert_empty hook("pre-bash.sh", stdin: "not json").out
     assert_equal 0, hook("pre-bash.sh", stdin: "not json").code
+  end
+
+  def test_pre_bash_names_every_tool_a_command_matches
+    script = "python3 - <<'EOF'\nimport json\np='a.json'; d=json.load(open(p)); d['x']=1\ns=json.dumps(d).replace('a','b')\nopen(p,'w').write(s)\njson.dump(d, open(p,'w'))\nEOF"
+    context = JSON.parse(hook("pre-bash.sh", stdin: bash_event(script)).out).dig("hookSpecificOutput", "additionalContext")
+    assert_includes context, "`toolsmith-json-set` exists for that"
+    assert_includes context, "`toolsmith-text-replace` exists for that"
+    assert_equal %w[toolsmith-json-set toolsmith-text-replace], log_events.map { |e| e["tool"] }
   end
 
   def test_pre_bash_denies_in_block_mode

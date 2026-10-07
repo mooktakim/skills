@@ -8,6 +8,12 @@ Claude repeats the same shell patterns hundreds of times: a Python heredoc that 
 |---------|-----|
 | `toolsmith-text-replace` | Replace exact, literal text in existing files as one all-or-nothing change. |
 | `toolsmith-history-add` | Add one new entry file to the project's `docs/history` log. |
+| `toolsmith-file-lines` | Print numbered line ranges from several files in one call. |
+| `toolsmith-check-run` | Run a check command, printing only its outcome with any failures. |
+| `toolsmith-files-write` | Create several new files from one stdin bundle, never overwriting by accident. |
+| `toolsmith-json-set` | Set one value in a JSON file, keeping its existing layout. |
+| `toolsmith-ci-wait` | Wait for the CI runs of one commit to finish, printing only what failed. |
+| `toolsmith-pr-land` | Merge a pull request, then return the local clone to its updated base branch. |
 
 Run any command with `--help` for a summary, or `--llm` for the full guide: when to use it, input format, exit codes and tested examples.
 
@@ -36,6 +42,7 @@ The session-start note says when a scan is more than a week old.
 ## Requirements
 
 - Rust (`cargo`) to build the tools on first use. Without it, a command explains how to install Rust.
+- The GitHub CLI (`gh`), signed in, for `toolsmith-ci-wait` and `toolsmith-pr-land`.
 - Ruby (the macOS system Ruby is enough) for the hooks and the analysis.
 - Claude Code CLI or desktop. claude.ai and Cowork do not install plugins that ship a `bin/` directory.
 

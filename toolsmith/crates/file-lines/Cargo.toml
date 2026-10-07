@@ -1,0 +1,13 @@
+[package]
+name = "toolsmith-file-lines"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "toolsmith-file-lines"
+path = "src/main.rs"
+
+[dependencies]
+toolsmith-common = { path = "../common" }

@@ -1,0 +1,13 @@
+[package]
+name = "toolsmith-ci-wait"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "toolsmith-ci-wait"
+path = "src/main.rs"
+
+[dependencies]
+toolsmith-common = { path = "../common" }

@@ -1,0 +1,55 @@
+{
+  "name": "toolsmith-pr-land",
+  "intent": "Merge a pull request, then return the local clone to its updated base branch.",
+  "usage": "toolsmith-pr-land [N] [--merge | --squash | --rebase]",
+  "use_when": [
+    "A pull request is approved and green, and the next step is to merge it and carry on from the updated base branch.",
+    "You would otherwise chain `gh pr merge`, `git checkout main`, `git pull` and `git branch -D`."
+  ],
+  "not_for": [
+    "Waiting for CI first: run toolsmith-ci-wait --pr N before this.",
+    "Creating or reviewing pull requests.",
+    "Merging when tracked files have uncommitted changes: commit or stash them first."
+  ],
+  "input": "No stdin. N is the pull request number; without it, the pull request of the current branch. Runs in the repository's directory, with `gh` installed and signed in, and the GitHub remote named origin.",
+  "options": [
+    { "flag": "--merge", "text": "Merge with a merge commit." },
+    { "flag": "--squash", "text": "Squash the commits into one." },
+    { "flag": "--rebase", "text": "Rebase the commits onto the base. Without one of these three, the repository's only allowed method is used; when it allows several, the tool asks you to choose." }
+  ],
+  "output": "'Merged #N \"title\" into <base> (<method>).', then the clean-up: the head branch is deleted on origin and locally, the base branch is checked out and fast-forwarded to origin, and its new tip is shown. When open pull requests or local branches were built on the head branch, it lists the commands to move them: `git rebase --onto <base> <old head commit> <branch>` and `gh pr edit <n> --base <base>`. It does not run those.",
+  "exit_codes": [
+    { "code": 0, "text": "Merged, and the local clone is on the updated base branch." },
+    { "code": 1, "text": "Nothing merged: uncommitted changes, the pull request is not open or is a draft, or gh could not merge it." },
+    { "code": 2, "text": "The arguments are wrong, or the repository allows several merge methods and none was chosen." },
+    { "code": 3, "text": "Merged, but a clean-up step failed; the message names the git command that failed." }
+  ],
+  "examples": [
+    {
+      "title": "Merge the current branch's pull request and clean up",
+      "situation": "On branch empty-results, whose pull request #7 targets main. The repository allows only squash merges, and pull request #8 (results-filters) was built on empty-results.",
+      "setup": "set -e\nexport GIT_AUTHOR_NAME=Dev GIT_AUTHOR_EMAIL=dev@example.com GIT_COMMITTER_NAME=Dev GIT_COMMITTER_EMAIL=dev@example.com\ngit init -q . && git symbolic-ref HEAD refs/heads/main\no=.git/test-origin\ngit init -q \"$o\" && git -C \"$o\" symbolic-ref HEAD refs/heads/main\necho '# Shop' > \"$o/README.md\" && git -C \"$o\" add README.md && git -C \"$o\" commit -qm Start\ngit -C \"$o\" checkout -qb empty-results && echo 'No results yet.' > \"$o/results.txt\" && git -C \"$o\" add results.txt && git -C \"$o\" commit -qm 'Show empty results' && git -C \"$o\" checkout -q main\ngit remote add origin \"$PWD/$o\" && git fetch -q origin\ngit checkout -q -b empty-results origin/empty-results && git branch -q --track main origin/main\n",
+      "fake_commands": {
+        "gh": "#!/usr/bin/env bash\nexport GIT_AUTHOR_NAME=Dev GIT_AUTHOR_EMAIL=dev@example.com GIT_COMMITTER_NAME=Dev GIT_COMMITTER_EMAIL=dev@example.com\no=\"$(git rev-parse --show-toplevel)/.git/test-origin\"\ncase \"$1 $2\" in\n  \"pr view\") printf '{\"number\":7,\"title\":\"Show empty results\",\"state\":\"OPEN\",\"isDraft\":false,\"headRefName\":\"empty-results\",\"headRefOid\":\"%s\",\"baseRefName\":\"main\"}' \"$(git -C \"$o\" rev-parse empty-results)\" ;;\n  \"repo view\") echo '{\"mergeCommitAllowed\":false,\"squashMergeAllowed\":true,\"rebaseMergeAllowed\":false}' ;;\n  \"pr list\") echo '[{\"number\":8,\"headRefName\":\"results-filters\"}]' ;;\n  \"pr merge\") git -C \"$o\" merge -q --squash empty-results && git -C \"$o\" commit -qm 'Show empty results (#7)' ;;\n  *) echo \"fake gh: unexpected $*\" >&2; exit 1 ;;\nesac\n"
+      },
+      "args": [],
+      "exit": 0,
+      "stdout_regex": "\\AMerged #7 \"Show empty results\" into main \\(squash\\)\\.\\nDeleted branch empty-results on origin and locally\\.\\nmain is now at [0-9a-f]{7} Show empty results \\(#7\\)\\nBranches built on empty-results need a rebase onto main:\\n  git rebase --onto main [0-9a-f]{40} results-filters\\n  gh pr edit 8 --base main\\n\\z",
+      "stdout_sample": "Merged #7 \"Show empty results\" into main (squash).\nDeleted branch empty-results on origin and locally.\nmain is now at 4f2c1d9 Show empty results (#7)\nBranches built on empty-results need a rebase onto main:\n  git rebase --onto main 9b1e0c4d2a7f3e8b6c5d4a3f2e1d0c9b8a7f6e5d results-filters\n  gh pr edit 8 --base main\n",
+      "files_after": { "README.md": "# Shop\n", "results.txt": "No results yet.\n" }
+    },
+    {
+      "title": "Uncommitted changes stop it before the merge",
+      "situation": "The same branch, with an edit to README.md that is not committed.",
+      "setup": "set -e\nexport GIT_AUTHOR_NAME=Dev GIT_AUTHOR_EMAIL=dev@example.com GIT_COMMITTER_NAME=Dev GIT_COMMITTER_EMAIL=dev@example.com\ngit init -q .\necho '# Shop' > README.md && git add README.md && git commit -qm Start\necho 'draft' >> README.md\n",
+      "fake_commands": { "gh": "#!/usr/bin/env bash\necho \"fake gh: unexpected $*\" >&2; exit 1\n" },
+      "args": ["7"],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "toolsmith-pr-land: tracked files have uncommitted changes; commit or stash them first. Nothing was merged.\n"
+    }
+  ],
+  "family": "pr-land",
+  "mode": "remind",
+  "added": "2026-10-07"
+}

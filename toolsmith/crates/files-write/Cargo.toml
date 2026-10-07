@@ -1,0 +1,13 @@
+[package]
+name = "toolsmith-files-write"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "toolsmith-files-write"
+path = "src/main.rs"
+
+[dependencies]
+toolsmith-common = { path = "../common" }

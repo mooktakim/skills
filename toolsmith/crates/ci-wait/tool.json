@@ -1,0 +1,65 @@
+{
+  "name": "toolsmith-ci-wait",
+  "intent": "Wait for the CI runs of one commit to finish, printing only what failed.",
+  "usage": "toolsmith-ci-wait [--pr N | --commit SHA] [--timeout MINUTES] [--interval SECONDS] [--lines N]",
+  "use_when": [
+    "You pushed and need the CI result before the next step (merge, release, reply).",
+    "You would otherwise poll with `gh pr checks`, `gh run list`, `gh run watch` and sleep, or read failures with `gh run view --log-failed | grep`."
+  ],
+  "not_for": [
+    "Starting or re-running CI: use `gh run rerun`.",
+    "CI systems other than GitHub Actions.",
+    "Reading a whole job log: use `gh run view <id> --log`."
+  ],
+  "input": "No stdin. By default the commit is HEAD, which must be pushed; --commit names another commit (SHA or ref), --pr N uses the head commit of pull request N. Runs in the current repository's directory and talks to GitHub through `gh`, so `gh` must be installed and signed in.",
+  "options": [
+    { "flag": "--pr", "text": "Wait for the head commit of this pull request number." },
+    { "flag": "--commit", "text": "Wait for this commit (SHA or ref) instead of HEAD." },
+    { "flag": "--timeout", "text": "Give up after this many minutes (default 30). The first run must appear within 2 minutes." },
+    { "flag": "--interval", "text": "Seconds between checks (default 15)." },
+    { "flag": "--lines", "text": "Log lines to show per failed job (default 40)." }
+  ],
+  "output": "When every run passed: 'CI for <sha>: N runs, all passed.' and one line per run. When something failed: a line per job of every run with its conclusion, then for each failed job its last log lines (from `gh run view --log-failed`, with timestamps and colours removed) under '== <job>: last N log lines =='. Nothing is printed while waiting.",
+  "exit_codes": [
+    { "code": 0, "text": "Every run finished and passed (success, skipped or neutral)." },
+    { "code": 1, "text": "A run failed or was cancelled; the failed jobs and their logs are shown. Also used when gh is missing or fails." },
+    { "code": 2, "text": "The arguments are wrong." },
+    { "code": 3, "text": "No result: HEAD is not pushed, no run appeared within 2 minutes, or runs were still going at the timeout." }
+  ],
+  "examples": [
+    {
+      "title": "Every run passed",
+      "situation": "Two workflows ran on the commit and both passed.",
+      "fake_commands": {
+        "gh": "#!/usr/bin/env bash\ncase \"$1 $2\" in\n  \"run list\") echo '[{\"databaseId\":101,\"name\":\"Test\",\"status\":\"completed\",\"conclusion\":\"success\"},{\"databaseId\":102,\"name\":\"Lint\",\"status\":\"completed\",\"conclusion\":\"success\"}]' ;;\n  *) echo \"fake gh: unexpected $*\" >&2; exit 1 ;;\nesac\n"
+      },
+      "args": ["--commit", "7e6179afbfc8bc1004c484dc7320c10c4f929886"],
+      "exit": 0,
+      "stdout": "CI for 7e6179a: 2 runs, all passed.\n  success   Test\n  success   Lint\n"
+    },
+    {
+      "title": "Waits while a run is in progress, then shows the failed job's log",
+      "situation": "The Test workflow is still running at the first check; it then fails in one of its two jobs.",
+      "fake_commands": {
+        "gh": "#!/usr/bin/env bash\nstate=\"$(dirname \"$0\")/calls\"\ncase \"$1 $2\" in\n  \"run list\")\n    n=$(cat \"$state\" 2>/dev/null || echo 0); echo $((n + 1)) > \"$state\"\n    if [ \"$n\" = 0 ]; then echo '[{\"databaseId\":201,\"name\":\"Test\",\"status\":\"in_progress\",\"conclusion\":\"\"}]'\n    else echo '[{\"databaseId\":201,\"name\":\"Test\",\"status\":\"completed\",\"conclusion\":\"failure\"}]'; fi ;;\n  \"run view\")\n    if [ \"$4\" = \"--json\" ]; then echo '{\"jobs\":[{\"name\":\"Linux, Ruby 4.0\",\"conclusion\":\"failure\"},{\"name\":\"macOS\",\"conclusion\":\"success\"}]}'\n    else\n      j='Linux, Ruby 4.0\tRun bin/test\t'\n      printf \"${j}\\357\\273\\2772026-10-07T20:25:06.7478892Z   1) Failure:\\n\"\n      printf \"${j}2026-10-07T20:25:06.7480034Z HistoryTest#test_never_overwrites [test/history_test.rb:261]:\\n\"\n      printf \"${j}2026-10-07T20:25:06.7483019Z Expected: 1\\n\"\n      printf \"${j}2026-10-07T20:25:06.7483715Z \\033[31m  Actual: 0\\033[0m\\n\"\n      printf \"${j}2026-10-07T20:25:06.7484645Z 96 runs, 818 assertions, 1 failures, 0 errors, 0 skips\\n\"\n    fi ;;\n  *) echo \"fake gh: unexpected $*\" >&2; exit 1 ;;\nesac\n"
+      },
+      "args": ["--commit", "abc1234def5678", "--interval", "1"],
+      "exit": 1,
+      "stdout": "CI for abc1234: 1 run, 2 jobs, 1 failed.\n  failure   Linux, Ruby 4.0 (Test)\n  success   macOS (Test)\n\n== Linux, Ruby 4.0: last 5 log lines ==\n  1) Failure:\nHistoryTest#test_never_overwrites [test/history_test.rb:261]:\nExpected: 1\n  Actual: 0\n96 runs, 818 assertions, 1 failures, 0 errors, 0 skips\n"
+    },
+    {
+      "title": "HEAD is not pushed",
+      "situation": "A repository with one local commit and no remote.",
+      "setup": "set -e\nexport GIT_AUTHOR_NAME=Dev GIT_AUTHOR_EMAIL=dev@example.com GIT_COMMITTER_NAME=Dev GIT_COMMITTER_EMAIL=dev@example.com\ngit init -q .\ngit commit -q --allow-empty -m Start\n",
+      "fake_commands": { "gh": "#!/usr/bin/env bash\necho \"fake gh: unexpected $*\" >&2; exit 1\n" },
+      "args": [],
+      "exit": 3,
+      "stdout": "",
+      "stderr_regex": "\\Atoolsmith-ci-wait: HEAD \\([0-9a-f]{7}\\) is not on any remote branch, so CI cannot have run on it\\. Push it first\\.\\n\\z",
+      "stderr_sample": "toolsmith-ci-wait: HEAD (1a2b3c4) is not on any remote branch, so CI cannot have run on it. Push it first.\n"
+    }
+  ],
+  "family": "ci-wait",
+  "mode": "remind",
+  "added": "2026-10-07"
+}

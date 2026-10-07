@@ -1,0 +1,51 @@
+{
+  "name": "toolsmith-files-write",
+  "intent": "Create several new files from one stdin bundle, never overwriting by accident.",
+  "usage": "toolsmith-files-write [--force] [--marker TEXT] <<'EOF' ... EOF",
+  "use_when": [
+    "You create two or more new files in one step, such as a class with its test and its docs.",
+    "You would otherwise chain several `cat > path <<'EOF'` heredocs with `mkdir -p`."
+  ],
+  "not_for": [
+    "Changing an existing file: use the Edit tool or toolsmith-text-replace.",
+    "One new file: the Write tool is enough.",
+    "Binary files."
+  ],
+  "input": "A bundle on stdin. Each file starts with a marker line, '=== <path>' (the marker, a space, the path relative to the current directory). The file's content is every following line up to the next marker line, exactly as written, blank lines included; it ends with a newline unless it is empty. Change the marker with --marker when a file has lines that start with '=== '.",
+  "options": [
+    { "flag": "--force", "text": "Replace files that already exist (keeping their permissions) instead of refusing." },
+    { "flag": "--marker", "text": "Use this text instead of '===' to start each file." }
+  ],
+  "output": "Before writing, every path is checked: if any already exists (without --force) or is a directory, nothing is written and stderr lists them all. Then each file is written through a temporary file and a rename, with missing parent directories created, and stdout shows 'created <path> (N lines)' or 'replaced <path> (N lines)' per file and 'Done: N files written.'",
+  "exit_codes": [
+    { "code": 0, "text": "Every file was written." },
+    { "code": 1, "text": "Nothing written: a path already exists or is a directory." },
+    { "code": 2, "text": "Nothing written: the bundle or the arguments are wrong." },
+    { "code": 3, "text": "A write failed after other files were written; the message lists the files already written." }
+  ],
+  "examples": [
+    {
+      "title": "A component and its test",
+      "args": [],
+      "stdin": "=== app/components/empty_state_component.rb\nclass EmptyStateComponent < ViewComponent::Base\nend\n=== test/components/empty_state_component_test.rb\nrequire \"test_helper\"\n\nclass EmptyStateComponentTest < ViewComponent::TestCase\nend\n",
+      "exit": 0,
+      "stdout": "created app/components/empty_state_component.rb (2 lines)\ncreated test/components/empty_state_component_test.rb (4 lines)\nDone: 2 files written.\n",
+      "files_after": {
+        "app/components/empty_state_component.rb": "class EmptyStateComponent < ViewComponent::Base\nend\n",
+        "test/components/empty_state_component_test.rb": "require \"test_helper\"\n\nclass EmptyStateComponentTest < ViewComponent::TestCase\nend\n"
+      }
+    },
+    {
+      "title": "An existing file stops the whole bundle",
+      "files": { "README.md": "# Shop\n" },
+      "args": [],
+      "stdin": "=== NOTES.md\n- First note.\n=== README.md\n# New shop\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "toolsmith-files-write: nothing written:\n  README.md already exists\nUse the Edit tool or toolsmith-text-replace to change an existing file, or --force to replace it.\n"
+    }
+  ],
+  "family": "multi-file-heredoc",
+  "mode": "remind",
+  "added": "2026-10-07"
+}

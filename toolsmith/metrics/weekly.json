@@ -35,6 +35,14 @@
         "structured-set": {
           "calls": 2,
           "chars": 9051
+        },
+        "yaml-edit": {
+          "calls": 17,
+          "chars": 84104
+        },
+        "json-edit": {
+          "calls": 1,
+          "chars": 743
         }
       },
       "tools": {
@@ -74,6 +82,15 @@
           "calls": 196,
           "chars": 517595,
           "errors": 3
+        },
+        "yaml-edit": {
+          "calls": 28,
+          "chars": 195892,
+          "errors": 2
+        },
+        "json-edit": {
+          "calls": 1,
+          "chars": 1757
         }
       },
       "tools": {
@@ -127,6 +144,15 @@
           "calls": 58,
           "chars": 10763,
           "errors": 2
+        },
+        "json-edit": {
+          "calls": 30,
+          "chars": 44734,
+          "errors": 2
+        },
+        "yaml-edit": {
+          "calls": 42,
+          "chars": 175197
         }
       },
       "tools": {
@@ -182,6 +208,16 @@
         "multi-file-heredoc": {
           "calls": 34,
           "chars": 279874
+        },
+        "json-edit": {
+          "calls": 26,
+          "chars": 41605,
+          "errors": 1
+        },
+        "yaml-edit": {
+          "calls": 98,
+          "chars": 386976,
+          "errors": 2
         }
       },
       "tools": {
@@ -237,6 +273,16 @@
           "calls": 68,
           "chars": 67010,
           "errors": 5
+        },
+        "json-edit": {
+          "calls": 39,
+          "chars": 70832,
+          "errors": 3
+        },
+        "yaml-edit": {
+          "calls": 84,
+          "chars": 713950,
+          "errors": 3
         }
       },
       "tools": {
@@ -292,22 +338,31 @@
         "image-prep": {
           "calls": 92,
           "chars": 110942
+        },
+        "json-edit": {
+          "calls": 54,
+          "chars": 129562,
+          "errors": 1
+        },
+        "yaml-edit": {
+          "calls": 130,
+          "chars": 332196
         }
       },
       "tools": {
       }
     },
     "2026-W41": {
-      "bash_calls": 3150,
+      "bash_calls": 3192,
       "families": {
         "line-range-read": {
-          "calls": 572,
-          "chars": 222858,
+          "calls": 576,
+          "chars": 223431,
           "errors": 6
         },
         "literal-replace": {
-          "calls": 578,
-          "chars": 1242634,
+          "calls": 579,
+          "chars": 1243735,
           "errors": 4
         },
         "test-output-trim": {
@@ -321,22 +376,22 @@
           "errors": 1
         },
         "commit-chain": {
-          "calls": 123,
-          "chars": 232146
+          "calls": 124,
+          "chars": 233828
         },
         "ci-wait": {
-          "calls": 107,
-          "chars": 42561,
+          "calls": 120,
+          "chars": 46803,
           "errors": 2
         },
         "pr-land": {
-          "calls": 56,
-          "chars": 21803,
+          "calls": 57,
+          "chars": 22008,
           "errors": 1
         },
         "multi-file-heredoc": {
-          "calls": 44,
-          "chars": 222354
+          "calls": 45,
+          "chars": 229019
         },
         "image-prep": {
           "calls": 26,
@@ -345,9 +400,44 @@
         "structured-set": {
           "calls": 21,
           "chars": 25876
+        },
+        "yaml-edit": {
+          "calls": 31,
+          "chars": 71363
+        },
+        "json-edit": {
+          "calls": 20,
+          "chars": 28416
         }
       },
       "tools": {
+        "toolsmith-text-replace": {
+          "calls": 3
+        },
+        "toolsmith-history-add": {
+          "calls": 4
+        },
+        "toolsmith-common": {
+          "calls": 2
+        },
+        "toolsmith-file-lines": {
+          "calls": 3
+        },
+        "toolsmith-files-write": {
+          "calls": 2
+        },
+        "toolsmith-json-set": {
+          "calls": 2
+        },
+        "toolsmith-check-run": {
+          "calls": 1
+        },
+        "toolsmith-ci-wait": {
+          "calls": 1
+        },
+        "toolsmith-pr-land": {
+          "calls": 1
+        }
       }
     }
   }

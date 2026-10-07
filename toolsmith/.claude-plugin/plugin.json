@@ -1,6 +1,6 @@
 {
   "name": "toolsmith",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Find shell patterns Claude repeats in your Claude Code history, replace them with small single-purpose Rust commands that are tested against their own LLM guide, and measure whether Claude uses them",
   "author": { "name": "Mooktakim Ahmed", "email": "mooktakim@fluxter.co.uk" },
   "homepage": "https://github.com/mooktakim/skills",

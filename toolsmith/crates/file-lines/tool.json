@@ -1,0 +1,64 @@
+{
+  "name": "toolsmith-file-lines",
+  "intent": "Print numbered line ranges from several files in one call.",
+  "usage": "toolsmith-file-lines [--context N] <file[:range]>...",
+  "use_when": [
+    "You need parts of one or more files in one call, with line numbers, to read or to edit by line.",
+    "You would otherwise chain `sed -n 'A,Bp'`, `grep -n` and `echo '==='` separators."
+  ],
+  "not_for": [
+    "Searching many files for a pattern: use grep or the Grep tool.",
+    "Reading one whole file when the Read tool fits.",
+    "Regular expressions: /text/ matches literal text only."
+  ],
+  "input": "One or more arguments, each a file with an optional range after a colon:\n\n- `path`: the whole file.\n- `path:12`: line 12.\n- `path:12-40`: lines 12 to 40 (a range past the end stops at the last line).\n- `path:12-`: line 12 to the end.\n- `path:12+20`: 20 lines from line 12.\n- `path:/text/`: every line that contains the literal text, with --context lines around each (overlapping windows merge; separate ones are split by '--').\n\nA colon followed by anything else is part of the file name. Quote an argument whose search text has spaces: 'app/models/user.rb:/def display_name/'.",
+  "options": [
+    { "flag": "--context", "text": "Lines shown before and after each /text/ match (default 3)." }
+  ],
+  "output": "For each argument, a header '==> path:range <==' (the whole file shows its line count, a search its match count), then each line as its number, two spaces and the text. A blank line separates the blocks. Problems (a missing file, a range that starts past the end, no match) go to stderr and the other arguments are still printed.",
+  "exit_codes": [
+    { "code": 0, "text": "Every argument was printed." },
+    { "code": 1, "text": "At least one argument could not be printed; the others were." },
+    { "code": 2, "text": "The arguments are wrong (no file given, a bad range, an unknown option)." }
+  ],
+  "examples": [
+    {
+      "title": "One range",
+      "files": {
+        "app/models/user.rb": "class User < ApplicationRecord\n  has_many :orders\n\n  validates :email, presence: true\n  validates :name, length: { maximum: 80 }\n\n  def display_name\n    name.presence || email\n  end\nend\n"
+      },
+      "args": ["app/models/user.rb:7-9"],
+      "exit": 0,
+      "stdout": "==> app/models/user.rb:7-9 <==\n7    def display_name\n8      name.presence || email\n9    end\n"
+    },
+    {
+      "title": "A text search and a whole file in one call",
+      "files": {
+        "app/models/user.rb": "class User < ApplicationRecord\n  has_many :orders\n\n  validates :email, presence: true\n  validates :name, length: { maximum: 80 }\n\n  def display_name\n    name.presence || email\n  end\nend\n",
+        "config/app.yml": "name: shop\nport: 3000\n"
+      },
+      "args": ["--context", "0", "app/models/user.rb:/validates/", "config/app.yml"],
+      "exit": 0,
+      "stdout": "==> app/models/user.rb:/validates/ (2 matches) <==\n4    validates :email, presence: true\n5    validates :name, length: { maximum: 80 }\n\n==> config/app.yml (2 lines) <==\n1  name: shop\n2  port: 3000\n"
+    },
+    {
+      "title": "A range past the end of the file",
+      "files": { "config/app.yml": "name: shop\nport: 3000\n" },
+      "args": ["config/app.yml:40-50"],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "toolsmith-file-lines: config/app.yml: starts at line 40, but the file has 2 lines\n"
+    },
+    {
+      "title": "Search text with a space, not quoted",
+      "files": { "config/app.yml": "name: shop\nport: 3000\n" },
+      "args": ["config/app.yml:/name:", "shop/"],
+      "exit": 2,
+      "stdout": "",
+      "stderr": "toolsmith-file-lines: config/app.yml:/name:: a /text/ search needs text and a closing '/'; quote the whole argument when the text has spaces, e.g. 'app/x.rb:/def call/'\nRun `toolsmith-file-lines --help` for usage, or `toolsmith-file-lines --llm` for the full guide.\n"
+    }
+  ],
+  "family": "line-range-read",
+  "mode": "remind",
+  "added": "2026-10-07"
+}

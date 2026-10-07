@@ -1,0 +1,13 @@
+[package]
+name = "toolsmith-pr-land"
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "toolsmith-pr-land"
+path = "src/main.rs"
+
+[dependencies]
+toolsmith-common = { path = "../common" }

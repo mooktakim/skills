@@ -3,11 +3,53 @@
 version = 4
 
 [[package]]
+name = "toolsmith-check-run"
+version = "0.1.0"
+dependencies = [
+ "toolsmith-common",
+]
+
+[[package]]
+name = "toolsmith-ci-wait"
+version = "0.1.0"
+dependencies = [
+ "toolsmith-common",
+]
+
+[[package]]
 name = "toolsmith-common"
 version = "0.1.0"
 
 [[package]]
+name = "toolsmith-file-lines"
+version = "0.1.0"
+dependencies = [
+ "toolsmith-common",
+]
+
+[[package]]
+name = "toolsmith-files-write"
+version = "0.1.0"
+dependencies = [
+ "toolsmith-common",
+]
+
+[[package]]
 name = "toolsmith-history-add"
+version = "0.1.0"
+dependencies = [
+ "toolsmith-common",
+]
+
+[[package]]
+name = "toolsmith-json-set"
+version = "0.1.0"
+dependencies = [
+ "toolsmith-common",
+]
+
+[[package]]
+name = "toolsmith-pr-land"
 version = "0.1.0"
 dependencies = [
  "toolsmith-common",

@@ -32,7 +32,8 @@ Every toolsmith tool meets every rule below. Rules marked **(test)** are enforce
 ## Fully tested
 
 - At least two examples, including at least one failure. **(test)**
-- Every example in `tool.json` runs against the built binary: exit code, stdout (exact, or a regex with a sample that matches it), stderr when given, the files after, and the files staged in git. The guide prints the same examples, so the guide cannot drift from the tool. **(test)**
+- Every example in `tool.json` runs against the built binary: exit code, stdout and stderr (exact, or a regex with a sample that matches it), the files after, and the files staged in git. The guide prints the same examples, so the guide cannot drift from the tool. **(test)**
+- An example that needs git history or another program's answers builds them with `setup` (a bash script run in the scratch directory; a git remote goes under `.git/` so it is not part of the compared files) and `fake_commands` (scripts put first on PATH, such as a `gh` that returns fixed JSON). Such an example has a `situation`: the sentence the guide shows in their place. Unknown example keys fail the test. **(test)**
 - Unit tests in the crate cover the logic: parsing, matching, edge cases. `cargo test --workspace` runs from `bin/test`. **(test)**
 - Rust standard library only, so tools build without network access and with any recent stable Rust.
 
