@@ -253,9 +253,10 @@ class ToolsmithTest < Minitest::Test
 
   def test_history_add_never_overwrites_an_entry
     need_cargo
+    assert_equal 0, run_tool("toolsmith-history-add", "--help").code, "build first, so the build time cannot pass the entries below"
     day = Time.now.strftime("%Y-%m-%d")
     now = Time.now.to_i
-    (now..now + 5).each { |epoch| write "docs/history/#{day}/#{epoch}-same-title.md", "- First.\n" }
+    (now..now + 60).each { |epoch| write "docs/history/#{day}/#{epoch}-same-title.md", "- First.\n" }
     before = tree(@dir)
     result = run_tool("toolsmith-history-add", "Same title", stdin: "- Second.\n")
     assert_equal 1, result.code, result.out
@@ -331,10 +332,13 @@ class ToolsmithTest < Minitest::Test
     FileUtils.mkdir_p(shadow)
     File.write(File.join(shadow, "toolsmith-text-replace"), "#!/bin/sh\n")
     File.chmod(0o755, File.join(shadow, "toolsmith-text-replace"))
-    result = hook("session-start.sh", env: { "PATH" => "#{shadow}:#{File.join(PLUGIN, 'bin')}:#{ENV['PATH']}" })
+    other_copy = File.join(@state, "other-version/bin")
+    FileUtils.mkdir_p(other_copy)
+    FileUtils.cp(File.join(PLUGIN, "bin/toolsmith-history-add"), other_copy)
+    result = hook("session-start.sh", env: { "PATH" => "#{shadow}:#{other_copy}:#{File.join(PLUGIN, 'bin')}:#{ENV['PATH']}" })
     assert_includes result.out, "toolsmith-text-replace is not available: #{shadow}/toolsmith-text-replace has the same name"
     refute_includes result.out, "- toolsmith-text-replace:"
-    assert_includes result.out, "- toolsmith-history-add:"
+    assert_includes result.out, "- toolsmith-history-add:", "another toolsmith copy's shim is not a clash"
   end
 
   def test_pre_bash_reminds_only_on_a_matching_command

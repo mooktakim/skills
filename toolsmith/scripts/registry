@@ -46,14 +46,18 @@ rescue StandardError
   nil
 end
 
-# Another executable with this name on PATH, outside the plugin's bin/.
+# Another command with this name on PATH. Shims of any toolsmith copy (this
+# checkout, an installed version, an older version still on PATH) do not count.
 def clash(name)
   own = File.expand_path("../bin", __dir__)
   ENV.fetch("PATH", "").split(File::PATH_SEPARATOR).each do |dir|
     next if dir.empty? || (File.directory?(dir) && File.realpath(dir) == File.realpath(own))
 
     candidate = File.join(dir, name)
-    return candidate if File.file?(candidate) && File.executable?(candidate)
+    next unless File.file?(candidate) && File.executable?(candidate)
+    next if File.read(candidate, 400).to_s.include?(%(libexec/shim" #{name} ))
+
+    return candidate
   end
   nil
 end
