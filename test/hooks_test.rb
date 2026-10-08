@@ -328,6 +328,9 @@ class HooksTest < Minitest::Test
     context = JSON.parse(hook("rails-minitest", "session-context.sh").out).dig("hookSpecificOutput", "additionalContext")
     assert_includes context, "load the rails-minitest:rails-minitest skill"
     assert_includes context, "rails-minitest:minitest-runner"
+    assert_includes context, "more than one test file"
+    assert_includes context, "Run a single test file directly"
+    assert_includes context, "Skip the run when only docs"
   end
 
   def test_minitest_note_finds_an_app_one_level_down

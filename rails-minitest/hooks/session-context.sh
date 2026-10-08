@@ -19,7 +19,7 @@ cat <<'JSON'
 {
   "hookSpecificOutput": {
     "hookEventName": "SessionStart",
-    "additionalContext": "This Rails app is tested with Minitest and the rails-minitest plugin is installed.\n- Before writing, changing, or reorganising tests, or fixtures and test helpers, load the rails-minitest:rails-minitest skill and follow it.\n- Delegate running a test suite or subset (more than one file) to rails-minitest:minitest-runner without being asked, so suite output stays out of this conversation. Also delegate diagnosing a failing or flaky test to it.\nPrefer it over general-purpose agents for test work."
+    "additionalContext": "This Rails app is tested with Minitest and the rails-minitest plugin is installed.\n- Before writing, changing, or reorganising tests, or fixtures and test helpers, load the rails-minitest:rails-minitest skill and follow it.\n- Delegate a test run that covers more than one test file to rails-minitest:minitest-runner without being asked, so suite output stays out of this conversation, and pass it the exact files or path:line to run. Run a single test file directly. Also delegate diagnosing a failing or flaky test to it.\n- Skip the run when only docs, comments, or files the app never loads (CI, editor settings) changed since the last green run; config/ changes do count.\nPrefer it over general-purpose agents for test work."
   }
 }
 JSON

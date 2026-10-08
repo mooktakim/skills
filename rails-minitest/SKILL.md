@@ -73,7 +73,8 @@ Never use `ActionController::TestCase`. Keep system tests few: one costs as much
 
 - Narrowest first: `bin/rails test test/models/card_test.rb:42`, then the file, the directory, `bin/rails test` (everything except system tests), and `bin/rails test:all` when system tests are affected.
 - Flags: `-n "/closing/"` selects by name, `--fail-fast` stops at the first failure, `--seed N` repeats an order, `--profile 20` lists the slowest tests, and `PARALLEL_WORKERS=1` runs one process for debugging.
-- When subagents are available and a run covers more than one file, delegate it to `rails-minitest:minitest-runner`, so suite output stays out of the conversation.
+- When subagents are available and a run covers more than one file, delegate it to `rails-minitest:minitest-runner`, so suite output stays out of the conversation. Pass it the exact files or `path:line` to run. Run a single test file directly.
+- Skip the run when nothing the tests exercise has changed since the last green run - only docs, comments, or files the app never loads, such as CI or editor settings (`config/` changes do count) - and do not run again what already passed.
 
 ## Suite mode
 
