@@ -1,5 +1,5 @@
 {
-  "description": "rails-minitest: in Rails apps on Minitest, state when to load the rails-minitest skill and when to delegate to the rails-tester agent",
+  "description": "rails-minitest: in Rails apps on Minitest, state when to load the rails-minitest skill and when to delegate to the minitest-runner agent",
   "hooks": {
     "SessionStart": [
       {

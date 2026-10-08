@@ -73,7 +73,7 @@ Never use `ActionController::TestCase`. Keep system tests few: one costs as much
 
 - Narrowest first: `bin/rails test test/models/card_test.rb:42`, then the file, the directory, `bin/rails test` (everything except system tests), and `bin/rails test:all` when system tests are affected.
 - Flags: `-n "/closing/"` selects by name, `--fail-fast` stops at the first failure, `--seed N` repeats an order, `--profile 20` lists the slowest tests, and `PARALLEL_WORKERS=1` runs one process for debugging.
-- When subagents are available and a run covers more than one file, delegate it to `rails-minitest:rails-tester`, so suite output stays out of the conversation.
+- When subagents are available and a run covers more than one file, delegate it to `rails-minitest:minitest-runner`, so suite output stays out of the conversation.
 
 ## Suite mode
 
@@ -82,7 +82,7 @@ The approval gate is a hard stop. Change nothing until the user approves the Pha
 ### Phase 1: survey and plan
 
 1. From the app root, run `ruby "${CLAUDE_SKILL_DIR}/scripts/audit_tests"`. It reports the stack, tests per kind, app files with no test file, suite-level gaps (no parallel runs, no network guard, coverage set up wrong), smells with file and line, and the files that create the most records. Its header comment explains each check. Its findings are leads: confirm each one in the code before it goes into the plan.
-2. Run the full suite once with `--profile 20` (`bin/rails test:all` when there are system tests), delegated to `rails-minitest:rails-tester`, for the baseline: wall time, test count, slowest tests, failures. If SimpleCov is set up, record line and branch coverage.
+2. Run the full suite once with `--profile 20` (`bin/rails test:all` when there are system tests), delegated to `rails-minitest:minitest-runner`, for the baseline: wall time, test count, slowest tests, failures. If SimpleCov is set up, record line and branch coverage.
 3. Read the slowest files and the files that create the most records, to find why they are slow (`references/speed.md`).
 4. Present the plan, grouped, each item with its files and a one-line reason:
    - **Infrastructure:** `test_helper.rb` (parallel runs, network guard, coverage), and gems to add.

@@ -1,7 +1,7 @@
 {
   "name": "rails-minitest",
-  "version": "0.1.0",
-  "description": "Minitest for Rails apps: a skill with the standard for every kind of test, fixtures, shared helpers, state shortcuts, speed, coverage, and flaky tests, a suite audit, and a rails-tester agent that runs and writes tests",
+  "version": "0.1.1",
+  "description": "Minitest for Rails apps: a skill with the standard for every kind of test, fixtures, shared helpers, state shortcuts, speed, coverage, and flaky tests, a suite audit, and a minitest-runner agent that runs and writes tests",
   "author": { "name": "Mooktakim Ahmed", "email": "mooktakim@fluxter.co.uk" },
   "homepage": "https://github.com/mooktakim/skills",
   "repository": "https://github.com/mooktakim/skills",

@@ -24,7 +24,7 @@
     {
       "name": "rails-minitest",
       "source": "./rails-minitest",
-      "description": "Minitest for Rails apps: the standard for every kind of test, fixtures, shared helpers, state shortcuts, speed, coverage, and flaky tests, a suite audit, and a rails-tester agent"
+      "description": "Minitest for Rails apps: the standard for every kind of test, fixtures, shared helpers, state shortcuts, speed, coverage, and flaky tests, a suite audit, and a minitest-runner agent"
     },
     {
       "name": "capture",

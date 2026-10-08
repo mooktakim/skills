@@ -327,7 +327,7 @@ class HooksTest < Minitest::Test
     write "Gemfile", "gem \"rails\"\n"
     context = JSON.parse(hook("rails-minitest", "session-context.sh").out).dig("hookSpecificOutput", "additionalContext")
     assert_includes context, "load the rails-minitest:rails-minitest skill"
-    assert_includes context, "rails-minitest:rails-tester"
+    assert_includes context, "rails-minitest:minitest-runner"
   end
 
   def test_minitest_note_finds_an_app_one_level_down

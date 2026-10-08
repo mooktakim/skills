@@ -18,7 +18,7 @@ The agents are stack-agnostic: every one starts by reading the Gemfile and confi
 | `rails-deploy` | Deploy config, Dockerfiles, process topology, health checks, CI | yes |
 | `rails-upgrade` | Rails/Ruby/gem upgrades in small green steps, defaults-flag by defaults-flag | yes |
 
-Test work - running suites, writing tests, diagnosing failures - moved to the separate [`rails-minitest`](../rails-minitest/) plugin in version 0.4.0. Its `rails-minitest:rails-tester` agent replaces the `rails-tester` that used to ship here, and the plugin adds the standard it writes tests to.
+Test work - running suites, writing tests, diagnosing failures - moved to the separate [`rails-minitest`](../rails-minitest/) plugin in version 0.4.0. Its `rails-minitest:minitest-runner` agent replaces the `rails-tester` that used to ship here, and the plugin adds the standard it writes tests to.
 
 ## Philosophy
 

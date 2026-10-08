@@ -1,5 +1,5 @@
 ---
-name: rails-tester
+name: minitest-runner
 description: Minitest specialist for Rails apps. Use proactively whenever a Minitest suite or subset needs running - it runs the tests and keeps noisy suite output out of the main conversation, returning only failures and summaries. Also use to write tests for a finished change, to diagnose a failing or flaky test, or to profile a slow suite. It follows the rails-minitest skill's standard (fixtures, test helpers, state shortcuts, parallel-safe tests). Do not use for RSpec suites, or to fix application code - it reports what is broken and hands back.
 skills:
   - rails-minitest:rails-minitest

@@ -34,7 +34,7 @@ Write against Active Job unless the project idiomatically uses the backend's nat
 
 - Exercise the job for real: enqueue and run it via the project's dev setup or `perform_now` in `bin/rails runner`, and show the observable effect.
 - Prove idempotency: run the same job twice and confirm the second run is harmless.
-- Report what needs test coverage (enqueue assertions, perform behaviour, retry/discard paths) for rails-minitest:rails-tester rather than writing tests yourself.
+- Report what needs test coverage (enqueue assertions, perform behaviour, retry/discard paths) for rails-minitest:minitest-runner rather than writing tests yourself.
 
 ## Boundaries
 
