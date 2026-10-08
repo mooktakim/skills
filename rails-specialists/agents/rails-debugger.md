@@ -1,6 +1,6 @@
 ---
 name: rails-debugger
-description: Bug investigator for Rails. Use proactively when a bug report or exception arrives and the root cause is not yet proven, before writing a fix. It reproduces reported bugs end-to-end, digs through logs, uses rails console/runner to interrogate state, and isolates the root cause. Returns a diagnosis with evidence; it does not write the fix. Also use when weird behaviour needs a root cause, or when a log dig would flood the main conversation. Do not use to implement fixes (hand the diagnosis to the relevant specialist) or to investigate pure test failures (rails-tester).
+description: Bug investigator for Rails. Use proactively when a bug report or exception arrives and the root cause is not yet proven, before writing a fix. It reproduces reported bugs end-to-end, digs through logs, uses rails console/runner to interrogate state, and isolates the root cause. Returns a diagnosis with evidence; it does not write the fix. Also use when weird behaviour needs a root cause, or when a log dig would flood the main conversation. Do not use to implement fixes (hand the diagnosis to the relevant specialist) or to investigate pure test failures (rails-minitest:rails-tester).
 disallowedTools: Write, Edit, NotebookEdit
 ---
 

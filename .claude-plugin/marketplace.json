@@ -19,7 +19,12 @@
     {
       "name": "rails-specialists",
       "source": "./rails-specialists",
-      "description": "A team of ten Rails specialist agents: models, Hotwire, tests, jobs, debugging, review, security, performance, deploy, upgrades"
+      "description": "A team of nine Rails specialist agents: models, Hotwire, jobs, debugging, review, security, performance, deploy, upgrades"
+    },
+    {
+      "name": "rails-minitest",
+      "source": "./rails-minitest",
+      "description": "Minitest for Rails apps: the standard for every kind of test, fixtures, shared helpers, state shortcuts, speed, coverage, and flaky tests, a suite audit, and a rails-tester agent"
     },
     {
       "name": "capture",

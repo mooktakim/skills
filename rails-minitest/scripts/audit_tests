@@ -1,0 +1,287 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Survey a Rails app's Minitest suite, for the rails-minitest skill's suite mode.
+# Plain Ruby, standard library only (Ruby 2.6+). Read-only: it changes nothing.
+# Run it from anywhere inside the app; the root is $AUDIT_ROOT, else the nearest
+# directory at or above the current one that holds test/test_helper.rb.
+#
+# The output is a set of LEADS, not verdicts: confirm each one in the code.
+#   Stack     Rails, Minitest, and test gem versions from Gemfile.lock
+#   Setup     what test/test_helper.rb and the helper files set up
+#   Tests     test files and tests per directory under test/ (a static count:
+#             a loop that defines tests counts once), and the system test share
+#   Untested  app/ and lib/ files with code but no test file named after them
+#             (app/models/card/closeable.rb expects .../card/closeable_test.rb
+#             anywhere under test/; controllers also match test/integration/).
+#             Ten files per directory; --all lists every one. Concerns are often
+#             tested through the classes that include them.
+#   Findings  one line per lead: [rule] path:line - what and why
+#   Records   the test files with the most create calls (factories or create!)
+#
+# Rules:
+#   no-parallel            test_helper never calls parallelize
+#   no-network-guard       WebMock is not loaded, so tests can reach the network
+#   network-allowed        WebMock.allow_net_connect! (or enable_net_connect!) turns the guard
+#                          off, whatever its arguments
+#   coverage-late          SimpleCov starts after the app loads, so app files are missed
+#   coverage-parallel      SimpleCov 0.22 with parallelize but no per-worker command_name
+#   coverage-parallel-hooks  SimpleCov 1.x merges workers itself; hand-made hooks interfere
+#   minitest-mock-missing  Minitest 6 code uses stub or Minitest::Mock without the minitest-mock gem
+#   no-fixture-guard       fixtures exist but no test checks that every fixture is valid
+#   system-heavy           system tests are over 20% of all tests
+#   controller-test-case   ActionController::TestCase (use ActionDispatch::IntegrationTest)
+#   assert-equal-nil       assert_equal nil, ... or assert_same nil, ... (Minitest 6 rejects
+#                          both; use assert_nil)
+#   minitest-namespace     MiniTest:: (removed in Minitest 6)
+#   sleep                  sleep in test code (use travel_to or Capybara's waiting matchers)
+#   debugger               binding.irb, binding.pry, byebug, or debugger left in test code
+#   order-dependent        i_suck_and_my_tests_are_order_dependent!
+#   skip                   a test that starts with an unconditional skip (guards like
+#                          `skip "..." unless feature?` are not reported)
+#   env-write              ENV[...] = in a test file with no ensure to restore it
+#   form-login             three or more integration test files, outside the auth tests,
+#                          sign in through the login route (a sign-in helper is missing)
+
+ROOT = begin
+  if ENV["AUDIT_ROOT"]
+    File.expand_path(ENV["AUDIT_ROOT"])
+  else
+    dir = Dir.pwd
+    dir = File.dirname(dir) until File.file?(File.join(dir, "test/test_helper.rb")) || File.dirname(dir) == dir
+    dir
+  end
+end
+
+unless File.file?(File.join(ROOT, "test/test_helper.rb"))
+  warn "audit_tests: no test/test_helper.rb found at or above #{Dir.pwd}. Run it inside a Rails app that uses Minitest."
+  exit 1
+end
+Dir.chdir(ROOT)
+
+TEST_GEMS = %w[minitest minitest-mock mocha factory_bot_rails webmock vcr simplecov test-prof capybara selenium-webdriver cuprite minitest-reporters rspec-rails].freeze
+NOT_TEST_DIRS = %w[fixtures test_helpers support files vcr_cassettes cassettes].freeze
+APP_SKIP_DIRS = %w[assets views javascript frontend images stylesheets fonts].freeze
+LIB_SKIP_DIRS = %w[tasks generators templates assets].freeze
+LOGIN_FILE = /session|login|sign_?in|sign_?up|auth|registration|password|magic_link|api_test/.freeze
+LIST_ALL = ARGV.include?("--all")
+
+def read(path)
+  File.binread(path).force_encoding(Encoding::UTF_8).scrub
+end
+
+def code_lines(path)
+  read(path).lines.each_with_index.map { |line, index| [line, index + 1] }.reject { |line, _| line.strip.start_with?("#") }
+end
+
+def version(name)
+  LOCK[name] && Gem::Version.new(LOCK[name][/\A[\d.]+/] || "0")
+rescue ArgumentError
+  nil
+end
+
+# -- stack ------------------------------------------------------------------
+
+LOCK = {}
+if File.file?("Gemfile.lock")
+  read("Gemfile.lock").each_line do |line|
+    match = line.match(/\A {4}([A-Za-z0-9_.\-]+) \(([^)]+)\)\s*\z/)
+    LOCK[match[1]] ||= match[2] if match
+  end
+end
+
+rails = LOCK["rails"] || LOCK["railties"]
+minitest = version("minitest")
+fixture_files = Dir.glob("test/fixtures/**/*.yml")
+factories = LOCK.key?("factory_bot_rails") || LOCK.key?("factory_bot")
+
+# -- setup ------------------------------------------------------------------
+
+helper_files = ["test/test_helper.rb", "test/application_system_test_case.rb"].select { |f| File.file?(f) } +
+               Dir.glob("test/{test_helpers,support}/**/*.rb").sort
+setup_text = helper_files.map { |f| read(f) }.join("\n")
+test_helper_lines = code_lines("test/test_helper.rb")
+
+def first_line(lines, pattern)
+  hit = lines.find { |line, _| line =~ pattern }
+  hit && hit[1]
+end
+
+parallel = setup_text =~ /^\s*parallelize\b/
+webmock = setup_text =~ /require\s+["']webmock(\/minitest)?["']/
+allow_net = helper_files.flat_map { |f| code_lines(f).map { |line, n| [f, line, n] } }
+                        .find { |_, line, _| line =~ /WebMock\.(?:allow|enable)_net_connect!/ }
+environment_line = first_line(test_helper_lines, %r{require_relative\s+["']\.\./config/environment["']|config/environment["']\s*\)|require\s+["']rails/test_help["']})
+coverage_line = first_line(test_helper_lines, /require\s+["']simplecov["']|SimpleCov\.start/)
+simplecov = version("simplecov")
+
+# -- tests per directory ----------------------------------------------------
+
+test_files = Dir.glob("test/**/*_test.rb").reject { |f| f.start_with?("test/fixtures/") }.sort
+TEST_PATTERN = /^\s*(?:test\s*\(?\s*["':]|def\s+test_\w)/.freeze
+counts = Hash.new { |hash, key| hash[key] = [0, 0] }
+test_files.each do |file|
+  parts = file.split("/")
+  kind = parts.length > 2 ? parts[1] : "(root)"
+  next if NOT_TEST_DIRS.include?(kind)
+
+  counts[kind][0] += 1
+  counts[kind][1] += read(file).scan(TEST_PATTERN).length
+end
+total_tests = counts.values.map(&:last).sum
+system_tests = counts.key?("system") ? counts["system"][1] : 0
+
+# -- untested files ---------------------------------------------------------
+
+test_tails = test_files.map { |f| f.sub(%r{\Atest/}, "") }
+
+def has_code?(path)
+  body = code_lines(path).map { |line, _| line.strip }.reject(&:empty?)
+  body.reject { |line| line =~ /\A(class|module)\s/ || line == "end" }.any?
+end
+
+def tested?(tails, dir, rel)
+  expected = "#{rel.sub(/\.rb\z/, '')}_test.rb"
+  tails.any? do |tail|
+    tail == "#{dir}/#{expected}" || tail.end_with?("/#{expected}") ||
+      (dir == "controllers" && tail == "integration/#{expected}")
+  end
+end
+
+untested = Hash.new { |hash, key| hash[key] = [] }
+sources = Hash.new(0)
+Dir.glob("app/*/").sort.each do |dir_path|
+  dir = File.basename(dir_path)
+  next if APP_SKIP_DIRS.include?(dir)
+
+  Dir.glob("app/#{dir}/**/*.rb").sort.each do |file|
+    rel = file.sub("app/#{dir}/", "")
+    next if File.basename(rel) =~ /\Aapplication_/ || !has_code?(file)
+
+    sources["app/#{dir}"] += 1
+    untested["app/#{dir}"] << file unless tested?(test_tails, dir, rel)
+  end
+end
+Dir.glob("lib/**/*.rb").sort.each do |file|
+  rel = file.sub("lib/", "")
+  next if LIB_SKIP_DIRS.include?(rel.split("/").first) || !has_code?(file)
+
+  sources["lib"] += 1
+  untested["lib"] << file unless tested?(test_tails, "lib", rel)
+end
+
+# -- findings ---------------------------------------------------------------
+
+findings = []
+add = ->(rule, where, message) { findings << [rule, where, message] }
+
+add.call("no-parallel", "test/test_helper.rb", "parallelize is never called; the suite runs in one process") unless parallel
+if !webmock
+  add.call("no-network-guard", "test/test_helper.rb", "WebMock is not loaded, so a test can call a real service")
+elsif allow_net
+  add.call("network-allowed", "#{allow_net[0]}:#{allow_net[2]}", "WebMock.allow_net_connect! turns the network guard off for every test; allow hosts with disable_net_connect!(allow: ...)")
+end
+if coverage_line && environment_line && coverage_line > environment_line
+  add.call("coverage-late", "test/test_helper.rb:#{coverage_line}", "SimpleCov starts after the app loads (line #{environment_line}), so files loaded at boot are missed")
+end
+if simplecov && parallel
+  hooks = setup_text =~ /parallelize_(setup|teardown)/ && setup_text =~ /SimpleCov\.(command_name|result)/
+  if simplecov >= Gem::Version.new("1.0") && hooks
+    add.call("coverage-parallel-hooks", "test/test_helper.rb", "SimpleCov #{LOCK['simplecov']} merges parallel workers itself; remove the hand-made parallelize hooks")
+  elsif simplecov < Gem::Version.new("1.0") && setup_text !~ /SimpleCov\.command_name/
+    add.call("coverage-parallel", "test/test_helper.rb", "SimpleCov #{LOCK['simplecov']} with parallelize needs a command_name per worker, or workers' coverage is lost")
+  end
+end
+if !fixture_files.empty? && test_files.none? { |f| (text = read(f)) =~ /\.valid\?/ && text =~ /descendants|fixture/i }
+  add.call("no-fixture-guard", "test/fixtures", "#{fixture_files.length} fixture files and no test that checks every fixture is valid")
+end
+if total_tests >= 20 && system_tests * 5 > total_tests
+  add.call("system-heavy", "test/system", "#{system_tests} of #{total_tests} tests are system tests (#{(100.0 * system_tests / total_tests).round}%); move those that need no JavaScript to integration tests")
+end
+
+mock_uses = []
+login_files = []
+Dir.glob("test/**/*.rb").sort.each do |file|
+  next if file.start_with?("test/fixtures/")
+
+  test_file = file.end_with?("_test.rb")
+  restores = read(file) =~ /^\s*ensure\b/
+  login_candidate = test_file && file =~ %r{\Atest/(controllers|integration)/} && file !~ LOGIN_FILE
+  previous = ""
+  code_lines(file).each do |line, n|
+    where = "#{file}:#{n}"
+    add.call("controller-test-case", where, "ActionController::TestCase; use ActionDispatch::IntegrationTest") if line =~ /<\s*ActionController::TestCase\b/
+    add.call("assert-equal-nil", where, "assert_equal or assert_same with nil; use assert_nil (Minitest 6 rejects it)") if line =~ /\bassert_(?:equal|same)\s*\(?\s*nil\s*,/
+    add.call("minitest-namespace", where, "MiniTest:: was removed in Minitest 6; use Minitest::") if line =~ /\bMiniTest::/
+    add.call("sleep", where, "sleep; use travel_to, or Capybara's waiting matchers") if line =~ /(?:\A|[\s;(])sleep(?:\s+[\d.(]|\(|\s*\z)/
+    add.call("debugger", where, "debugger call left in test code") if line =~ /\b(?:binding\.(?:irb|pry)|byebug)\b|\A\s*debugger\b/
+    add.call("order-dependent", where, "order-dependent tests declared; fix the shared state instead") if line =~ /i_suck_and_my_tests_are_order_dependent!/
+    mock_uses << where if line =~ /\bMinitest::Mock\b|\.stub\s*\(?\s*:/
+    if test_file
+      if line =~ /\A\s*skip(?:\s|\(|\z)/ && line !~ /\b(?:if|unless)\b/ && previous =~ /\A\s*(?:test\s.*\bdo\s*(?:\|[^|]*\|)?|def\s+test_\w+.*)\s*\z/
+        add.call("skip", where, "test skipped unconditionally")
+      end
+      add.call("env-write", where, "ENV changed in a test file with no ensure to restore it") if !restores && line =~ /\bENV\[[^\]]+\]\s*=(?!=)/
+      if login_candidate && !login_files.last.to_s.start_with?("#{file}:") && line =~ /\bpost\s*\(?\s*:?(?:new_)?(?:user_)?(?:sessions?|login|sign_in)(?:_path|_url)?\b/
+        login_files << where
+      end
+    end
+    previous = line unless line.strip.empty?
+  end
+end
+if login_files.length >= 3
+  add.call("form-login", login_files.first, "#{login_files.length} integration test files sign in through the login route; add a sign_in_as helper that creates the session directly")
+end
+if minitest && minitest >= Gem::Version.new("6") && !LOCK.key?("minitest-mock") && !mock_uses.empty?
+  add.call("minitest-mock-missing", mock_uses.first, "Minitest #{LOCK['minitest']} has no stub or Minitest::Mock without the minitest-mock gem (#{mock_uses.length} uses)")
+end
+
+# -- records ----------------------------------------------------------------
+
+CREATE_PATTERN = /\b(?:FactoryBot\.)?create(?:_list|_pair)?\s*\(?\s*:\w|\.create!?(?:\(|\s+\w)|\.insert_all!?\b/.freeze
+records = test_files.map { |f| [f, code_lines(f).map { |line, _| line.scan(CREATE_PATTERN).length }.sum] }
+                    .select { |_, count| count >= 5 }.sort_by { |f, count| [-count, f] }.first(10)
+
+# -- report -----------------------------------------------------------------
+
+puts "Rails Minitest audit: #{ROOT}"
+puts
+puts "Stack"
+puts "  Rails #{rails || 'unknown'}, Minitest #{LOCK['minitest'] || 'unknown'}"
+data = fixture_files.empty? ? "no fixtures" : "fixtures (#{fixture_files.length} files)"
+data += ", factory_bot" if factories
+puts "  Test data: #{data}"
+gems = (TEST_GEMS - %w[minitest]).select { |name| LOCK.key?(name) }.map { |name| "#{name} #{LOCK[name]}" }
+puts "  Test gems: #{gems.empty? ? 'none' : gems.join(', ')}"
+puts
+puts "Setup"
+puts "  parallelize: #{parallel ? 'yes' : 'no'}"
+puts "  fixtures :all: #{setup_text =~ /^\s*fixtures\s+:all/ ? 'yes' : 'no'}"
+puts "  network guard: #{!webmock ? 'no' : allow_net ? 'off (allow_net_connect!)' : 'WebMock'}"
+puts "  coverage: #{coverage_line ? "SimpleCov, test_helper.rb line #{coverage_line}" : 'no'}"
+helper_dirs = %w[test/test_helpers test/support].select { |d| File.directory?(d) }
+puts "  helper modules: #{helper_dirs.empty? ? 'none' : helper_dirs.map { |d| "#{d}/ (#{Dir.glob("#{d}/**/*.rb").length} files)" }.join(', ')}"
+puts
+puts "Tests (static count)"
+counts.sort.each { |kind, (files, tests)| puts format("  %-16s %4d files %6d tests", kind, files, tests) }
+puts format("  %-16s %4d files %6d tests", "total", counts.values.map(&:first).sum, total_tests)
+puts "  system share: #{total_tests.zero? ? 0 : (100.0 * system_tests / total_tests).round}%"
+puts
+missing = untested.values.map(&:length).sum
+puts "Untested (#{missing} of #{sources.values.sum} files with code have no test file named after them)"
+untested.keys.sort.each do |dir|
+  next if untested[dir].empty?
+
+  puts "  #{dir} (#{untested[dir].length} of #{sources[dir]})"
+  shown = LIST_ALL ? untested[dir] : untested[dir].first(10)
+  shown.each { |file| puts "    #{file}" }
+  puts "    ... #{untested[dir].length - shown.length} more (--all lists them)" if shown.length < untested[dir].length
+end
+puts
+puts "Findings (#{findings.length})"
+findings.each { |rule, where, message| puts "  [#{rule}] #{where} - #{message}" }
+puts "  none" if findings.empty?
+puts
+puts "Records (test files with the most create calls)"
+records.each { |file, count| puts format("  %4d  %s", count, file) }
+puts "  none with 5 or more" if records.empty?

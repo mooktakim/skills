@@ -315,5 +315,24 @@ class HooksTest < Minitest::Test
     context = JSON.parse(hook("rails-specialists", "delegation-context.sh").out).dig("hookSpecificOutput", "additionalContext")
     assert_includes context, "rails-specialists:rails-reviewer"
     assert_includes context, "in one message so they run in parallel"
+    refute_includes context, "rails-tester", "test runs belong to rails-minitest now"
+  end
+
+  def test_minitest_note_only_in_rails_apps_tested_with_minitest
+    write "config/application.rb", "class App < Rails::Application\nend\n"
+    assert_equal "", hook("rails-minitest", "session-context.sh").out, "no test/test_helper.rb"
+    write "test/test_helper.rb", "require \"rails/test_help\"\n"
+    write "Gemfile", "gem \"rails\"\ngem \"rspec-rails\"\n"
+    assert_equal "", hook("rails-minitest", "session-context.sh").out, "an RSpec app"
+    write "Gemfile", "gem \"rails\"\n"
+    context = JSON.parse(hook("rails-minitest", "session-context.sh").out).dig("hookSpecificOutput", "additionalContext")
+    assert_includes context, "load the rails-minitest:rails-minitest skill"
+    assert_includes context, "rails-minitest:rails-tester"
+  end
+
+  def test_minitest_note_finds_an_app_one_level_down
+    write "web/config/application.rb", "module Web\n  class Application < Rails::Application\n  end\nend\n"
+    write "web/test/test_helper.rb", "\n"
+    assert_equal "SessionStart", JSON.parse(hook("rails-minitest", "session-context.sh").out).dig("hookSpecificOutput", "hookEventName")
   end
 end
