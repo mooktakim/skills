@@ -1,0 +1,4 @@
+# toolsmith 0.2.1: text-replace says how to edit after a deletion
+
+- Found while building rails-minitest: a spec with a whole-line deletion (`-row` then `-` alone), an empty line, then another `-` edit in the same block failed twice with "empty line inside an edit; write '-' or '+' alone". The rejection is right (after a deletion, a `-` line continues the same edit, so the empty line is ambiguous), but neither the message nor the guide said how to start the next edit.
+- Fix: that case now reports "empty line after a deletion; to start the next edit, repeat the '@@ <path>' header; for an empty line of text, write '-' alone". Guide (tool.json input) says a `-` line after a deletion continues it, so the next edit needs its own header. New unit test parses a deletion block followed by a second block for the same file.

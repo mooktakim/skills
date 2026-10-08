@@ -99,6 +99,12 @@ pub fn parse(input: &str) -> Result<Vec<Block>, String> {
                 Some(l) if l.starts_with('-') => pending.is_empty() || !pending.new.is_empty(),
                 Some(_) => pending.is_empty(),
             };
+            if !between && !pending.old.is_empty() && pending.new.is_empty() && next.map_or(false, |l| l.starts_with('-')) {
+                return Err(format!(
+                    "line {}: empty line after a deletion; to start the next edit, repeat the '@@ <path>' header; for an empty line of text, write '-' alone",
+                    no
+                ));
+            }
             if !between {
                 return Err(format!(
                     "line {}: empty line inside an edit; write '-' or '+' alone for an empty line of text",
@@ -178,12 +184,19 @@ mod tests {
     }
 
     #[test]
+    fn a_deletion_then_another_edit_in_the_same_file_takes_a_new_header() {
+        let blocks = parse("@@ a\n-gone\n-\n\n@@ a\n-x\n+y\n").unwrap();
+        assert_eq!(blocks[0].edits, vec![edit("gone\n", "", 2)]);
+        assert_eq!(blocks[1].edits, vec![edit("x", "y", 6)]);
+    }
+
+    #[test]
     fn rejects_ambiguous_or_broken_specs() {
         let cases = [
             ("", "the spec is empty"),
             ("-x\n", "line 1: a '-' line comes before"),
             ("@@ a\n+x\n", "line 2: a '+' line must follow"),
-            ("@@ a\n-x\n\n-y\n", "line 3: empty line inside an edit"),
+            ("@@ a\n-x\n\n-y\n", "line 3: empty line after a deletion; to start the next edit, repeat the '@@ <path>' header"),
             ("@@ a\n-x\n\n+y\n", "line 3: empty line inside an edit"),
             ("@@ a\n-x\n+y\n\n+z\n", "line 4: empty line inside an edit"),
             ("@@ a\nx\n", "line 2: every line must start"),
