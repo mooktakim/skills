@@ -1,5 +1,5 @@
 {
-  "description": "rails-view-component: in Rails apps that use ViewComponent, state when to load the rails-view-component skill",
+  "description": "rails-view-component: in Rails apps that use ViewComponent, state when to load the rails-view-component skill and when to delegate to the component-builder agent",
   "hooks": {
     "SessionStart": [
       {

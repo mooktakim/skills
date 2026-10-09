@@ -16,7 +16,8 @@ It sets no visual rules. How components look comes from the app's design system 
   - `previews.md`, `testing.md` (component, preview, stream, and broadcast tests), `performance.md` (queries, caching, instrumentation), `upgrade.md` (v3 to v4, and the 4.14 security fix).
 - **A library mode** - audit, set up, upgrade, or reorganise a component library: survey, plan, your approval, apply, verify.
 - **`scripts/audit_components`** - a read-only survey the library mode runs from the skill's directory (plain Ruby, standard library, Ruby 2.6+). It reports the stack, components per namespace, base classes, template styles, components with no preview or test, and leads with file and line: old versions and v3 config, removed APIs, components that read request state or query the database, helpers in `initialize`, `html_safe`, random ids, blocks lost to `render Foo.new { }`, `_later` broadcasts that cannot serialize, frames used as broadcast targets, broadcasting components with `render?`, unloaded sidecar Stimulus controllers, and `:unprocessable_entity` on Rack 3.1+. Nothing is copied into the app.
-- **A `SessionStart` hook** - in Rails apps that use ViewComponent only, it tells the main session to load the skill before component work.
+- **The `component-builder` agent** (`rails-view-component:component-builder`) - builds or changes a component with its preview, its test, and the callers, Turbo, or Stimulus wiring, then returns a short report; also extracts repeated markup into components, makes components broadcast themselves, and runs library audits and upgrades (returning the plan for your approval first). The skill is preloaded into it. It makes no visual decisions, never adds gems on its own, and never commits.
+- **A `SessionStart` hook** - in Rails apps that use ViewComponent only, it tells the main session to delegate component work to the agent, and to load the skill when it works on components itself.
 
 ## Where the standard comes from
 
@@ -31,4 +32,4 @@ The ViewComponent 4.x guide, API, and changelog (through 4.15), the turbo-rails 
 
 ## How to use it
 
-Work as usual: when you ask for UI that the app builds with components, the skill loads. For the whole library, ask in plain words - "audit our components", "upgrade ViewComponent", "set up previews" - or invoke the skill directly with `/rails-view-component:rails-view-component`.
+Work as usual: when you ask for UI that the app builds with components, Claude hands it to the agent, or loads the skill for a small fix. For the whole library, ask in plain words - "audit our components", "upgrade ViewComponent", "set up previews" - or invoke the skill directly with `/rails-view-component:rails-view-component`.

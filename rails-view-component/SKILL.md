@@ -27,6 +27,8 @@ This skill is about structure, code, and tests. It sets no visual rules: colours
 - **Writing mode** - components that belong to a change, or components the user asks for. Follow the rules below. A component, its preview, and its test that belong to the change need no approval step.
 - **Library mode** - the user asks to audit, set up, upgrade, or reorganise the component library. Follow "Library mode" at the end: survey, plan, approval, apply, verify.
 
+In the main conversation, when subagents are available, hand component work to `rails-view-component:component-builder` (it has this skill loaded) and pass it the change's intent, the pages or records involved, and any design-system spec that applies. Do a one-line fix yourself. In library mode the agent returns the Phase 1 plan; get the user's approval, then call it again with the approved plan.
+
 ## Detect first
 
 1. Read `Gemfile.lock`: the `view_component` version, and `turbo-rails`, `stimulus-rails`, `importmap-rails` or `jsbundling-rails` or `vite_rails`, `lookbook`, and any forms gem (`simple_form`, `view_component-form`, ...). With no `view_component`, stop: adding the gem is a library-mode change that needs approval. Below 4.0, read `references/upgrade.md` before writing anything, because v3 APIs differ. Below 4.14, tell the user once that 4.14 fixes a security issue (CVE-2026-54497).

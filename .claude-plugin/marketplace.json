@@ -29,7 +29,7 @@
     {
       "name": "rails-view-component",
       "source": "./rails-view-component",
-      "description": "ViewComponent for Rails apps: organising, writing, composing, and testing components, Turbo Streams, frames, broadcasts and morphing, Stimulus beside components, forms with the app's own builder, previews, the v4 upgrade, and a library audit"
+      "description": "ViewComponent for Rails apps: organising, writing, composing, and testing components, Turbo Streams, frames, broadcasts and morphing, Stimulus beside components, forms with the app's own builder, previews, the v4 upgrade, a library audit, and a component-builder agent"
     },
     {
       "name": "capture",

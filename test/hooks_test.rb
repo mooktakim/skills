@@ -341,6 +341,8 @@ class HooksTest < Minitest::Test
     context = JSON.parse(hook("rails-view-component", "session-context.sh").out).dig("hookSpecificOutput", "additionalContext")
     assert_includes context, "load the rails-view-component:rails-view-component skill"
     assert_includes context, "Turbo Streams or frames"
+    assert_includes context, "rails-view-component:component-builder without being asked"
+    assert_includes context, "needs the user's approval"
   end
 
   def test_view_component_note_finds_an_app_one_level_down_from_its_gemfile
