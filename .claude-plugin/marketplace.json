@@ -19,7 +19,7 @@
     {
       "name": "rails-specialists",
       "source": "./rails-specialists",
-      "description": "A team of nine Rails specialist agents: models, Hotwire, jobs, debugging, review, security, performance, deploy, upgrades"
+      "description": "A team of eight Rails specialist agents: models, jobs, debugging, review, security, performance, deploy, upgrades"
     },
     {
       "name": "rails-minitest",
@@ -34,7 +34,7 @@
     {
       "name": "rails-hotwire",
       "source": "./rails-hotwire",
-      "description": "Hotwire for Rails apps: Turbo Drive, Frames, Streams, broadcasts, Turbo 8 morphing, and Stimulus - form responses, secure streams, state through morphs, UI patterns, accessibility, testing, upgrades, and an app audit"
+      "description": "Hotwire for Rails apps: Turbo Drive, Frames, Streams, broadcasts, Turbo 8 morphing, and Stimulus - form responses, secure streams, state through morphs, UI patterns, accessibility, testing, upgrades, an app audit, and a hotwire-builder agent"
     },
     {
       "name": "capture",

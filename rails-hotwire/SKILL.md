@@ -28,6 +28,8 @@ For components: when the UI is a ViewComponent, the rails-view-component skill o
 - **Writing mode** - the Hotwire parts of a change, or a fix. Follow the rules below. Changes that belong to the task need no approval step.
 - **App mode** - the user asks to audit, upgrade, or reorganise the app's Hotwire setup. Follow "App mode" at the end: survey, plan, approval, apply, verify.
 
+In the main conversation, when subagents are available, hand Hotwire work to `rails-hotwire:hotwire-builder` (it has this skill loaded) and pass it the change's intent, the pages and records involved, and who should see live updates. Do a one-line fix yourself. In app mode the agent returns the Phase 1 plan; get the user's approval, then call it again with the approved plan.
+
 ## Detect first
 
 1. Read `Gemfile.lock`: `turbo-rails` (2.x ships Turbo 8), `stimulus-rails`, `importmap-rails` or `jsbundling-rails` or `vite_rails`, `requestjs-rails`, `view_component`, and the cable adapter in `config/cable.yml` (production). Below turbo-rails 2.0, or with rails-ujs or Turbolinks loaded, read `references/upgrade.md` first.

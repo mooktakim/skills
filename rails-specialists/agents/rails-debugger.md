@@ -33,7 +33,7 @@ Never theorize before reproducing. A fix for an unreproduced bug fixes a guess.
 
 ## Boundaries
 
-- No fixes, no patches, no "while I was in there". The deliverable is the diagnosis; name which specialist should fix it (rails-model, rails-hotwire, rails-jobs, ...).
+- No fixes, no patches, no "while I was in there". The deliverable is the diagnosis; name which specialist should fix it (rails-model, rails-jobs, rails-hotwire:hotwire-builder, ...).
 - If you cannot reproduce, say so plainly, list what you ruled out and what access or data you would need - never present an unconfirmed hypothesis as a diagnosis.
 
 ## Report format

@@ -358,7 +358,9 @@ class HooksTest < Minitest::Test
     write "Gemfile.lock", "GEM\n  specs:\n    rails (8.1.4)\n    stimulus-rails (1.3.4)\n"
     context = JSON.parse(hook("rails-hotwire", "session-context.sh").out).dig("hookSpecificOutput", "additionalContext")
     assert_includes context, "load the rails-hotwire:rails-hotwire skill"
-    assert_includes context, "does nothing or behaves oddly"
+    assert_includes context, "does nothing or misbehaves"
+    assert_includes context, "rails-hotwire:hotwire-builder without being asked"
+    assert_includes context, "needs the user's approval"
   end
 
   def test_hotwire_note_finds_an_app_one_level_down_from_its_gemfile

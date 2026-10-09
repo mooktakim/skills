@@ -16,7 +16,8 @@ It sets no visual rules (that is the app's design system), and leaves ViewCompon
   - `forms.md`, `patterns.md` (dialogs, inline editing, search, pagination, tabs, flash, optimistic UI, sorting, confirm, live updates, counters, wizards, accessible updates), `testing.md`, `native.md`, `upgrade.md` (rails-ujs, Turbolinks, Turbo 7, Stimulus 1.x).
 - **An app mode** - audit, upgrade, or reorganise an app's Hotwire setup: survey, plan, your approval, apply, verify.
 - **`scripts/audit_hotwire`** - a read-only survey the app mode runs from the skill's directory (plain Ruby, standard library, Ruby 2.6+). It reports the stack, the layouts' Turbo setup, an inventory (controllers, stream templates, frames, broadcasts, subscriptions, system tests), and leads with file and line: Turbo 7, rails-ujs and Turbolinks leftovers, form renders with no status, `:unprocessable_entity` on Rack 3.1+, synchronous broadcasts in models, removed Turbo attributes and APIs, `form.submit()`, page-ready handlers, Stimulus 1.x syntax, listener leaks, global queries, unregistered controllers, scripts in `<body>`, and `turbo_stream_from` in `<head>`. Nothing is copied into the app.
-- **A `SessionStart` hook** - in Rails apps that use turbo-rails or stimulus-rails only, it tells the main session to load the skill before Hotwire work.
+- **The `hotwire-builder` agent** (`rails-hotwire:hotwire-builder`) - builds interactive UI (frames, stream responses, broadcasts, morph-safe pages, Stimulus controllers) with the views, controller responses, and tests, checks it in a browser, and returns a short report; also fixes Turbo behaviour that misbehaves and runs Hotwire audits and upgrades (returning the plan for your approval first). The skill is preloaded into it. It replaces the `rails-hotwire` agent that `rails-specialists` shipped before 0.5.0. It makes no visual decisions, leaves components to `rails-view-component:component-builder`, never adds gems on its own, and never commits.
+- **A `SessionStart` hook** - in Rails apps that use turbo-rails or stimulus-rails only, it tells the main session to delegate Hotwire work to the agent, and to load the skill when it works on Hotwire itself.
 
 ## Where the standard comes from
 
@@ -31,4 +32,4 @@ The Turbo and Stimulus handbooks and source (Turbo 8.0.23, turbo-rails 2.0.23, S
 
 ## How to use it
 
-Work as usual: when you ask for interactive UI in a Hotwire app, the skill loads. For the whole app, ask in plain words - "audit our Hotwire setup", "move us off rails-ujs", "turn on morph refreshes" - or invoke the skill directly with `/rails-hotwire:rails-hotwire`.
+Work as usual: when you ask for interactive UI in a Hotwire app, Claude hands it to the agent, or loads the skill for a small fix. For the whole app, ask in plain words - "audit our Hotwire setup", "move us off rails-ujs", "turn on morph refreshes" - or invoke the skill directly with `/rails-hotwire:rails-hotwire`.

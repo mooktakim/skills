@@ -1,6 +1,6 @@
 # rails-specialists
 
-A team of nine Rails specialist agents for Claude Code. Each agent owns one slice of Rails work - the data layer, the Hotwire front end, background jobs, debugging, review, security, performance, deployment, upgrades - and carries the focused expertise and working discipline for that slice, so the main session can delegate instead of context-switching.
+A team of eight Rails specialist agents for Claude Code. Each agent owns one slice of Rails work - the data layer, background jobs, debugging, review, security, performance, deployment, upgrades - and carries the focused expertise and working discipline for that slice, so the main session can delegate instead of context-switching.
 
 The agents are stack-agnostic: every one starts by reading the Gemfile and config to learn what the project actually uses (Minitest or RSpec, Solid Queue or Sidekiq, Kamal or Heroku, ViewComponent or partials) and follows the project's own conventions rather than imposing defaults.
 
@@ -9,7 +9,7 @@ The agents are stack-agnostic: every one starts by reading the Gemfile and confi
 | Agent | Specialty | Writes code? |
 |---|---|---|
 | `rails-model` | ActiveRecord models, associations, validations, safe reversible migrations, schema design | yes |
-| `rails-hotwire` | Turbo Drive/Frames/Streams, Stimulus, the view layer | yes |
+
 | `rails-jobs` | Background jobs, mailers, recurring work, Action Cable | yes |
 | `rails-debugger` | Reproduces bugs, digs logs and console state, returns a proven root cause | read-only |
 | `rails-reviewer` | Code review of a diff/branch: correctness, conventions, migration safety, layering | read-only |
@@ -18,13 +18,15 @@ The agents are stack-agnostic: every one starts by reading the Gemfile and confi
 | `rails-deploy` | Deploy config, Dockerfiles, process topology, health checks, CI | yes |
 | `rails-upgrade` | Rails/Ruby/gem upgrades in small green steps, defaults-flag by defaults-flag | yes |
 
+Hotwire front-end work moved to the separate [`rails-hotwire`](../rails-hotwire/) plugin in version 0.5.0: its `rails-hotwire:hotwire-builder` agent replaces the `rails-hotwire` agent that used to ship here, with the rails-hotwire skill preloaded. ViewComponent work goes to [`rails-view-component`](../rails-view-component/)'s `component-builder`.
+
 Test work - running suites, writing tests, diagnosing failures - moved to the separate [`rails-minitest`](../rails-minitest/) plugin in version 0.4.0. Its `rails-minitest:minitest-runner` agent replaces the `rails-tester` that used to ship here, and the plugin adds the standard it writes tests to.
 
 ## Philosophy
 
 **Specialists, no manager.** There is deliberately no architect/orchestrator agent. The main session stays in charge of the plan, the conversation, and every approval; specialists are dispatched with pre-resolved inputs and report back. An agent never asks the user anything.
 
-**Two reasons to delegate.** An agent earns its place either by isolating noisy work (test runs, log digs, scanner output stay out of the main context) or by carrying deep domain discipline (migration safety, job idempotency, Turbo semantics) so the main session doesn't need re-prompting.
+**Two reasons to delegate.** An agent earns its place either by isolating noisy work (test runs, log digs, scanner output stay out of the main context) or by carrying deep domain discipline (migration safety, job idempotency, query plans) so the main session doesn't need re-prompting.
 
 **Detect, don't assume.** Every agent reads the Gemfile, config, and neighbouring code before acting, and matches the project's idiom - even where it differs from common defaults.
 
