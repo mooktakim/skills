@@ -1,0 +1,9 @@
+{
+  "name": "rails-hotwire",
+  "version": "0.1.0",
+  "description": "Hotwire for Rails apps: a skill with the standard for Turbo Drive, Frames, Streams, broadcasts, Turbo 8 morphing, and Stimulus - choosing the lightest tool, form responses, secure streams, state through morphs, controller design, UI patterns, accessibility, testing, Hotwire Native readiness, and upgrades - plus an app audit",
+  "author": { "name": "Mooktakim Ahmed", "email": "mooktakim@fluxter.co.uk" },
+  "homepage": "https://github.com/mooktakim/skills",
+  "repository": "https://github.com/mooktakim/skills",
+  "keywords": ["rails", "hotwire", "turbo", "stimulus", "action-cable"]
+}

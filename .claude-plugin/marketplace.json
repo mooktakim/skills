@@ -32,6 +32,11 @@
       "description": "ViewComponent for Rails apps: organising, writing, composing, and testing components, Turbo Streams, frames, broadcasts and morphing, Stimulus beside components, forms with the app's own builder, previews, the v4 upgrade, a library audit, and a component-builder agent"
     },
     {
+      "name": "rails-hotwire",
+      "source": "./rails-hotwire",
+      "description": "Hotwire for Rails apps: Turbo Drive, Frames, Streams, broadcasts, Turbo 8 morphing, and Stimulus - form responses, secure streams, state through morphs, UI patterns, accessibility, testing, upgrades, and an app audit"
+    },
+    {
       "name": "capture",
       "source": "./capture",
       "description": "Record a rule you state, or a correction you make, into the one checked-in context file where it belongs"

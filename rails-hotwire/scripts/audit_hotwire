@@ -1,0 +1,266 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Survey a Rails app's Hotwire setup (Turbo Drive, Frames, Streams, broadcasts,
+# morphing, Stimulus), for the rails-hotwire skill's app mode. Plain Ruby,
+# standard library only (Ruby 2.6+). Read-only: it changes nothing. Run it from
+# anywhere inside the app; the root is $AUDIT_ROOT, else the nearest directory at
+# or above the current one that holds config/application.rb.
+#
+# The output is a set of LEADS, not verdicts: confirm each one in the code.
+#   Stack      turbo-rails, stimulus-rails, the JavaScript setup, the cable adapter
+#   Setup      what the layouts set up: morph refreshes, view transitions, prefetch
+#   Inventory  Stimulus controllers, stream templates, frames, broadcasts, subscriptions,
+#              system tests
+#   Findings   one line per lead: [rule] path:line - what and why
+#
+# Rules:
+#   turbo-7              turbo-rails older than 2.0 (Turbo 7: no morphing, no refreshes)
+#   ujs                  rails-ujs is still loaded; Turbo replaces it
+#   ujs-attribute        a rails-ujs attribute Turbo ignores: remote: true, data-remote,
+#                        data-method / method: on a link, data-confirm, data-disable-with
+#   turbolinks           Turbolinks gem, events, or attributes
+#   render-200           render :new / :edit with no status: in a controller; Turbo
+#                        shows nothing for a 200 response to a form submission
+#   unprocessable-entity :unprocessable_entity on Rack 3.1+; use :unprocessable_content
+#   sync-broadcast       broadcast_{append,prepend,replace,update,before,after}_to (not
+#                        _later) in a model; it renders inside the transaction or request
+#   turbo-cache-false    data-turbo-cache="false" on an element (removed in Turbo 8.0.21);
+#                        use data-turbo-temporary
+#   removed-js           Turbo.clearCache, setProgressBarDelay, setConfirmMethod, or
+#                        setFormMode (removed or deprecated); use Turbo.cache / Turbo.config
+#   form-submit          form.submit() in JavaScript skips Turbo; use requestSubmit()
+#   page-ready           DOMContentLoaded or $(document).ready; under Turbo Drive it runs
+#                        once, not on each visit; use a Stimulus controller
+#   stimulus-1           Stimulus 1.x syntax: data-target="a.b", this.data.get, or
+#                        import from "stimulus"
+#   listener-leak        a controller adds a listener to window or document, a timer, or
+#                        an observer and never removes, clears, or disconnects it
+#                        (listeners on its own element, and { once: true }, are fine)
+#   global-query         document.querySelector / getElementById in a controller with a
+#                        literal selector; stay in scope with targets, outlets, or
+#                        this.element (an id passed in through a value is fine)
+#   unregistered         a jsbundling app with a controller missing from controllers/index.js
+#   body-script          the JavaScript entry point is loaded inside <body>; it runs again
+#                        on every visit
+#   stream-in-head       turbo_stream_from inside <head>; it must be in <body>
+
+ROOT = begin
+  if ENV["AUDIT_ROOT"]
+    File.expand_path(ENV["AUDIT_ROOT"])
+  else
+    dir = Dir.pwd
+    dir = File.dirname(dir) until File.file?(File.join(dir, "config/application.rb")) || File.dirname(dir) == dir
+    dir
+  end
+end
+
+unless File.file?(File.join(ROOT, "config/application.rb"))
+  warn "audit_hotwire: no config/application.rb found at or above #{Dir.pwd}. Run it inside a Rails app."
+  exit 1
+end
+Dir.chdir(ROOT)
+
+def read(path)
+  File.binread(path).force_encoding(Encoding::UTF_8).scrub
+end
+
+COMMENT = %r{\A\s*(?:#|//|\*|/\*|<%#|<!--)}.freeze
+
+def code_lines(path)
+  read(path).lines.each_with_index.map { |line, index| [line, index + 1] }.reject { |line, _| line =~ COMMENT }
+end
+
+LOCK = {}
+if File.file?("Gemfile.lock")
+  read("Gemfile.lock").each_line do |line|
+    match = line.match(/\A {4}([A-Za-z0-9_.\-]+) \(([^)]+)\)\s*\z/)
+    LOCK[match[1]] ||= match[2] if match
+  end
+end
+
+def version(name)
+  LOCK[name] && Gem::Version.new(LOCK[name][/\A[\d.]+/] || "0")
+rescue ArgumentError
+  nil
+end
+
+turbo = version("turbo-rails")
+unless turbo || LOCK.key?("stimulus-rails") || LOCK.key?("turbolinks")
+  warn "audit_hotwire: neither turbo-rails nor stimulus-rails is in Gemfile.lock. This audit covers apps that use Hotwire."
+  exit 1
+end
+
+IMPORTMAP = File.file?("config/importmap.rb")
+views = Dir.glob("app/{views,components}/**/*.{erb,haml,slim,rb}").sort
+view_templates = views.reject { |f| f.end_with?(".rb") }
+layouts = Dir.glob("app/views/layouts/**/*.{erb,haml,slim}").sort
+controllers = Dir.glob("app/controllers/**/*.rb").sort
+models = Dir.glob("app/models/**/*.rb").sort
+js_files = Dir.glob("app/javascript/**/*.{js,ts}").sort
+stimulus_files = Dir.glob("app/{javascript,components}/**/*_controller.{js,ts}").sort
+
+findings = []
+add = ->(rule, where, message) { findings << [rule, where, message] }
+
+# -- stack --------------------------------------------------------------------
+
+add.call("turbo-7", "Gemfile.lock", "turbo-rails #{LOCK['turbo-rails']} ships Turbo 7; Turbo 8 adds page refreshes and morphing (references/upgrade.md)") if turbo && turbo < Gem::Version.new("2.0")
+
+if LOCK.key?("turbolinks")
+  add.call("turbolinks", "Gemfile.lock", "the turbolinks gem is still installed; Turbo replaces it")
+end
+
+ujs_sources = (js_files + %w[config/importmap.rb package.json]).select { |f| File.file?(f) }
+ujs_sources.each do |file|
+  code_lines(file).each do |line, n|
+    if line =~ %r{["']@rails/ujs["']|["']rails-ujs["']|\bRails\.start\(\)}
+      add.call("ujs", "#{file}:#{n}", "rails-ujs is loaded; Turbo replaces it (references/upgrade.md)")
+      break
+    end
+  end
+end
+
+# -- views and layouts ----------------------------------------------------------
+
+UJS_ATTR = /\bremote:\s*true\b|data-remote=|\bdata-disable-with=|\bdisable_with:|\bdata-confirm=|data:\s*\{[^}]*\bconfirm:|\blink_to\b.*\bmethod:\s*:(?:delete|post|patch|put)\b|data-method=/.freeze
+view_templates.each do |file|
+  code_lines(file).each do |line, n|
+    where = "#{file}:#{n}"
+    if line =~ UJS_ATTR && line !~ /turbo_(?:method|confirm)|data-turbo-(?:method|confirm)/
+      add.call("ujs-attribute", where, "#{line[UJS_ATTR][0, 40].strip} is a rails-ujs attribute Turbo ignores; use button_to, data-turbo-confirm, data-turbo-submits-with")
+    end
+    add.call("turbolinks", where, "Turbolinks attribute; use data-turbo-*") if line =~ /data-turbolinks|turbolinks:/
+    add.call("turbo-cache-false", where, "data-turbo-cache=\"false\" was removed in Turbo 8.0.21; use data-turbo-temporary") if line =~ /data-turbo-cache=["']false|turbo_cache:\s*false/
+  end
+end
+
+layouts.each do |file|
+  body_at = nil
+  head_open = false
+  code_lines(file).each do |line, n|
+    head_open = true if line =~ /<head[\s>]/
+    head_open = false if line =~ %r{</head>}
+    body_at ||= n if line =~ /<body[\s>]/
+    if body_at && line =~ /javascript_importmap_tags|javascript_include_tag\s*\(?\s*["']application|vite_javascript_tag/
+      add.call("body-script", "#{file}:#{n}", "the JavaScript entry point loads inside <body>; load it in <head> so it runs once")
+    end
+    add.call("stream-in-head", "#{file}:#{n}", "turbo_stream_from inside <head>; it renders an element that must be in <body>") if head_open && line =~ /turbo_stream_from/
+  end
+end
+
+# -- controllers ----------------------------------------------------------------
+
+rack = version("rack")
+controllers.each do |file|
+  code_lines(file).each do |line, n|
+    where = "#{file}:#{n}"
+    if line =~ /\brender\s*\(?\s*:(?:new|edit)\b/ && line !~ /status:/
+      add.call("render-200", where, "render :#{line[/:(new|edit)\b/, 1]} with no status; a failed form needs a 4xx (status: :unprocessable_content) or Turbo shows nothing")
+    end
+    if rack && rack >= Gem::Version.new("3.1") && line =~ /:unprocessable_entity\b/
+      add.call("unprocessable-entity", where, ":unprocessable_entity is deprecated on Rack #{LOCK['rack']}; use :unprocessable_content")
+    end
+  end
+end
+
+# -- models ---------------------------------------------------------------------
+
+SYNC_BROADCAST = /\bbroadcast_(?:append|prepend|replace|update|before|after|action|render)_to\b/.freeze
+models.each do |file|
+  code_lines(file).each do |line, n|
+    add.call("sync-broadcast", "#{file}:#{n}", "#{line[SYNC_BROADCAST]} renders in the request or transaction; use the _later_to version (remove may stay sync)") if line =~ SYNC_BROADCAST
+  end
+end
+
+# -- JavaScript -----------------------------------------------------------------
+
+js_files.each do |file|
+  code_lines(file).each do |line, n|
+    where = "#{file}:#{n}"
+    if line =~ /Turbo\.(clearCache|setProgressBarDelay|setConfirmMethod|setFormMode)\b/
+      add.call("removed-js", where, "Turbo.#{Regexp.last_match(1)} is removed or deprecated; use Turbo.cache.clear() or Turbo.config")
+    end
+    add.call("form-submit", where, ".submit() skips Turbo and the submit event; use requestSubmit()") if line =~ /(?<!\bthis)(?<!Outlet)\.submit\(\s*\)/
+    add.call("page-ready", where, "#{line[/DOMContentLoaded|\$\(document\)\.ready/]} runs once under Turbo Drive; use a Stimulus controller") if line =~ /DOMContentLoaded|\$\(document\)\.ready/
+    add.call("stimulus-1", where, "Stimulus 1.x syntax; use static values, targets, and @hotwired/stimulus") if line =~ /this\.data\.get\(|from\s+["']stimulus["']/
+    add.call("turbolinks", where, "Turbolinks event or API; use turbo:* events and Turbo.visit") if line =~ /turbolinks:|Turbolinks\./
+  end
+end
+view_templates.each do |file|
+  code_lines(file).each do |line, n|
+    add.call("stimulus-1", "#{file}:#{n}", "data-target=\"controller.name\" is Stimulus 1.x; use data-<controller>-target") if line =~ /data-target=["'][\w-]+\.[\w]+["']/
+  end
+end
+
+LEAKS = [
+  [/\b(?:window|document)\.addEventListener\((?![^)]*once:\s*true)/, /\bremoveEventListener\(/, "a window or document listener with no removeEventListener"],
+  [/\bsetInterval\(/, /\bclearInterval\(/, "setInterval with no clearInterval"],
+  [/new\s+(?:Intersection|Mutation|Resize)Observer\b/, /\.disconnect\(\)/, "an observer with no disconnect()"]
+].freeze
+stimulus_files.each do |file|
+  source = code_lines(file).map(&:first).join
+  LEAKS.each do |made, undone, message|
+    next unless source =~ made && source !~ undone
+
+    n = code_lines(file).find { |line, _| line =~ made }[1]
+    add.call("listener-leak", "#{file}:#{n}", "#{message}; undo it in disconnect(), or use data-action (with @window/@document)")
+  end
+  code_lines(file).each do |line, n|
+    if line =~ /\bdocument\.(?:querySelector(?:All)?|getElementById)\(\s*["'`]/
+      add.call("global-query", "#{file}:#{n}", "#{line[/document\.(?:querySelector(?:All)?|getElementById)/]} with a fixed selector reaches outside the controller; use targets, outlets, or an id passed in through a value")
+    end
+  end
+end
+
+if !IMPORTMAP && File.file?("app/javascript/controllers/index.js")
+  index = read("app/javascript/controllers/index.js")
+  Dir.glob("app/javascript/controllers/**/*_controller.{js,ts}").sort.each do |file|
+    rel = file.sub(%r{\Aapp/javascript/controllers/}, "").sub(/\.(js|ts)\z/, "")
+    next if index.include?("./#{rel}")
+
+    add.call("unregistered", file, "not imported in controllers/index.js, so it never registers; run bin/rails stimulus:manifest:update")
+  end
+end
+
+# -- inventory ------------------------------------------------------------------
+
+def count_in(files, pattern)
+  files.map { |f| read(f).scan(pattern).length }.sum
+end
+
+layout_text = layouts.map { |f| read(f) }.join("\n")
+morph = layout_text =~ /turbo_refreshes_with[^\n]*morph|turbo_refresh_method_tag[^\n]*morph|name=["']turbo-refresh-method["'][^>]*morph/
+cable = File.file?("config/cable.yml") && read("config/cable.yml")[/^production:\s*\n(?:\s+.*\n)*?\s+adapter:\s*(\S+)/, 1]
+js_setup = if IMPORTMAP then "importmap"
+           elsif LOCK.key?("vite_rails") then "vite"
+           elsif LOCK.key?("jsbundling-rails") then "jsbundling"
+           else "unknown"
+           end
+
+puts "Hotwire audit: #{ROOT}"
+puts
+puts "Stack"
+puts "  turbo-rails #{LOCK['turbo-rails'] || 'none'}, stimulus-rails #{LOCK['stimulus-rails'] || 'none'}, Rails #{LOCK['rails'] || LOCK['railties'] || 'unknown'}"
+puts "  JavaScript: #{js_setup}; cable (production): #{cable || 'unknown'}"
+others = %w[view_component phlex-rails requestjs-rails hotwire-native-rails anycable-rails solid_cable redis].select { |name| LOCK.key?(name) }.map { |name| "#{name} #{LOCK[name]}" }
+puts "  Related gems: #{others.empty? ? 'none' : others.join(', ')}"
+puts
+puts "Setup (layouts)"
+puts "  page refreshes by morph: #{morph ? 'yes' : 'no'}"
+puts "  view transitions: #{layout_text =~ /view-transition/ ? 'yes' : 'no'}"
+puts "  hover prefetch: #{layout_text =~ /turbo-prefetch["'][^>]*false|turbo_prefetch:\s*false/ ? 'off' : 'on (Turbo 8 default)'}"
+puts "  data-turbo-permanent elements: #{count_in(view_templates, /data-turbo-permanent|turbo_permanent:/)}"
+puts
+puts "Inventory"
+puts "  Stimulus controllers: #{stimulus_files.length}"
+puts "  stream templates (.turbo_stream.*): #{Dir.glob('app/views/**/*.turbo_stream.*').length}"
+puts "  inline render turbo_stream: #{count_in(controllers, /render\s*\(?\s*turbo_stream:/)}"
+puts "  frames (turbo_frame_tag): #{count_in(views, /turbo_frame_tag\b/)}"
+puts "  broadcast calls (models and components): #{count_in(models + Dir.glob('app/components/**/*.rb'), /\bbroadcasts(?:_to|_refreshes(?:_to)?)?\b|\bbroadcast_\w+_to\b|\bbroadcast_refresh\b/)}"
+puts "  subscriptions (turbo_stream_from): #{count_in(views, /turbo_stream_from\b/)}"
+puts "  system tests: #{Dir.glob('test/system/**/*_test.rb').length}"
+puts
+puts "Findings (#{findings.length})"
+findings.each { |rule, where, message| puts "  [#{rule}] #{where} - #{message}" }
+puts "  none" if findings.empty?

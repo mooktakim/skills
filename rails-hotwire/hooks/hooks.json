@@ -1,0 +1,17 @@
+{
+  "description": "rails-hotwire: in Rails apps that use turbo-rails or stimulus-rails, state when to load the rails-hotwire skill",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-context.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

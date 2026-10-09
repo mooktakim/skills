@@ -351,6 +351,22 @@ class HooksTest < Minitest::Test
     assert_equal "SessionStart", JSON.parse(hook("rails-view-component", "session-context.sh").out).dig("hookSpecificOutput", "hookEventName")
   end
 
+  def test_hotwire_note_only_in_rails_apps_that_use_hotwire
+    write "config/application.rb", "class App < Rails::Application\nend\n"
+    write "Gemfile.lock", "GEM\n  specs:\n    rails (8.1.4)\n"
+    assert_equal "", hook("rails-hotwire", "session-context.sh").out, "no turbo-rails or stimulus-rails"
+    write "Gemfile.lock", "GEM\n  specs:\n    rails (8.1.4)\n    stimulus-rails (1.3.4)\n"
+    context = JSON.parse(hook("rails-hotwire", "session-context.sh").out).dig("hookSpecificOutput", "additionalContext")
+    assert_includes context, "load the rails-hotwire:rails-hotwire skill"
+    assert_includes context, "does nothing or behaves oddly"
+  end
+
+  def test_hotwire_note_finds_an_app_one_level_down_from_its_gemfile
+    write "web/config/application.rb", "module Web\n  class Application < Rails::Application\n  end\nend\n"
+    write "web/Gemfile", "gem 'rails'\ngem \"turbo-rails\"\n"
+    assert_equal "SessionStart", JSON.parse(hook("rails-hotwire", "session-context.sh").out).dig("hookSpecificOutput", "hookEventName")
+  end
+
   def test_minitest_note_finds_an_app_one_level_down
     write "web/config/application.rb", "module Web\n  class Application < Rails::Application\n  end\nend\n"
     write "web/test/test_helper.rb", "\n"
