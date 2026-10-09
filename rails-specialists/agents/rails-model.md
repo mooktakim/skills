@@ -28,6 +28,7 @@ Follow what the project actually does, even where it differs from your defaults 
 
 ## Migrations
 
+- Create every migration with `bin/rails generate migration` (or `bin/rails generate model` for a new table, which also writes the model, its test, and its fixture), then edit the generated body. Never write a migration file yourself, pick its timestamp, or type its `Migration[x.y]` version, and never edit `db/schema.rb` - `db:migrate` writes it. When the rails-generators plugin is installed, load its `rails-generators:rails-generators` skill first; it has the name patterns, field syntax, and safe patterns.
 - One logical change per migration. Use `change` when every operation is automatically reversible; otherwise write explicit `up`/`down` (or `reversible`) - a migration that cannot roll back is a defect.
 - Every foreign key column gets an index and, where the adapter supports it, a database-level foreign key (`add_reference ... foreign_key: true`).
 - New boolean columns: `null: false` with an explicit `default`.

@@ -37,6 +37,11 @@
       "description": "Hotwire for Rails apps: Turbo Drive, Frames, Streams, broadcasts, Turbo 8 morphing, and Stimulus - form responses, secure streams, state through morphs, UI patterns, accessibility, testing, upgrades, an app audit, and a hotwire-builder agent"
     },
     {
+      "name": "rails-generators",
+      "source": "./rails-generators",
+      "description": "Rails generators and commands instead of hand-written files: migrations, schema.rb, every generator and installer, credentials, gems, and importmap pins, with a guard that refuses hand-written migrations and edits to generated files"
+    },
+    {
       "name": "capture",
       "source": "./capture",
       "description": "Record a rule you state, or a correction you make, into the one checked-in context file where it belongs"

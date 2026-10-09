@@ -1,0 +1,132 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# PreToolUse guard for Write, Edit, MultiEdit, and Bash in Rails apps: refuses to
+# write files the framework must write - a new migration (bin/rails generate
+# picks its timestamp and version), the schema dumps, encrypted credentials, and
+# Gemfile.lock - and tells Claude the command to use instead. Editing a migration
+# that has already run gets a note, not a refusal. Silent for everything else,
+# and outside Rails apps (no bin/rails above the file). Plain Ruby, standard
+# library only, Ruby 2.6+.
+
+require "json"
+
+MIGRATION = %r{\A(.*?)/db/((?:\w+_)?migrate)/(\d+)_\w+\.rb\z}.freeze
+SCHEMA = %r{\A(.*?)/db/[^/]*(?:schema[^/]*\.rb|structure[^/]*\.sql)\z}.freeze
+CREDENTIALS = %r{\A(.*?)/config/(?:[^/]+/)*[^/]+\.enc\z}.freeze
+LOCKFILE = %r{\A(.*?)/(?:Gemfile\.lock|gems\.locked)\z}.freeze
+# A Bash token that names one of the protected kinds of file.
+PATH_TOKEN = %r{[^\s'"<>|;&]*(?:db/(?:\w+_)?migrate/\d+_\w+\.rb|db/[^/\s'"]*(?:schema[^/\s'"]*\.rb|structure[^/\s'"]*\.sql)|config/[^\s'"]*\.enc|Gemfile\.lock|gems\.locked)}.freeze
+
+def rails_root?(dir)
+  File.file?(File.join(dir, "bin", "rails"))
+end
+
+def run_in(root, project)
+  root == project ? "" : " (run it in #{root})"
+end
+
+# The reason a write to path must not happen, or nil.
+def refusal(path, project)
+  if (m = MIGRATION.match(path)) && rails_root?(m[1])
+    return if File.exist?(path)
+
+    "Do not write a migration file by hand. Generate it, so Rails picks the timestamp and the " \
+      "ActiveRecord::Migration[x.y] version: `bin/rails generate migration AddPublishedAtToPosts published_at:datetime:index" \
+      "#{m[2] == 'migrate' ? '' : " --database #{m[2].sub(/_migrate\z/, '')}"}`#{run_in(m[1], project)}" \
+      " - or `bin/rails generate model` for a new table. Then edit the generated file's body. " \
+      "The rails-generators skill has the name patterns and field syntax."
+  elsif (m = SCHEMA.match(path)) && rails_root?(m[1])
+    "#{File.basename(path)} is generated from the database: `bin/rails db:migrate` rewrites it. Change the " \
+      "schema with a migration (`bin/rails generate migration ...`), never in this file. For a merge conflict " \
+      "in it, take the base branch's copy (`git checkout <base> -- #{path.sub("#{m[1]}/", '')}`), then run " \
+      "`bin/rails db:migrate`#{run_in(m[1], project)} to dump it again with this branch's migrations."
+  elsif (m = CREDENTIALS.match(path)) && rails_root?(m[1])
+    "#{File.basename(path)} is encrypted; writing it directly corrupts it. Change it with " \
+      "`bin/rails credentials:edit` (add `--environment <env>` for per-environment files)#{run_in(m[1], project)}. " \
+      "The rails-generators skill shows how to do that without an interactive editor. Never print or commit the key."
+  elsif (m = LOCKFILE.match(path)) && rails_root?(m[1])
+    "Bundler writes #{File.basename(path)}. Edit the Gemfile (or `bundle add NAME`, `bundle remove NAME`) and run " \
+      "`bundle install`; to move one gem, `bundle update NAME --conservative`#{run_in(m[1], project)}."
+  end
+end
+
+# A note for an edit to a migration that has already run in this database.
+def applied_note(path)
+  m = MIGRATION.match(path)
+  return unless m && rails_root?(m[1]) && File.exist?(path)
+
+  prefix = m[2] == "migrate" ? "" : m[2].sub(/migrate\z/, "")
+  version = m[3]
+  ran = if File.exist?(schema = File.join(m[1], "db", "#{prefix}schema.rb"))
+          defined = File.read(schema)[/define\(version:\s*([\d_]+)\)/, 1]
+          defined && defined.delete("_").to_i >= version.to_i
+        elsif File.exist?(sql = File.join(m[1], "db", "#{prefix}structure.sql"))
+          File.read(sql).include?("('#{version}')")
+        end
+  return unless ran
+
+  "#{File.basename(path)} has already run (the schema dump is at or past version #{version}), so editing it " \
+    "changes no database that ran it. If it is local and uncommitted, roll it back first " \
+    "(`bin/rails db:migrate:down VERSION=#{version}`), edit it, and migrate again. If it is committed or " \
+    "deployed, leave it and generate a new migration."
+end
+
+# The files a shell command writes: redirect, tee, touch, cp or mv targets, and
+# any protected path named by an in-place editor (sed -i, perl -i, ruby -i) or a
+# toolsmith edit, whose spec names its files on later lines.
+def writes_in_bash(command, cwd)
+  targets = []
+  command.each_line do |line|
+    line.split(/&&|\|\||;/).each do |segment|
+      segment.scan(/>>?\|?\s*(#{PATH_TOKEN})/o) { targets << $1 }
+      segment.scan(/\btee\s+(?:-a\s+)?(#{PATH_TOKEN})/o) { targets << $1 }
+      segment.scan(/\btouch\s+(?:\S+\s+)*?(#{PATH_TOKEN})/o) { targets << $1 }
+      last = segment.split.last
+      targets << last if segment =~ /\b(?:cp|mv)\s/ && last =~ /\A#{PATH_TOKEN}\z/o
+      segment.scan(PATH_TOKEN) { |token| targets << token } if segment =~ /\b(?:sed|perl|ruby)\b.*\s-[a-zA-Z]*i/
+    end
+  end
+  command.scan(PATH_TOKEN) { |token| targets << token } if command =~ /\btoolsmith-(?:text-replace|files-write)\b/
+  targets.map { |token| File.expand_path(token.delete("'\""), cwd) }.uniq
+end
+
+input = begin
+  JSON.parse($stdin.read)
+rescue StandardError
+  exit 0
+end
+tool = input["tool_name"].to_s
+tool_input = input["tool_input"] || {}
+cwd = input["cwd"] || Dir.pwd
+project = ENV["CLAUDE_PROJECT_DIR"].to_s.empty? ? cwd : ENV["CLAUDE_PROJECT_DIR"]
+
+reasons = []
+notes = []
+case tool
+when "Write", "Edit", "MultiEdit"
+  path = File.expand_path(tool_input["file_path"].to_s, cwd)
+  if (reason = refusal(path, project))
+    reasons << reason
+  elsif (note = applied_note(path))
+    notes << note
+  end
+when "Bash"
+  writes_in_bash(tool_input["command"].to_s, cwd).each do |path|
+    reason = refusal(path, project)
+    reasons << reason if reason
+  end
+end
+
+if reasons.any?
+  puts JSON.generate("hookSpecificOutput" => {
+                       "hookEventName" => "PreToolUse",
+                       "permissionDecision" => "deny",
+                       "permissionDecisionReason" => "rails-generators: #{reasons.uniq.join(' ')}"
+                     })
+elsif notes.any?
+  puts JSON.generate("hookSpecificOutput" => {
+                       "hookEventName" => "PreToolUse",
+                       "additionalContext" => "rails-generators: #{notes.join(' ')}"
+                     })
+end

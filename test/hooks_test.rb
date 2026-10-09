@@ -374,4 +374,95 @@ class HooksTest < Minitest::Test
     write "web/test/test_helper.rb", "\n"
     assert_equal "SessionStart", JSON.parse(hook("rails-minitest", "session-context.sh").out).dig("hookSpecificOutput", "hookEventName")
   end
+
+  # -- rails-generators -------------------------------------------------------
+
+  def test_generators_note_only_in_rails_apps_including_one_level_down
+    assert_equal "", hook("rails-generators", "session-context.sh").out
+    write "web/config/application.rb", "module Web\n  class Application < Rails::Application\n  end\nend\n"
+    context = JSON.parse(hook("rails-generators", "session-context.sh").out).dig("hookSpecificOutput", "additionalContext")
+    assert_includes context, "`bin/rails generate migration`"
+    assert_includes context, "never hand-pick a migration timestamp"
+    assert_includes context, "Load the rails-generators:rails-generators skill"
+  end
+
+  def rails_app(prefix = "")
+    write "#{prefix}bin/rails", "#!/usr/bin/env ruby\n"
+    write "#{prefix}config/application.rb", "class App < Rails::Application\nend\n"
+    write "#{prefix}db/schema.rb", "ActiveRecord::Schema[8.1].define(version: 2026_09_30_160000) do\nend\n"
+    write "#{prefix}db/migrate/20260930160000_add_name_to_users.rb", "class AddNameToUsers < ActiveRecord::Migration[8.1]\nend\n"
+  end
+
+  def guard(tool, tool_input)
+    stdin = JSON.generate("tool_name" => tool, "cwd" => @dir, "tool_input" => tool_input)
+    out = hook("rails-generators", "guard.sh", stdin: stdin).out
+    out.empty? ? {} : JSON.parse(out).fetch("hookSpecificOutput")
+  end
+
+  def refused(tool, tool_input)
+    decision = guard(tool, tool_input)
+    decision["permissionDecision"] == "deny" ? decision["permissionDecisionReason"] : nil
+  end
+
+  def test_guard_refuses_a_hand_written_migration_and_allows_editing_a_generated_one
+    rails_app
+    reason = refused("Write", "file_path" => path("db/migrate/20261009120000_create_posts.rb"))
+    assert_includes reason, "`bin/rails generate migration AddPublishedAtToPosts published_at:datetime:index`"
+    assert_includes refused("Write", "file_path" => path("db/queue_migrate/20261009120000_x.rb")), "published_at:datetime:index --database queue`"
+    write "db/migrate/20261009120001_create_posts.rb", "class CreatePosts < ActiveRecord::Migration[8.1]\nend\n"
+    assert_equal({}, guard("Write", "file_path" => path("db/migrate/20261009120001_create_posts.rb")), "generated and not yet run")
+  end
+
+  def test_guard_notes_an_edit_to_a_migration_that_has_already_run
+    rails_app
+    decision = guard("Edit", "file_path" => path("db/migrate/20260930160000_add_name_to_users.rb"))
+    assert_nil decision["permissionDecision"]
+    assert_includes decision["additionalContext"], "`bin/rails db:migrate:down VERSION=20260930160000`"
+    FileUtils.rm(path("db/schema.rb"))
+    write "db/structure.sql", "INSERT INTO \"schema_migrations\" (version) VALUES\n('20260930160000');\n"
+    assert_includes guard("Edit", "file_path" => path("db/migrate/20260930160000_add_name_to_users.rb"))["additionalContext"], "has already run"
+    write "db/structure.sql", "\n"
+    assert_equal({}, guard("Edit", "file_path" => path("db/migrate/20260930160000_add_name_to_users.rb")))
+  end
+
+  def test_guard_refuses_edits_to_schema_dumps_credentials_and_the_lockfile
+    rails_app
+    assert_includes refused("Edit", "file_path" => path("db/schema.rb")), "`git checkout <base> -- db/schema.rb`"
+    assert_includes refused("Write", "file_path" => path("db/queue_schema.rb")), "queue_schema.rb is generated"
+    assert_includes refused("Edit", "file_path" => path("db/structure.sql")), "structure.sql is generated"
+    assert_includes refused("Write", "file_path" => path("config/credentials/production.yml.enc")), "`bin/rails credentials:edit`"
+    assert_includes refused("Edit", "file_path" => path("Gemfile.lock")), "`bundle update NAME --conservative`"
+    assert_equal({}, guard("Edit", "file_path" => path("db/seeds.rb")))
+    assert_equal({}, guard("Edit", "file_path" => path("Gemfile")))
+  end
+
+  def test_guard_refuses_shell_writes_and_allows_shell_reads
+    rails_app
+    {
+      "cat > db/migrate/20261009120000_create_posts.rb <<'EOF'\nclass CreatePosts\nEOF" => "Do not write a migration file by hand",
+      "sed -i '' 's/a/b/' db/schema.rb" => "schema.rb is generated",
+      "bundle exec rails runner 1 && echo x | tee -a Gemfile.lock" => "Bundler writes Gemfile.lock",
+      "toolsmith-text-replace <<'EOF'\n@@ db/schema.rb\n-a\n+b\nEOF" => "schema.rb is generated",
+      "cp ../other/db/migrate/20250101000000_x.rb db/migrate/20261009120000_x.rb" => "Do not write a migration file by hand"
+    }.each do |command, message|
+      assert_includes refused("Bash", "command" => command).to_s, message, command
+    end
+    [
+      "cat db/schema.rb | head",
+      "git checkout main -- db/schema.rb && bin/rails db:migrate",
+      "bin/rails generate migration AddTitleToPosts title:string > /dev/null",
+      "cat > db/migrate/20260930160000_add_name_to_users.rb <<'EOF'\nclass AddNameToUsers\nEOF",
+      "ls db/migrate"
+    ].each { |command| assert_nil refused("Bash", "command" => command), command }
+  end
+
+  def test_guard_finds_an_app_one_level_down_and_is_silent_outside_rails
+    write "db/migrate/20261009120000_x.rb.keep", ""
+    assert_equal({}, guard("Write", "file_path" => path("db/migrate/20261009120000_create_posts.rb")), "no bin/rails")
+    assert_equal({}, guard("Edit", "file_path" => path("Gemfile.lock")))
+    rails_app("api/")
+    reason = refused("Bash", "command" => "echo x > api/db/migrate/20261009120000_create_posts.rb")
+    assert_includes reason, "(run it in #{path('api')})"
+    assert_equal "", hook("rails-generators", "guard.sh", stdin: JSON.generate("tool_name" => "Read", "tool_input" => { "file_path" => path("app/models/user.rb") })).out
+  end
 end
