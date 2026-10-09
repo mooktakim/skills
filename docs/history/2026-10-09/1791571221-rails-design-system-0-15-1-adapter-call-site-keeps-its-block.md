@@ -1,0 +1,2 @@
+- `adapters/view_component.md` showed `render Admin::ButtonComponent.new(variant: :danger) { "Delete" }`: the braces bind to `.new`, so the content never reached the component. Now `render(...) { }` with a note why. Also "sidecar template" -> "template beside it" (the example uses the sibling-file layout).
+- Found during the ViewComponent research for the new rails-view-component plugin; its audit has a `lost-block` rule for this.

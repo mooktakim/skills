@@ -1,6 +1,6 @@
 # ViewComponent adapter - realising specs as components
 
-Read this when the Gemfile includes `view_component` and a spec needs realising, or when writing a spec's "Realized as" guidance. The unit of realisation is a component class with a sidecar template; the contract's axes become keyword arguments.
+Read this when the Gemfile includes `view_component` and a spec needs realising, or when writing a spec's "Realized as" guidance. The unit of realisation is a component class with a template beside it; the contract's axes become keyword arguments.
 
 ## Rules
 
@@ -44,4 +44,4 @@ end
 </button>
 ```
 
-Call site: `<%= render Admin::ButtonComponent.new(variant: :danger) { "Delete" } %>`. A call site needing its own class string means the contract is missing an axis - extend the spec first.
+Call site: `<%= render(Admin::ButtonComponent.new(variant: :danger)) { "Delete" } %>` - the parentheses matter: without them the braces bind to `.new` and the content is lost. A call site needing its own class string means the contract is missing an axis - extend the spec first.
