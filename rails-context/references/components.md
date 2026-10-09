@@ -33,7 +33,7 @@ build full-page Phlex views rendered straight from a controller.
 - New component? Read the closest sibling in the same namespace and mirror it.
 
 ## Gotchas
-- Components that broadcast include `TurboBroadcastable`, which wraps output in
-  a turbo_frame automatically - writing the outer frame yourself double-wraps.
+- Components that broadcast inherit `TurboViewComponent`, which puts the stream
+  target id on the root element - never wrap them in a turbo_frame as a target.
 - Never share a component between `Admin::*` and public namespaces.
 ```

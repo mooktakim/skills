@@ -1,6 +1,6 @@
 # Components with Turbo
 
-Read this before rendering a component in a Turbo Stream or a Turbo Frame, giving a component an id, or making it survive morphing. Broadcasting over Action Cable is in `broadcasting.md`.
+Read this before rendering a component in a Turbo Stream or a Turbo Frame, giving a component an id, or making it survive morphing. Broadcasting over Action Cable is in `broadcasting.md`. The general Turbo and Stimulus rules - Drive, frames, streams, broadcasts, morphing, controller design - are in the rails-hotwire skill when it is installed; this file covers what is specific to components.
 
 ## Pick the lightest tool
 

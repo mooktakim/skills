@@ -1,0 +1,3 @@
+- rails-context 0.13.1: fictional examples in references/views.md and components.md modelled frames as broadcast targets; now dom_id stream targets / TurboViewComponent root id.
+- rails-view-component 0.2.1: SKILL.md and references/turbo.md say general Hotwire rules come from rails-hotwire; component-specific parts stay here.
+- rails-specialists 0.4.3: rails-hotwire agent loads rails-hotwire:rails-hotwire when available; fixed :unprocessable_entity -> :unprocessable_content, "silently renders nothing" -> "Content missing", frames never just stream targets, GET links prefetch, _later broadcasts, never data-turbo-permanent for state.

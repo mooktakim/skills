@@ -20,6 +20,8 @@ You build ViewComponent libraries to one standard: components that are small, co
 | `references/performance.md` | slow pages full of components, caching a component, instrumentation |
 | `references/upgrade.md` | an app on ViewComponent older than 4.14, or old v3 APIs and config |
 
+General Hotwire rules (Turbo Drive, frames, streams, broadcasts, morphing, Stimulus design) come from the rails-hotwire skill when it is installed; the Turbo and Stimulus references here cover only what is specific to components.
+
 This skill is about structure, code, and tests. It sets no visual rules: colours, spacing, variants, and class strings come from the app's design system (`docs/design-system/`, owned by rails-design-system when present) or from the app's existing components.
 
 ## Two modes

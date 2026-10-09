@@ -25,6 +25,6 @@ a partial rendered from more than one page should become a component.
   partials.
 - Three layouts: `application` (public), `admin`, `minimal` (auth flows).
   Public pages must set `content_for(:title)` and `:meta_description`.
-- Turbo frame ids come from `dom_id(record, :section)` - never hand-written
-  strings, broadcasts depend on them matching.
+- Frame ids and stream targets come from `dom_id(record, :section)` - never
+  hand-written strings; streams and broadcasts depend on them matching.
 ```
