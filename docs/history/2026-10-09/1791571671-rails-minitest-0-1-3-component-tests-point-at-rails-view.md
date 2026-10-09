@@ -1,0 +1,1 @@
+- test-kinds.md component section: assert contract attributes (stream-target ids, data-controller/values) rather than design classes; ViewComponent extras (refute_component_rendered, render_preview, every-preview test, broadcast tests that run the job) with a pointer to rails-view-component's references/testing.md.

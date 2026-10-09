@@ -80,7 +80,9 @@ end
 - **ViewComponent:** `ViewComponent::TestCase`, `render_inline(BadgeComponent.new(tone: :danger))`, then `assert_selector "span.badge", text: "Overdue"`.
 - **Phlex:** `ActionView::TestCase`, `render Components::Badge.new(tone: :danger)`, then `assert_dom "span.badge", "Overdue"`.
 
-Test each variant and state the component's contract defines, not every combination.
+Test each variant and state the component's contract defines, not every combination. Assert the attributes other code relies on - the id a Turbo Stream targets, `data-controller` and its values - rather than design class names.
+
+For ViewComponent, also: `refute_component_rendered` for `render?`, `render_preview(:name)` to reuse a preview as the example, one test that renders every preview, and broadcast tests that run the job. When the rails-view-component plugin is installed, its skill's `references/testing.md` has these in full.
 
 ## Channels and broadcasts
 
