@@ -333,6 +333,22 @@ class HooksTest < Minitest::Test
     assert_includes context, "Skip the run when only docs"
   end
 
+  def test_view_component_note_only_in_rails_apps_that_use_view_component
+    write "config/application.rb", "class App < Rails::Application\nend\n"
+    write "Gemfile.lock", "GEM\n  specs:\n    rails (8.1.4)\n"
+    assert_equal "", hook("rails-view-component", "session-context.sh").out, "no view_component"
+    write "Gemfile.lock", "GEM\n  specs:\n    rails (8.1.4)\n    view_component (4.15.0)\n"
+    context = JSON.parse(hook("rails-view-component", "session-context.sh").out).dig("hookSpecificOutput", "additionalContext")
+    assert_includes context, "load the rails-view-component:rails-view-component skill"
+    assert_includes context, "Turbo Streams or frames"
+  end
+
+  def test_view_component_note_finds_an_app_one_level_down_from_its_gemfile
+    write "web/config/application.rb", "module Web\n  class Application < Rails::Application\n  end\nend\n"
+    write "web/Gemfile", "gem 'rails'\ngem \"view_component\", \"~> 4.15\"\n"
+    assert_equal "SessionStart", JSON.parse(hook("rails-view-component", "session-context.sh").out).dig("hookSpecificOutput", "hookEventName")
+  end
+
   def test_minitest_note_finds_an_app_one_level_down
     write "web/config/application.rb", "module Web\n  class Application < Rails::Application\n  end\nend\n"
     write "web/test/test_helper.rb", "\n"

@@ -1,0 +1,9 @@
+{
+  "name": "rails-view-component",
+  "version": "0.1.0",
+  "description": "ViewComponent for Rails apps: a skill with the standard for organising, writing, composing, and testing components, Turbo Streams, frames, broadcasts and morphing, Stimulus beside components, forms with the app's own builder, previews, the v4 upgrade, and a library audit",
+  "author": { "name": "Mooktakim Ahmed", "email": "mooktakim@fluxter.co.uk" },
+  "homepage": "https://github.com/mooktakim/skills",
+  "repository": "https://github.com/mooktakim/skills",
+  "keywords": ["rails", "view_component", "hotwire", "turbo", "stimulus", "components"]
+}

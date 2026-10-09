@@ -27,6 +27,11 @@
       "description": "Minitest for Rails apps: the standard for every kind of test, fixtures, shared helpers, state shortcuts, speed, coverage, and flaky tests, a suite audit, and a minitest-runner agent"
     },
     {
+      "name": "rails-view-component",
+      "source": "./rails-view-component",
+      "description": "ViewComponent for Rails apps: organising, writing, composing, and testing components, Turbo Streams, frames, broadcasts and morphing, Stimulus beside components, forms with the app's own builder, previews, the v4 upgrade, and a library audit"
+    },
+    {
       "name": "capture",
       "source": "./capture",
       "description": "Record a rule you state, or a correction you make, into the one checked-in context file where it belongs"

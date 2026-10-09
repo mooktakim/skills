@@ -1,0 +1,268 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Survey a Rails app's ViewComponent library, for the rails-view-component
+# skill's library mode. Plain Ruby, standard library only (Ruby 2.6+).
+# Read-only: it changes nothing. Run it from anywhere inside the app; the root is
+# $AUDIT_ROOT, else the nearest directory at or above the current one that holds
+# config/application.rb.
+#
+# The output is a set of LEADS, not verdicts: confirm each one in the code.
+#   Stack       view_component, Rails, turbo-rails, and JavaScript setup versions
+#   Components  components per namespace, the base classes, the template styles
+#   Previews    components with no preview file named after them
+#   Tests       components with no test file named after them
+#   Findings    one line per lead: [rule] path:line - what and why
+#
+# Rules:
+#   vc-v3                view_component is older than 4.0 (references/upgrade.md)
+#   vc-insecure          view_component 4.x older than 4.14, which fixes CVE-2026-54497
+#                        (content leaking between renders of one instance)
+#   v3-config            a config.view_component key that v4 renamed or removed
+#   removed-api          use_helper, use_helpers, or render_component (removed in v4)
+#   no-base-class        three or more components and no ApplicationComponent
+#   direct-base          a component inherits ViewComponent::Base although
+#                        ApplicationComponent exists
+#   global-state         a component reads request state: params, session, cookies,
+#                        request, Current, or helpers.current_*; pass values in
+#   query                a component runs a database query; the caller preloads
+#   helpers-in-initialize  helpers, controller, request, or t() inside initialize,
+#                        which raise there; move them to before_render or a method
+#   html-safe            html_safe or raw() in a component; take markup through
+#                        content or a slot
+#   random-id            SecureRandom or object_id in a component; ids must be stable
+#                        for Turbo Stream targets and morphing
+#   lost-block           render Foo.new(...) { ... }: the braces bind to .new, so the
+#                        block never reaches the component; use render(Foo.new(...)) { }
+#   later-renderable     a _later broadcast with renderable: Foo.new; the job cannot
+#                        serialize it, use Foo.render_later
+#   frame-wrapper        a component template wrapped in turbo_frame_tag with no src:,
+#                        usually a broadcast target; a frame also captures every link
+#                        and form inside it, so use a plain element with the id
+#   hidden-target        a broadcasting component defines render?; when it renders
+#                        nothing, the next broadcast has no target to replace
+#   sidecar-js-unloaded  *_controller.js files in app/components, importmap-rails,
+#                        and no pin_all_from "app/components" in config/importmap.rb
+#   unprocessable-entity :unprocessable_entity on Rack 3.1+; use :unprocessable_content
+
+ROOT = begin
+  if ENV["AUDIT_ROOT"]
+    File.expand_path(ENV["AUDIT_ROOT"])
+  else
+    dir = Dir.pwd
+    dir = File.dirname(dir) until File.file?(File.join(dir, "config/application.rb")) || File.dirname(dir) == dir
+    dir
+  end
+end
+
+unless File.file?(File.join(ROOT, "config/application.rb"))
+  warn "audit_components: no config/application.rb found at or above #{Dir.pwd}. Run it inside a Rails app."
+  exit 1
+end
+Dir.chdir(ROOT)
+
+def read(path)
+  File.binread(path).force_encoding(Encoding::UTF_8).scrub
+end
+
+def code_lines(path)
+  read(path).lines.each_with_index.map { |line, index| [line, index + 1] }
+            .reject { |line, _| line.strip.start_with?("#", "<%#") }
+end
+
+LOCK = {}
+if File.file?("Gemfile.lock")
+  read("Gemfile.lock").each_line do |line|
+    match = line.match(/\A {4}([A-Za-z0-9_.\-]+) \(([^)]+)\)\s*\z/)
+    LOCK[match[1]] ||= match[2] if match
+  end
+end
+
+def version(name)
+  LOCK[name] && Gem::Version.new(LOCK[name][/\A[\d.]+/] || "0")
+rescue ArgumentError
+  nil
+end
+
+vc = version("view_component")
+unless vc
+  warn "audit_components: view_component is not in Gemfile.lock. This audit covers apps that use ViewComponent."
+  exit 1
+end
+V4 = vc >= Gem::Version.new("4.0")
+
+# -- components ---------------------------------------------------------------
+
+BASE_NAMES = %w[application_component turbo_view_component].freeze
+component_files = Dir.glob("app/components/**/*_component.rb").sort
+base_files, components = component_files.partition { |f| BASE_NAMES.include?(File.basename(f, ".rb")) }
+
+def logical(file)
+  rel = file.sub(%r{\Aapp/components/}, "").sub(/\.rb\z/, "")
+  parts = rel.split("/")
+  parts.delete_at(-2) if parts.length >= 2 && parts[-2] == parts[-1] # sidecar directory
+  parts.join("/")
+end
+
+def templates_for(file)
+  base = file.sub(/\.rb\z/, "")
+  Dir.glob("#{base}.*.erb") + Dir.glob("#{base}.*.{haml,slim}") +
+    Dir.glob("#{File.dirname(base)}/#{File.basename(base)}/#{File.basename(base)}.*.{erb,haml,slim}")
+end
+
+styles = Hash.new(0)
+namespaces = Hash.new(0)
+components.each do |file|
+  source = read(file)
+  styles[if source =~ /^\s*(?:erb|haml|slim)_template\b/ then "inline template"
+         elsif source =~ /^\s*def call\b/ then "call method"
+         elsif file =~ %r{/(\w+)/\1\.rb\z} then "sidecar directory"
+         else "sibling template"
+         end] += 1
+  name = logical(file)
+  namespaces[name.include?("/") ? name.split("/")[0..-2].join("/") : "(top level)"] += 1
+end
+
+preview_files = Dir.glob("{test,spec}/components/previews/**/*_preview.rb") +
+                Dir.glob("{test,spec}/components/**/*_preview.rb") + Dir.glob("app/components/**/*_preview.rb")
+preview_names = preview_files.uniq.map { |f| File.basename(f, "_preview.rb") }
+test_names = Dir.glob("{test,spec}/components/**/*_{test,spec}.rb").map { |f| File.basename(f, ".rb").sub(/_(test|spec)\z/, "") }
+no_preview = components.reject { |f| preview_names.include?(File.basename(logical(f))) }
+no_test = components.reject { |f| test_names.include?(File.basename(logical(f))) }
+
+# -- findings -----------------------------------------------------------------
+
+findings = []
+add = ->(rule, where, message) { findings << [rule, where, message] }
+
+if !V4
+  add.call("vc-v3", "Gemfile.lock", "view_component #{LOCK['view_component']}; v4 changed helpers, config, and previews (references/upgrade.md)")
+elsif vc < Gem::Version.new("4.14")
+  add.call("vc-insecure", "Gemfile.lock", "view_component #{LOCK['view_component']}; 4.14 fixes CVE-2026-54497 (content leaking between renders)")
+end
+
+OLD_CONFIG = /config\.view_component\.(preview_paths|preview_route|show_previews|preview_controller|default_preview_layout|test_controller|view_component_path|component_parent_class|render_monkey_patch_enabled|use_global_output_buffer|capture_compatibility_patch_enabled|use_deprecated_instrumentation_name)\b/.freeze
+if V4
+  Dir.glob("config/**/*.rb").sort.each do |file|
+    code_lines(file).each do |line, n|
+      add.call("v3-config", "#{file}:#{n}", "config.view_component.#{line[OLD_CONFIG, 1]} is a v3 key; see references/upgrade.md") if line =~ OLD_CONFIG
+    end
+  end
+  Dir.glob("{app,test,spec,lib}/**/*.{rb,erb}").sort.each do |file|
+    code_lines(file).each do |line, n|
+      add.call("removed-api", "#{file}:#{n}", "#{line[/\b(use_helpers?|render_component)\b/, 1]} was removed in v4") if line =~ /\b(?:use_helpers?|render_component)\b/
+    end
+  end
+end
+
+application_component = base_files.find { |f| File.basename(f) == "application_component.rb" }
+if application_component.nil? && components.length >= 3
+  add.call("no-base-class", "app/components", "#{components.length} components and no ApplicationComponent to hold shared infrastructure")
+end
+
+GLOBAL_STATE = /\bhelpers\.(?:current_\w+|request|params|session|cookies)\b|(?<![\w.@:])(?:params|session|cookies)\[|(?<![\w.@:])request\.|\bCurrent\.\w+/.freeze
+QUERY = /\.(?:where|find_by!?|find_each|find_in_batches|pluck|includes|preload|eager_load|joins|order)\(|\.find\(|\.(?:where|includes|order)\s+[:\w]/.freeze
+IN_INITIALIZE = /\bhelpers\.|(?<![\w:@.])(?:controller|request)\.|(?<![\w.:])(?:t|translate)\(/.freeze
+
+Dir.glob("app/components/**/*.{rb,erb,haml,slim}").sort.each do |file|
+  ruby = file.end_with?(".rb")
+  source = read(file)
+  if ruby && application_component && file != application_component && source =~ /<\s*ViewComponent::Base\b/
+    add.call("direct-base", "#{file}:#{source[0...source.index(/<\s*ViewComponent::Base\b/)].count("\n") + 1}", "inherits ViewComponent::Base; inherit ApplicationComponent")
+  end
+  init_indent = nil
+  code_lines(file).each do |line, n|
+    where = "#{file}:#{n}"
+    if ruby
+      if init_indent.nil? && line =~ /\A(\s*)def initialize\b/
+        init_indent = Regexp.last_match(1)
+      elsif init_indent && line =~ /\A#{init_indent}end\b/
+        init_indent = nil
+      elsif init_indent && line =~ IN_INITIALIZE
+        add.call("helpers-in-initialize", where, "#{line[IN_INITIALIZE].sub(/[.(]\z/, '')} in initialize raises; use before_render or a method called while rendering")
+      end
+    end
+    add.call("global-state", where, "reads #{line[GLOBAL_STATE].sub(/[.\[]\z/, '')}; pass the value in as an argument") if line =~ GLOBAL_STATE
+    add.call("query", where, "database query in a component; preload in the caller and pass the records in") if line =~ QUERY
+    add.call("html-safe", where, "html_safe or raw; take caller markup through content or a slot") if line =~ /\.html_safe\b|(?<![\w.])raw\(/
+    add.call("random-id", where, "#{line[/SecureRandom|object_id/]}; derive ids from dom_id so they stay stable") if line =~ /\bSecureRandom\b|\bobject_id\b/
+  end
+end
+
+components.each do |file|
+  source = read(file)
+  next unless source =~ /<\s*TurboViewComponent\b|\bbroadcast_\w+_to\b/ && source =~ /^\s*def render\?/
+
+  n = source[0...source.index(/^\s*def render\?/)].count("\n") + 1
+  add.call("hidden-target", "#{file}:#{n}", "a broadcasting component with render?; when it renders nothing, later broadcasts have no target. Always render the root element")
+end
+
+components.each do |file|
+  templates_for(file).each do |template|
+    first = code_lines(template).find { |line, _| !line.strip.empty? }
+    next unless first && first[0] =~ /<%=\s*turbo_frame_tag\b/ && first[0] !~ /\bsrc:/
+
+    add.call("frame-wrapper", "#{template}:#{first[1]}", "wrapped in turbo_frame_tag with no src; if it is only a stream target, use a plain element with the id (a frame captures its links)")
+  end
+end
+
+LOST_BLOCK = /\brender\s+[A-Z][\w:]*\.(?:new|with_collection)\b(?:\([^()]*(?:\([^()]*\)[^()]*)*\))?\s*\{/.freeze
+LATER = /_later(?:_to)?\b[^\n]*(?:\n[^\n]*){0,3}?\brenderable:\s*[A-Z][\w:]*\.new\b/.freeze
+Dir.glob("app/**/*.{rb,erb}").sort.each do |file|
+  code_lines(file).each do |line, n|
+    add.call("lost-block", "#{file}:#{n}", "the { } block binds to .new, not render, so the content is lost; write render(Foo.new(...)) { ... }") if line =~ LOST_BLOCK
+  end
+  next unless file.end_with?(".rb")
+
+  source = read(file)
+  offset = 0
+  while (match = LATER.match(source, offset))
+    n = source[0...match.begin(0)].count("\n") + 1
+    add.call("later-renderable", "#{file}:#{n}", "a _later broadcast with renderable: #{match[0][/[A-Z][\w:]*\.new/]}; the job cannot serialize it. Include ViewComponent::Serializable and use .render_later")
+    offset = match.end(0)
+  end
+end
+
+sidecar_js = Dir.glob("app/components/**/*_controller.{js,ts}").sort
+if !sidecar_js.empty? && LOCK.key?("importmap-rails")
+  importmap = File.file?("config/importmap.rb") ? read("config/importmap.rb") : ""
+  unless importmap =~ %r{^\s*pin_all_from\s*\(?\s*["']app/components["']}
+    add.call("sidecar-js-unloaded", sidecar_js.first, "#{sidecar_js.length} Stimulus controllers in app/components, but config/importmap.rb never pins app/components, so they never register")
+  end
+end
+
+rack = version("rack")
+if rack && rack >= Gem::Version.new("3.1")
+  Dir.glob("app/{controllers,components}/**/*.rb").sort.each do |file|
+    code_lines(file).each do |line, n|
+      add.call("unprocessable-entity", "#{file}:#{n}", ":unprocessable_entity is deprecated on Rack #{LOCK['rack']}; use :unprocessable_content") if line =~ /:unprocessable_entity\b/
+    end
+  end
+end
+
+# -- report -------------------------------------------------------------------
+
+puts "ViewComponent audit: #{ROOT}"
+puts
+puts "Stack"
+puts "  view_component #{LOCK['view_component']}, Rails #{LOCK['rails'] || LOCK['railties'] || 'unknown'}, turbo-rails #{LOCK['turbo-rails'] || 'none'}, stimulus-rails #{LOCK['stimulus-rails'] || 'none'}"
+js = %w[importmap-rails jsbundling-rails vite_rails].select { |name| LOCK.key?(name) }
+puts "  JavaScript: #{js.empty? ? 'unknown' : js.join(', ')}"
+extras = %w[lookbook view_component-contrib dry-initializer].select { |name| LOCK.key?(name) }.map { |name| "#{name} #{LOCK[name]}" }
+puts "  Related gems: #{extras.empty? ? 'none' : extras.join(', ')}"
+puts
+puts "Components (#{components.length})"
+puts "  base classes: #{base_files.empty? ? 'none' : base_files.join(', ')}"
+namespaces.sort.each { |space, count| puts format("  %-24s %4d", space, count) }
+puts "  templates: #{styles.sort.map { |style, count| "#{count} #{style}" }.join(', ')}" unless styles.empty?
+puts "  Stimulus controllers beside components: #{sidecar_js.length}"
+[["Previews", no_preview], ["Tests", no_test]].each do |title, missing|
+  puts
+  puts "#{title} (#{missing.length} of #{components.length} components have no #{title.downcase.chomp('s')} file named after them)"
+  missing.first(15).each { |file| puts "  #{file}" }
+  puts "  ... #{missing.length - 15} more" if missing.length > 15
+end
+puts
+puts "Findings (#{findings.length})"
+findings.each { |rule, where, message| puts "  [#{rule}] #{where} - #{message}" }
+puts "  none" if findings.empty?
