@@ -1,0 +1,2 @@
+- User asked whether a design-system maintenance run in rihlo (session at repo top, app in studio/) replaces updating bin/audit_design and removing the workaround hooks by hand. The skill's survey assumed the session starts in the app, and gap-fill looked only at the app's .claude/settings.json while rihlo's workaround hooks are in the repo-top one.
+- Phase 1 step 0: find the app (the directory below with config/application.rb; ask if several) and run everything from there. Gap-fill removes audit_design entries from the app's and the repo top's settings.json.
