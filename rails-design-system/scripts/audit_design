@@ -39,7 +39,9 @@
 #                  "<label> :: <regular expression>", optionally followed by
 #                  " :: <path prefix> <path prefix>..." to limit the rule to one
 #                  section's files (# comments); they apply in every mode, and
-#                  "design-ok" exempts a line
+#                  "design-ok" exempts a line. A rule with path prefixes also
+#                  reaches files outside the view directories under them (such
+#                  as copy in app/controllers/); token checks never do
 
 require "json"
 
@@ -147,12 +149,28 @@ def added_lines(path, base)
   lines.reject { |_, text| text.include?("design-ok") }
 end
 
+# A file outside the view directories that a rule's own path prefixes name.
+def rule_only?(path)
+  return false if in_scope?(path) || exempt_path?(path) || !EXTENSIONS.include?(File.extname(path))
+
+  RULES.any? { |_, _, prefixes| prefixes.any? { |prefix| path.start_with?(prefix) } }
+end
+
+def checked?(path)
+  in_scope?(path) || rule_only?(path)
+end
+
+# Outside the view directories only rules with path prefixes apply.
+def rule_reaches?(prefixes, path)
+  rule_applies?(prefixes, path) && (in_scope?(path) || !prefixes.empty?)
+end
+
 def findings_for(path, base)
   token_check = vendor?(path) ? Regexp.union(HEX, ARB) : Regexp.union(HEX, ARB, PAL)
   lines = added_lines(path, base)
-  token_hits = lines.select { |_, text| text.match?(token_check) }.map { |number, text| "  #{path.b}:#{number}: #{text}" }
+  token_hits = in_scope?(path) ? lines.select { |_, text| text.match?(token_check) }.map { |number, text| "  #{path.b}:#{number}: #{text}" } : []
   rule_hits = RULES.flat_map do |label, pattern, prefixes|
-    next [] unless rule_applies?(prefixes, path)
+    next [] unless rule_reaches?(prefixes, path)
 
     lines.select { |_, text| text.match?(pattern) }.map { |number, text| "  #{path.b}:#{number}: #{text}   [rule: #{label.b}]" }
   end
@@ -165,7 +183,7 @@ def changed_paths(base)
 end
 
 def changed_findings(base)
-  changed_paths(base).select { |path| File.file?(path) && in_scope?(path) }.flat_map { |path| findings_for(path, base) }
+  changed_paths(base).select { |path| File.file?(path) && checked?(path) }.flat_map { |path| findings_for(path, base) }
 end
 
 def block(findings, status: 2, where: "the lines just written")
@@ -209,7 +227,7 @@ def hook_mode
   return if file.empty?
 
   path = repo_relative(file)
-  return unless path && File.file?(path) && in_scope?(path)
+  return unless path && File.file?(path) && checked?(path)
 
   findings = findings_for(path, "HEAD")
   block(findings) unless findings.empty?
@@ -222,7 +240,7 @@ def bash_mode
   command = input.is_a?(Hash) ? input.dig("tool_input", "command").to_s : ""
   return if command.empty?
 
-  paths = changed_paths("HEAD").select { |path| File.file?(path) && in_scope?(path) && command.include?(File.basename(path)) }
+  paths = changed_paths("HEAD").select { |path| File.file?(path) && checked?(path) && command.include?(File.basename(path)) }
   findings = paths.flat_map { |path| findings_for(path, "HEAD") }
   block(findings) unless findings.empty?
 end
@@ -247,9 +265,14 @@ def changed_mode(base_ref)
 end
 
 def scan_files
-  VIEW_DIRS.select { |dir| File.directory?(dir) }.flat_map do |dir|
+  views = VIEW_DIRS.select { |dir| File.directory?(dir) }.flat_map do |dir|
     Dir.glob("#{dir}/**/*").select { |path| File.file?(path) && EXTENSIONS.include?(File.extname(path)) }.sort
   end.reject { |path| exempt_path?(path) }
+  ruled = RULES.flat_map { |_, _, prefixes| prefixes }.uniq.flat_map do |prefix|
+    dir = prefix.end_with?("/") ? prefix : File.dirname(prefix)
+    File.directory?(dir) ? Dir.glob("#{dir.chomp('/')}/**/*").select { |path| File.file?(path) && rule_only?(path) } : []
+  end
+  (views + ruled).uniq.sort
 end
 
 def full_scan(strict:)
@@ -266,10 +289,10 @@ def full_scan(strict:)
     [path, lines.reject { |_, text| text.include?("design-ok") }]
   end.compact
 
-  everywhere = ->(_path) { true }
-  checks = [["raw hex colours", HEX, everywhere], ["arbitrary values", ARB, everywhere],
-            ["literal palette classes", PAL, ->(path) { !vendor?(path) }]]
-  checks += RULES.map { |label, pattern, prefixes| ["rule: #{label}", pattern, ->(path) { rule_applies?(prefixes, path) }] }
+  views = ->(path) { in_scope?(path) }
+  checks = [["raw hex colours", HEX, views], ["arbitrary values", ARB, views],
+            ["literal palette classes", PAL, ->(path) { in_scope?(path) && !vendor?(path) }]]
+  checks += RULES.map { |label, pattern, prefixes| ["rule: #{label}", pattern, ->(path) { rule_reaches?(prefixes, path) }] }
   total = 0
   checks.each do |label, pattern, applies|
     hits = files.flat_map do |path, lines|

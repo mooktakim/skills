@@ -193,6 +193,22 @@ class AuditDesignTest < Minitest::Test
     refute_includes out, "app/views/site/a.html.erb"
   end
 
+  def test_rules_with_paths_reach_copy_outside_the_views
+    write "docs/design-system/audit-rules", <<~RULES
+      money is formatted by the helper (conventions.md) :: AED \\#\\{ :: app/controllers/ app/views/
+      no exclamation marks (conventions.md) :: !"
+    RULES
+    write "app/controllers/orders_controller.rb", %(flash[:notice] = "AED \#{total}"\nredirect_to root_path, notice: "Saved!"\n# bg-red-600\n)
+    out = run_script("audit_design").out
+    assert_includes out, "app/controllers/orders_controller.rb:1:"
+    refute_includes out, "orders_controller.rb:2:", "a rule with no paths stays in the views"
+    refute_includes out, "orders_controller.rb:3:", "token checks stay in the views"
+    result = hook(path("app/controllers/orders_controller.rb"))
+    assert_equal 2, result.code
+    assert_includes result.err, "[rule: money is formatted by the helper (conventions.md)]"
+    assert_equal 0, hook(path("app/models/order.rb").tap { |file| write "app/models/order.rb", %(X = "AED \#{1}"\n) }).code
+  end
+
   def test_rules_with_non_ascii_patterns_work
     write "docs/design-system/audit-rules", "no pound sign (conventions.md) :: £\n"
     append "app/views/x/a.html.erb", "<p>£5</p>\n"

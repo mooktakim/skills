@@ -40,7 +40,7 @@ State which mode and scope you used.
 
 **5. Stale specs:** the change alters a documented pattern or component contract and the spec was not updated in the same change - its contract, axes, or "Realized as" section (slots, arguments, file paths) no longer match the code; a new reusable element with no spec. Spec drift that predates the change gets one line at the end, not a finding.
 
-Token violations (raw hex, palette classes, arbitrary values) belong to `bin/audit_design`. Run `bin/audit_design` once and mention its result in one line; do not repeat its findings.
+Token violations (raw hex, palette classes, arbitrary values) belong to `bin/audit_design`. Run it once and mention its result in one line; do not repeat its findings. For a change, run `bin/audit_design --changed <base>` with the caller's base branch or commit (`--changed HEAD` for uncommitted work only): it checks just the lines the change added, so an app's old drift does not bury the result. Run the full scan only for a section sweep.
 
 ## Screenshots (only when the caller asks)
 
@@ -60,4 +60,4 @@ Findings ranked by impact (a convention broken across many pages first), each wi
 
 Then **Promote to the audit**: for each finding a regular expression can catch reliably - a forbidden class, helper, or element, not a judgment about layout - propose a rule line for `docs/design-system/audit-rules` in the form `<label naming the spec rule> :: <regular expression>` (the audit is Ruby; ordinary `grep -E` patterns mean the same there). A rule that belongs to one section ends with ` :: <path prefixes>` (e.g. ` :: app/views/admin/ app/components/admin/`) so it never fires on other sections. Before proposing one, run it with `grep -rnE` over the section's views and components and report what it matches: the violations you found, and anything else it hits. A rule that also hits legitimate code is not ready - say so, or tighten it. Read the existing `audit-rules` file first and never propose a duplicate. Skip this section when nothing qualifies.
 
-Then: stale specs to update, the `bin/audit_design` result in one line, any "Not in the specs" questions, and a short close - scope reviewed, verdict (conforms / fix-first), and the top thing to fix. If nothing survived verification, say exactly that.
+Then: stale specs to update, the `bin/audit_design` result in one line, any "Not in the specs" questions, and a short close - scope reviewed, verdict (conforms / fix-first), and the top thing to fix. If nothing survived verification, the whole report is 3-5 lines: scope, verdict, the audit result, and any stale specs. Do not list what you checked.
