@@ -15,8 +15,9 @@ MIGRATION = %r{\A(.*?)/db/((?:\w+_)?migrate)/(\d+)_\w+\.rb\z}.freeze
 SCHEMA = %r{\A(.*?)/db/[^/]*(?:schema[^/]*\.rb|structure[^/]*\.sql)\z}.freeze
 CREDENTIALS = %r{\A(.*?)/config/(?:[^/]+/)*[^/]+\.enc\z}.freeze
 LOCKFILE = %r{\A(.*?)/(?:Gemfile\.lock|gems\.locked)\z}.freeze
-# A Bash token that names one of the protected kinds of file.
-PATH_TOKEN = %r{[^\s'"<>|;&]*(?:db/(?:\w+_)?migrate/\d+_\w+\.rb|db/[^/\s'"]*(?:schema[^/\s'"]*\.rb|structure[^/\s'"]*\.sql)|config/[^\s'"]*\.enc|Gemfile\.lock|gems\.locked)}.freeze
+# A Bash token that names one of the protected kinds of file. A migration may be
+# named by a glob (db/migrate/*_create_users.rb).
+PATH_TOKEN = %r{[^\s'"<>|;&]*(?:db/(?:\w+_)?migrate/[\d*][\w*]*\.rb|db/[^/\s'"]*(?:schema[^/\s'"]*\.rb|structure[^/\s'"]*\.sql)|config/[^\s'"]*\.enc|Gemfile\.lock|gems\.locked)}.freeze
 
 def rails_root?(dir)
   File.file?(File.join(dir, "bin", "rails"))
@@ -104,7 +105,7 @@ def writes_in_bash(command, cwd)
       segment.scan(/\btouch\s+(?:\S+\s+)*?(#{PATH_TOKEN})/o) { targets << $1 }
       last = segment.split.last
       targets << last if segment =~ /\b(?:cp|mv)\s/ && last =~ /\A#{PATH_TOKEN}\z/o
-      segment.scan(PATH_TOKEN) { |token| targets << token } if segment =~ /\b(?:sed|perl|ruby)\b.*\s-[a-zA-Z]*i/
+      segment.scan(PATH_TOKEN) { |token| targets << token } if segment =~ /\b(?:sed|perl|ruby)\b.*\s-[a-zA-Z0-9]*i/
     end
     line.scan(HEREDOC).each do |_quote, word|
       body = []
@@ -137,9 +138,17 @@ when "Write", "Edit", "MultiEdit"
     notes << note
   end
 when "Bash"
-  writes_in_bash(tool_input["command"].to_s, cwd).each do |path|
-    reason = refusal(path, project)
-    reasons << reason if reason
+  writes_in_bash(tool_input["command"].to_s, cwd).each do |target|
+    # A glob edits the files it matches; a migration that has already run gets
+    # the same note an Edit would.
+    paths = target.include?("*") ? Dir.glob(target) : [target]
+    paths.each do |path|
+      if (reason = refusal(path, project))
+        reasons << reason
+      elsif (note = applied_note(path))
+        notes << note
+      end
+    end
   end
 end
 

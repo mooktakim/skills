@@ -537,6 +537,12 @@ class HooksTest < Minitest::Test
 
   def test_guard_notes_an_edit_to_a_migration_that_has_already_run
     rails_app
+    ["perl -0pi -e 's/end/x/' db/migrate/*_add_name_to_users.rb", "sed -i '' 's/a/b/' db/migrate/20260930160000_add_name_to_users.rb"].each do |command|
+      shell = guard("Bash", "command" => command)
+      assert_nil shell["permissionDecision"], command
+      assert_includes shell["additionalContext"].to_s, "`bin/rails db:migrate:down VERSION=20260930160000`", command
+    end
+    assert_equal({}, guard("Bash", "command" => "cat db/migrate/*_add_name_to_users.rb"), "a read")
     decision = guard("Edit", "file_path" => path("db/migrate/20260930160000_add_name_to_users.rb"))
     assert_nil decision["permissionDecision"]
     assert_includes decision["additionalContext"], "`bin/rails db:migrate:down VERSION=20260930160000`"
