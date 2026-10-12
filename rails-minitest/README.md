@@ -14,7 +14,7 @@ Minitest only. RSpec apps are out of scope: the skill and the agent stop and say
   - `speed.md`, `coverage.md` (SimpleCov 1.x with parallel workers, branch and view coverage, change coverage), `flaky.md` (reproduce, then a table of causes and fixes).
 - **A suite mode** - set up, audit, speed up, or reorganise a whole suite: survey, plan, your approval, apply, verify (two seeds, time and coverage before and after).
 - **`scripts/audit_tests`** - a read-only survey the suite mode runs from the skill's directory (plain Ruby, standard library, Ruby 2.6+). It reports the stack, tests per kind, app files with no test file, suite-level gaps (no parallel runs, no network guard, coverage set up wrong, no fixture validity test), smells with file and line (`sleep`, unconditional `skip`, `ActionController::TestCase`, Minitest 6 breakages, login through the form), and the files that create the most records. Nothing is copied into the app.
-- **The `minitest-runner` agent** (`rails-minitest:minitest-runner`) - runs suites and returns a summary instead of a wall of output, writes tests for a finished change, and diagnoses failing, flaky, or slow tests. The skill is preloaded into it.
+- **The `minitest-runner` agent** (`rails-minitest:minitest-runner`) - writes tests for a finished change, diagnoses failing, flaky, or slow tests, and runs suites with a summary instead of a wall of output when `toolsmith-check-run` is not installed. The skill is preloaded into it.
 - **A `SessionStart` hook** - in Rails apps tested with Minitest only, it tells the main session to load the skill before test work and to delegate test runs to the agent.
 
 ## Where the standard comes from

@@ -1,6 +1,18 @@
 {
   "description": "rails-view-component: in Rails apps that use ViewComponent, state when to load the rails-view-component skill and when to delegate to the component-builder agent",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/first-touch.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "startup|clear|compact",

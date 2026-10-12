@@ -1,6 +1,18 @@
 {
   "description": "rails-hotwire: in Rails apps that use turbo-rails or stimulus-rails, state when to load the rails-hotwire skill and when to delegate to the hotwire-builder agent",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/first-touch.sh\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "startup|clear|compact",

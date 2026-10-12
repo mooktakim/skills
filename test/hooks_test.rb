@@ -425,7 +425,7 @@ class HooksTest < Minitest::Test
     context = JSON.parse(hook("rails-minitest", "session-context.sh").out).dig("hookSpecificOutput", "additionalContext")
     assert_includes context, "load the rails-minitest:rails-minitest skill"
     assert_includes context, "rails-minitest:minitest-runner"
-    assert_includes context, "more than one test file"
+    assert_includes context, "more than one test file, use toolsmith-check-run when it is on PATH"
     assert_includes context, "Run a single test file directly"
     assert_includes context, "Skip the run when only docs"
   end
@@ -470,6 +470,31 @@ class HooksTest < Minitest::Test
     write "web/config/application.rb", "module Web\n  class Application < Rails::Application\n  end\nend\n"
     write "web/test/test_helper.rb", "\n"
     assert_equal "SessionStart", JSON.parse(hook("rails-minitest", "session-context.sh").out).dig("hookSpecificOutput", "hookEventName")
+  end
+
+  # -- the first-touch notes ------------------------------------------------
+
+  FIRST_TOUCH = {
+    "rails-view-component" => ["Write", { "file_path" => "/app/app/components/card_component.rb" }],
+    "rails-hotwire" => ["Bash", { "command" => "cat > app/javascript/controllers/tabs_controller.js <<'JS'\nJS" }],
+    "rails-minitest" => ["Edit", { "file_path" => "/app/test/models/user_test.rb" }],
+    "rails-generators" => ["Bash", { "command" => "bin/rails generate migration AddSlugToPosts slug:string" }]
+  }.freeze
+
+  def test_first_touch_notes_once_per_session_and_never_in_subagents
+    FIRST_TOUCH.each do |plugin, (tool, tool_input)|
+      note = lambda do |session, extra = {}|
+        # Each plugin has its own data directory in Claude Code; here they share one.
+        out = hook(plugin, "first-touch.sh", stdin: JSON.generate({ "session_id" => "#{plugin}-#{session}", "tool_name" => tool, "tool_input" => tool_input }.merge(extra))).out
+        out.empty? ? nil : JSON.parse(out).dig("hookSpecificOutput", "additionalContext")
+      end
+      assert_includes note.call("s1").to_s, "#{plugin}:#{plugin}", plugin
+      assert_nil note.call("s1"), "#{plugin}: once per session"
+      refute_nil note.call("s2"), "#{plugin}: a new session"
+      assert_nil note.call("s3", "agent_id" => "a1"), "#{plugin}: not in a subagent"
+      other = hook(plugin, "first-touch.sh", stdin: JSON.generate("session_id" => "s4", "tool_name" => "Bash", "tool_input" => { "command" => "git status" }))
+      assert_equal ["", 0], [other.out, other.code], "#{plugin}: other work"
+    end
   end
 
   # -- rails-generators -------------------------------------------------------
