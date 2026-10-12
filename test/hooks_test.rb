@@ -497,6 +497,11 @@ class HooksTest < Minitest::Test
 
   def test_first_touch_notes_once_per_session_and_never_in_subagents
     FIRST_TOUCH.each do |plugin, (tool, tool_input)|
+      assert_equal "", hook(plugin, "first-touch.sh", stdin: JSON.generate("session_id" => "#{plugin}-none", "tool_name" => tool, "tool_input" => tool_input)).out,
+                   "#{plugin}: silent outside a Rails app"
+    end
+    write "web/config/application.rb", "class App < Rails::Application\nend\n"
+    FIRST_TOUCH.each do |plugin, (tool, tool_input)|
       note = lambda do |session, extra = {}|
         # Each plugin has its own data directory in Claude Code; here they share one.
         out = hook(plugin, "first-touch.sh", stdin: JSON.generate({ "session_id" => "#{plugin}-#{session}", "tool_name" => tool, "tool_input" => tool_input }.merge(extra))).out

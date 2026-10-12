@@ -1,0 +1,1 @@
+- The minitest first-touch note fired in the skills repo on `ruby -Itest test/repo_test.rb` (matches test/*_test.rb). The four first-touch hooks now need config/application.rb in the project dir or one level down, like the session notes. Test covers silence outside a Rails app. Patch bumps: view-component 0.3.1, hotwire 0.3.1, minitest 0.2.1, generators 0.2.2.
