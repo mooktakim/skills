@@ -1,6 +1,6 @@
 ---
 name: capture
-description: Record a rule the user states or a correction they make into the project's checked-in context, at the one place it belongs - a directory's CLAUDE.md, the root CLAUDE.md, a design-system file, or (with extra confirmation) the user's global CLAUDE.md - so it never has to be said again. Use when the user says "remember this", "from now on", "always", "never", "don't do X again", "I already told you", "update CLAUDE.md so you stop doing this", or asks to capture or record a rule. Also offer it, once, right after the user corrects how you work in a way that should hold beyond the current task. Not for one-off taste on a single screen, task instructions, or anything already recorded and followed.
+description: Record a rule the user states or a correction they make in the one checked-in place it belongs - a directory CLAUDE.md, the root CLAUDE.md, a design-system file, or the global CLAUDE.md - so it is never said again. Use when the user says remember this, from now on, always, never, or I already told you, or agrees to an offer to record a correction. Not for one-off taste or task instructions.
 ---
 
 # Capture

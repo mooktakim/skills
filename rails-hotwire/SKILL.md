@@ -1,6 +1,6 @@
 ---
 name: rails-hotwire
-description: Build interactive Rails UI with Hotwire - Turbo Drive, Turbo Frames, Turbo Streams, broadcasts over Action Cable, Turbo 8 page refreshes and morphing, and Stimulus - the way 37signals and the Turbo source intend. Covers choosing the lightest tool, form responses and status codes, prefetch and the page cache, frame ids and lazy loading, stream templates and custom actions, refresh vs targeted broadcasts, signed and authorised streams, keeping state through morphs, Stimulus controller design and cleanup, common UI patterns (dialogs, inline editing, search, infinite scroll, flash, autosave), accessibility of dynamic updates, testing, Hotwire Native readiness, and upgrading from rails-ujs, Turbolinks, or Turbo 7. Use when building or changing anything interactive in a Rails app that uses turbo-rails or stimulus-rails, when a Turbo navigation, frame, stream, broadcast, or form "does nothing" or behaves oddly, when writing a Stimulus controller, or when asked to audit or upgrade an app's Hotwire setup. ViewComponent-specific wiring lives in the rails-view-component skill.
+description: Build and fix interactive Rails UI with Hotwire - Turbo Drive, Frames, Streams, broadcasts, page refreshes and morphing, and Stimulus. Use before writing a Stimulus controller, a Turbo Frame or Stream, a broadcast, or a form response in a Rails app with turbo-rails or stimulus-rails; when Turbo navigation, a frame, a stream, or a form misbehaves; or to audit or upgrade from rails-ujs, Turbolinks, or Turbo 7.
 ---
 
 # Rails Hotwire

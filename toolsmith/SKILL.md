@@ -1,6 +1,6 @@
 ---
 name: toolsmith
-description: Find repeated Bash patterns in the user's Claude Code history and build small single-purpose Rust commands (toolsmith-*) that replace them - inline Python, Ruby or sed edit scripts, hand-built log entries, CI polling and the like - then measure whether the commands are used and help. Use when the user asks to scan their Claude history for tool ideas, to build or change a toolsmith command, or to check how the toolsmith commands are doing; also when the session-start note says a scan is due and the user agrees to one. Not for running an existing toolsmith command (run `<command> --llm` for its guide), and not for tools unrelated to how Claude works in the shell.
+description: Scan the user's Claude Code history for repeated Bash patterns, build or change the small single-purpose toolsmith-* commands that replace them, and measure their use. Use when asked to scan for tool ideas, to build or change a toolsmith command, or to check how the commands are doing. Not for running a command - run `<command> --llm` for its guide.
 ---
 
 # Toolsmith

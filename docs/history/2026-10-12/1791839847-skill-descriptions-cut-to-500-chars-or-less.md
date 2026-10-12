@@ -1,0 +1,4 @@
+- Field review 2026-10-12: rails-view-component and toolsmith were listed as bare names in sessions (also seen in this one). Per the Claude Code skills docs, the listing budget is 1% of the context window (`skillListingBudgetFraction`), and when over budget descriptions are dropped from the least-invoked skills first - so new skills lose their description and then never get invoked.
+- All 8 skill descriptions rewritten to 315-428 chars, trigger first ("Use before ..."). Patch bumps: hotwire 0.2.1, view-component 0.2.3, generators 0.1.2, capture 0.1.2, toolsmith 0.2.3, minitest 0.1.4, design-system 0.15.2, context 0.13.3.
+- `test/repo_test.rb` now fails a SKILL.md description over 500 chars; repo CLAUDE.md states the rule.
+- Not done (user config, not repo): raising `skillListingBudgetFraction` or setting unused skill packs to name-only in `skillOverrides`.

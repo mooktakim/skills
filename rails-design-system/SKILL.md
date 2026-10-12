@@ -1,6 +1,6 @@
 ---
 name: rails-design-system
-description: Set up and maintain a design-system context repository at docs/design-system/ in a Rails app using Tailwind CSS v4. Detects the app's UI sections (admin, marketing, app...), then generates per-section role-token definitions, component specs, and page-pattern specs, plus a bin/audit_design drift script, edit-time enforcement hooks, and a CI check. Re-runnable, an app already set up gets maintenance - drift review, gap-fill - through the same approval gate. Use when asked to set up a design system, codify styles or UI conventions, keep views visually consistent, spec a component library, standardise a UI rule across every page, or audit design drift.
+description: Set up and maintain a design-system context repository (docs/design-system/) in a Rails app using Tailwind CSS v4 - role tokens, component and page-pattern specs, a bin/audit_design drift check, edit-time hooks, and CI. Use when asked to set up a design system, codify UI conventions, keep views consistent, standardise a UI rule across pages, or audit design drift.
 ---
 
 # Rails Design System

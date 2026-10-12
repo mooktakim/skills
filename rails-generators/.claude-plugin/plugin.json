@@ -1,6 +1,6 @@
 {
   "name": "rails-generators",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Rails generators and commands instead of hand-written files: a skill for migrations (generating, field syntax, running, reversing, schema.rb conflicts, data changes, production safety), every other generator and installer, credentials, gems, and importmap pins, plus a hook that refuses hand-written migrations and hand edits to schema dumps, encrypted credentials, and Gemfile.lock",
   "author": { "name": "Mooktakim Ahmed", "email": "mooktakim@fluxter.co.uk" },
   "homepage": "https://github.com/mooktakim/skills",

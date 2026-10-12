@@ -58,6 +58,16 @@ class RepoTest < Minitest::Test
     end
   end
 
+  # When the skill listing is over budget, Claude Code drops descriptions from
+  # the least-used skills first, and a skill listed with no description is rarely
+  # invoked. Short descriptions keep the whole listing inside the budget.
+  def test_skill_descriptions_stay_short
+    Dir.glob(File.join(REPO, "*/SKILL.md")).each do |file|
+      size = YAML.safe_load(frontmatter(file))["description"].size
+      assert_operator size, :<=, 500, "#{file}: description is #{size} characters; keep it to 500 with the trigger first"
+    end
+  end
+
   def test_hooks_parse_and_point_at_scripts_that_exist
     Dir.glob(File.join(REPO, "*/hooks/hooks.json")).each do |file|
       plugin_root = File.dirname(File.dirname(file))

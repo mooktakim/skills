@@ -1,6 +1,6 @@
 ---
 name: rails-generators
-description: Use the Rails framework's own generators and commands instead of writing their files by hand - migrations above all (bin/rails generate migration and model, name patterns, field syntax, running, reversing, schema.rb and its merge conflicts, data changes, production-safe patterns), plus models, controllers, resources, jobs, mailers, channels, Stimulus controllers, components, installers, credentials, gems, importmap pins, and app:update. Use before creating or changing a migration or the database schema, before creating a model, controller, job, mailer, mailbox, channel, Stimulus controller, component, rake task, or one-off script in a Rails app, before changing credentials, gems, or JavaScript pins, when a migration fails, is out of order, or has a hand-picked timestamp, when schema.rb has a merge conflict, or when asked which Rails command does something.
+description: Run the Rails, Bundler, and gem commands that write files instead of writing those files by hand. Use before creating a migration or changing the schema; before creating a model, controller, job, mailer, channel, Stimulus controller, component, rake task, or script; before changing credentials, gems, or importmap pins; when a migration fails or schema.rb has a merge conflict; or when asked which Rails command does something.
 ---
 
 # Rails generators and commands

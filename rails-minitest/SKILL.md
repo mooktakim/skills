@@ -1,6 +1,6 @@
 ---
 name: rails-minitest
-description: Write, organise, speed up, and audit Minitest test suites in Rails apps. Covers every kind of test (models, concerns, integration, system, jobs, mailers, components), fixture design, shared test helpers, shortcuts that put users, roles, and records into a known state without running the app's flows, parallel runs, coverage, and flaky tests. Use when writing or changing tests in a Rails app that uses Minitest, when tests are slow, flaky, or full of duplicated setup, when designing fixtures or test helpers, when setting up coverage or parallel testing, or when asked to audit, speed up, or reorganise a Rails test suite. Not for RSpec suites.
+description: Write, organise, speed up, and audit Minitest suites in Rails apps - fixtures, test helpers, state shortcuts, system tests, parallel runs, coverage, and flaky tests. Use before writing or changing tests in a Rails app that uses Minitest, when tests are slow, flaky, or full of duplicated setup, or when asked to audit or reorganise a test suite. Not for RSpec.
 ---
 
 # Rails Minitest

@@ -1,6 +1,6 @@
 ---
 name: rails-view-component
-description: Organise, write, compose, and test ViewComponent components in Rails apps, and wire them into Hotwire. Covers when to make a component, the component API (keyword arguments, render?, slots, collections), the base class and namespaces, helpers and i18n, Turbo Stream responses, Turbo Frames, self-broadcasting components (TurboViewComponent with change filters and render_later), Turbo 8 morphing, Stimulus controllers beside components, forms with the app's own form builder, previews, testing, caching, and upgrading to ViewComponent v4. Use when creating or changing a component, its preview, or its test; when rendering or broadcasting components through Turbo; when wiring Stimulus to a component; when a form lives in a component; or when asked to audit, set up, upgrade, or reorganise a component library. Not for visual design - how components look belongs to the app's design system.
+description: Write, compose, and test ViewComponent components in Rails apps and wire them into Turbo and Stimulus. Use before creating or changing a component, its preview, or its test; when rendering or broadcasting components through Turbo; when a form lives in a component; or to audit, set up, upgrade, or reorganise a component library. Not for visual design - the app's design system owns how components look.
 ---
 
 # Rails ViewComponent
