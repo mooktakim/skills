@@ -29,7 +29,7 @@
       "id": "ci-wait",
       "title": "polling a pull request's CI checks",
       "rules": [
-        ["gh pr checks|gh run (watch|view|list)"]
+        ["\\A(?!(?:.|\\n)*--log)(?:.|\\n)*gh (pr checks|run (watch|view|list))"]
       ]
     },
     {
@@ -57,9 +57,7 @@
       "id": "json-edit",
       "title": "changing a value in a JSON file with a script",
       "rules": [
-        ["\\bjq\\b", ">\\s*\\S+\\.json|mv \\S+ \\S+\\.json"],
-        ["json\\.load", "json\\.dump\\("],
-        ["JSON\\.parse", "JSON\\.(pretty_)?generate", "File\\.write"]
+        ["\\bjq\\b", ">\\s*\\S+\\.json|mv \\S+ \\S+\\.json"]
       ]
     },
     {
@@ -73,14 +71,14 @@
       "id": "line-range-read",
       "title": "reading line ranges of files with sed -n",
       "rules": [
-        ["sed -n\\s+\\S*\\d+,\\d+p"]
+        ["sed -n\\s+'?\\d+,\\d+p'?\\s+[^\\s|;&<>]+(?:.|\\n)*sed -n\\s+'?\\d+,\\d+p'?\\s+[^\\s|;&<>]+"]
       ]
     },
     {
       "id": "test-output-trim",
       "title": "running tests or lint and cutting the output with tail, grep or head",
       "rules": [
-        ["(rails test|bin/ci|rspec|rubocop|audit_\\w+)[^|\\n]*\\|\\s*(tail|grep|head)"]
+        ["(?:^|[;&|(]\\s*)(?:bundle exec\\s+)?(?:bin/rails test|rails test|bin/ci|bin/rspec|rspec|bin/rubocop|rubocop|bin/audit_\\w+)\\b[^|\\n]*\\|\\s*(tail|grep|head)"]
       ]
     }
   ]

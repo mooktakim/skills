@@ -7,13 +7,16 @@
 #                      any tool whose name another command on PATH already has
 #   registry check     PreToolUse (Bash): read the hook event on stdin; when the
 #                      command matches a family a tool replaces, remind Claude of
-#                      the tool (mode "remind") or deny the command (mode "block")
+#                      the tool (mode "remind") or deny the command (mode "block").
+#                      A reminder shows once per session and tool, and never in a
+#                      subagent, which has no tool list to act on
 #
 # Reads crates/*/tool.json, families.json and metrics/weekly.json from the
 # plugin root ($TOOLSMITH_ROOT overrides it, for tests). Ruby 2.6+, standard
 # library only. Never fails a hook: any error exits 0 silently.
 
 require "json"
+require "fileutils"
 require "time"
 
 ROOT = ENV.fetch("TOOLSMITH_ROOT", File.expand_path("..", __dir__))
@@ -62,6 +65,24 @@ def clash(name)
   nil
 end
 
+# The tools not yet named in this session's reminders, read from a small state
+# file beside the usage log, which then records them. Files older than a week go.
+def first_reminders(session, names)
+  path = log_path or return names
+  return names if session.to_s.empty?
+
+  dir = File.join(File.dirname(path), "reminded")
+  FileUtils.mkdir_p(dir)
+  file = File.join(dir, session.gsub(/[^\w-]/, "_"))
+  shown = File.exist?(file) ? File.read(file).split("\n") : []
+  fresh = names - shown
+  File.write(file, (shown + fresh).join("\n") + "\n") unless fresh.empty?
+  Dir.glob(File.join(dir, "*")).each { |old| File.delete(old) if File.mtime(old) < Time.now - 7 * 86_400 } if shown.empty?
+  fresh
+rescue StandardError
+  names
+end
+
 def scan_note
   file = File.join(ROOT, "metrics/weekly.json")
   last = File.exist?(file) ? JSON.parse(File.read(file))["last_scan"] : nil
@@ -101,14 +122,22 @@ def check
   found = tools.select { |t| (family = all_families[t["family"]]) && matches?(family, command) }
   return if found.empty?
 
+  blocking = found.any? { |tool| tool["mode"] == "block" }
+  unless blocking
+    return unless event["agent_id"].to_s.empty?
+
+    fresh = first_reminders(event["session_id"], found.map { |tool| tool["name"] })
+    found = found.select { |tool| fresh.include?(tool["name"]) }
+    return if found.empty?
+  end
   found.each { |tool| log("event" => "nudge", "tool" => tool["name"], "mode" => tool["mode"], "cwd" => event["cwd"].to_s) }
   message = "toolsmith: " + found.map do |tool|
     "this command looks like #{all_families[tool['family']]['title']}; `#{tool['name']}` exists for that: #{tool['intent']}"
   end.join(" Also, ") + " Run `<command> --llm` for how to use one."
-  output = if found.any? { |tool| tool["mode"] == "block" }
+  output = if blocking
              { "permissionDecision" => "deny", "permissionDecisionReason" => "#{message} Use it instead of this command." }
            else
-             { "additionalContext" => "#{message} Use it next time unless it does not fit; if it does not fit, say why in one line." }
+             { "additionalContext" => "#{message} Use it next time unless it does not fit. This reminder shows once per session." }
            end
   puts JSON.generate("hookSpecificOutput" => { "hookEventName" => "PreToolUse" }.merge(output))
 end

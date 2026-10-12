@@ -329,8 +329,13 @@ class ToolsmithTest < Minitest::Test
     run_bash File.join(PLUGIN, "hooks", script), stdin: stdin, env: { "TOOLSMITH_LOG" => @log }.merge(env)
   end
 
-  def bash_event(command)
-    JSON.generate("tool_name" => "Bash", "tool_input" => { "command" => command }, "cwd" => @dir)
+  def bash_event(command, **fields)
+    JSON.generate({ "tool_name" => "Bash", "tool_input" => { "command" => command }, "cwd" => @dir }.merge(fields.transform_keys(&:to_s)))
+  end
+
+  def reminded(command, **fields)
+    out = hook("pre-bash.sh", stdin: bash_event(command, **fields)).out
+    out.empty? ? nil : JSON.parse(out).dig("hookSpecificOutput", "additionalContext")
   end
 
   def test_session_start_lists_every_tool_and_a_due_scan
@@ -378,11 +383,39 @@ class ToolsmithTest < Minitest::Test
   end
 
   def test_pre_bash_names_every_tool_a_command_matches
-    script = "python3 - <<'EOF'\nimport json\np='a.json'; d=json.load(open(p)); d['x']=1\ns=json.dumps(d).replace('a','b')\nopen(p,'w').write(s)\njson.dump(d, open(p,'w'))\nEOF"
+    script = "jq '.x = 1' a.json > t.json && mv t.json a.json && sed -i '' 's/a/b/' b.rb"
     context = JSON.parse(hook("pre-bash.sh", stdin: bash_event(script)).out).dig("hookSpecificOutput", "additionalContext")
     assert_includes context, "`toolsmith-json-set` exists for that"
     assert_includes context, "`toolsmith-text-replace` exists for that"
     assert_equal %w[toolsmith-json-set toolsmith-text-replace], log_events.map { |e| e["tool"] }
+  end
+
+  def test_pre_bash_reminds_once_per_session_and_never_in_a_subagent
+    sed = "sed -i '' 's/a/b/' x.rb"
+    assert_includes reminded(sed, session_id: "s1").to_s, "toolsmith-text-replace"
+    assert_nil reminded(sed, session_id: "s1"), "a second reminder in the same session"
+    assert_includes reminded("sed -n 1,5p a.rb; sed -n 9,12p b.rb", session_id: "s1").to_s, "toolsmith-file-lines", "another tool is still new"
+    assert_includes reminded(sed, session_id: "s2").to_s, "toolsmith-text-replace", "a new session"
+    assert_nil reminded(sed, session_id: "s3", agent_id: "a1", agent_type: "Explore"), "a subagent"
+    assert_includes reminded(sed, session_id: "s3").to_s, "toolsmith-text-replace", "the subagent did not use up the session's reminder"
+    refute_includes reminded(sed).to_s, "say why"
+    assert_equal 5, log_events.size, "only reminders shown are logged"
+  end
+
+  def test_pre_bash_patterns_skip_the_commands_that_misfired
+    {
+      "sed -n 40,60p a.rb; sed -n '98,110p' b.rb" => "toolsmith-file-lines",
+      "cd app && bin/rails test test/models | tail -5" => "toolsmith-check-run",
+      "bin/audit_design --strict 2>&1 | tail -3" => "toolsmith-check-run",
+      "gh pr checks 12 --watch" => "toolsmith-ci-wait"
+    }.each { |command, tool| assert_includes reminded(command, session_id: command).to_s, tool, command }
+    [
+      "sed -n 1,80p app/models/user.rb",
+      "git show HEAD:a.rb | sed -n 1,20p",
+      "grep -n 'def ' bin/audit_design | head",
+      "gh run view 123 --log | grep -i error",
+      "python3 - <<'EOF'\nimport json\nd=json.load(open('a.json')); d['x']=[1]\njson.dump(d, open('a.json','w'))\nEOF"
+    ].each { |command| assert_nil reminded(command, session_id: command), command }
   end
 
   def test_pre_bash_denies_in_block_mode
