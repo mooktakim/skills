@@ -456,6 +456,27 @@ class HooksTest < Minitest::Test
     ].each { |command| assert_nil refused("Bash", "command" => command), command }
   end
 
+  # Only the files a toolsmith spec names in its headers are written; heredoc
+  # content and the command's other parts are not.
+  def test_guard_reads_toolsmith_targets_from_spec_headers_only
+    rails_app
+    {
+      "toolsmith-files-write <<'EOF'\n=== db/migrate/20261009120000_create_posts.rb\nclass CreatePosts\nEOF" => "Do not write a migration file by hand",
+      "toolsmith-files-write --marker '###' <<'EOF'\n### config/master.yml.enc\nx\nEOF" => "`bin/rails credentials:edit`",
+      "cd . && toolsmith-text-replace <<EOF\n@@ app/a.rb\n-a\n+b\n@@ Gemfile.lock --all\n-a\n+b\nEOF" => "Bundler writes Gemfile.lock",
+      "grep -c x <<< EOF\necho $((1<<2))\necho x > db/schema.rb\nEOF" => "schema.rb is generated"
+    }.each do |command, message|
+      assert_includes refused("Bash", "command" => command).to_s, message, command
+    end
+    [
+      "grep -n ' view_component (' Gemfile.lock; toolsmith-text-replace <<'EOF'\n@@ app/a.rb\n-a\n+b\nEOF",
+      "toolsmith-text-replace <<'EOF'\n@@ app/a.rb\n-a\n+b\nEOF\nbin/rails db:migrate && git diff --stat db/schema.rb",
+      "toolsmith-text-replace <<'EOF'\n@@ config/environments/production.rb\n-a\n+# The master key unlocks config/credentials.yml.enc on the server\nEOF",
+      "toolsmith-files-write <<'EOF'\n=== docs/notes.md\nNever run `echo x > db/schema.rb` or edit Gemfile.lock.\nEOF",
+      "cat > docs/notes.md <<-EOF\n\techo x > db/schema.rb\n\tEOF\nls"
+    ].each { |command| assert_nil refused("Bash", "command" => command), command }
+  end
+
   def test_guard_finds_an_app_one_level_down_and_is_silent_outside_rails
     write "db/migrate/20261009120000_x.rb.keep", ""
     assert_equal({}, guard("Write", "file_path" => path("db/migrate/20261009120000_create_posts.rb")), "no bin/rails")

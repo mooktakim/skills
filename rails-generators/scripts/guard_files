@@ -72,12 +72,32 @@ def applied_note(path)
     "deployed, leave it and generate a new migration."
 end
 
-# The files a shell command writes: redirect, tee, touch, cp or mv targets, and
-# any protected path named by an in-place editor (sed -i, perl -i, ruby -i) or a
-# toolsmith edit, whose spec names its files on later lines.
+# A heredoc start (not a <<< here-string or an arithmetic shift).
+HEREDOC = /(?<!<)<<-?\s*(['"]?)([A-Za-z_]\w*)\1/.freeze
+
+# The files a toolsmith command writes: the paths its spec names on header lines
+# ('@@ <path>' for text-replace, '=== <path>' or the --marker for files-write).
+# The edit and file content between the headers is text, not paths.
+def toolsmith_targets(line, body)
+  if line =~ /\btoolsmith-text-replace\b/
+    body.scan(/^@@ (\S+)/).flatten
+  elsif line =~ /\btoolsmith-files-write\b/
+    marker = line[/--marker[=\s]+(['"]?)(\S+?)\1(?:\s|\z)/, 2] || "==="
+    body.scan(/^#{Regexp.escape(marker)} (.+)$/).flatten.map(&:strip)
+  else
+    []
+  end
+end
+
+# The files a shell command writes: redirect, tee, touch, cp or mv targets, any
+# protected path named by an in-place editor (sed -i, perl -i, ruby -i), and the
+# files a toolsmith spec names. Heredoc bodies are content, not commands, so
+# only toolsmith reads them.
 def writes_in_bash(command, cwd)
   targets = []
-  command.each_line do |line|
+  lines = command.lines
+  until lines.empty?
+    line = lines.shift
     line.split(/&&|\|\||;/).each do |segment|
       segment.scan(/>>?\|?\s*(#{PATH_TOKEN})/o) { targets << $1 }
       segment.scan(/\btee\s+(?:-a\s+)?(#{PATH_TOKEN})/o) { targets << $1 }
@@ -86,8 +106,13 @@ def writes_in_bash(command, cwd)
       targets << last if segment =~ /\b(?:cp|mv)\s/ && last =~ /\A#{PATH_TOKEN}\z/o
       segment.scan(PATH_TOKEN) { |token| targets << token } if segment =~ /\b(?:sed|perl|ruby)\b.*\s-[a-zA-Z]*i/
     end
+    line.scan(HEREDOC).each do |_quote, word|
+      body = []
+      body << lines.shift until lines.empty? || lines.first.strip == word
+      lines.shift
+      targets.concat(toolsmith_targets(line, body.join))
+    end
   end
-  command.scan(PATH_TOKEN) { |token| targets << token } if command =~ /\btoolsmith-(?:text-replace|files-write)\b/
   targets.map { |token| File.expand_path(token.delete("'\""), cwd) }.uniq
 end
 
