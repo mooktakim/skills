@@ -1,7 +1,7 @@
 {
   "name": "toolsmith-ci-wait",
   "intent": "Wait for the CI runs of one commit to finish, printing only what failed.",
-  "usage": "toolsmith-ci-wait [--pr N | --commit SHA] [--timeout MINUTES] [--interval SECONDS] [--lines N]",
+  "usage": "toolsmith-ci-wait [--pr N | --commit SHA | SHA] [--timeout MINUTES] [--interval SECONDS] [--lines N]",
   "use_when": [
     "You pushed and need the CI result before the next step (merge, release, reply).",
     "You would otherwise poll with `gh pr checks`, `gh run list`, `gh run watch` and sleep, or read failures with `gh run view --log-failed | grep`."
@@ -11,7 +11,7 @@
     "CI systems other than GitHub Actions.",
     "Reading a whole job log: use `gh run view <id> --log`."
   ],
-  "input": "No stdin. By default the commit is HEAD, which must be pushed; --commit names another commit (SHA or ref), --pr N uses the head commit of pull request N. Runs in the current repository's directory and talks to GitHub through `gh`, so `gh` must be installed and signed in.",
+  "input": "No stdin. By default the commit is HEAD, which must be pushed; --commit (or a bare argument) names another commit (SHA or ref), --pr N uses the head commit of pull request N. Runs in the current repository's directory and talks to GitHub through `gh`, so `gh` must be installed and signed in.",
   "options": [
     { "flag": "--pr", "text": "Wait for the head commit of this pull request number." },
     { "flag": "--commit", "text": "Wait for this commit (SHA or ref) instead of HEAD." },
@@ -33,7 +33,7 @@
       "fake_commands": {
         "gh": "#!/usr/bin/env bash\ncase \"$1 $2\" in\n  \"run list\") echo '[{\"databaseId\":101,\"name\":\"Test\",\"status\":\"completed\",\"conclusion\":\"success\"},{\"databaseId\":102,\"name\":\"Lint\",\"status\":\"completed\",\"conclusion\":\"success\"}]' ;;\n  *) echo \"fake gh: unexpected $*\" >&2; exit 1 ;;\nesac\n"
       },
-      "args": ["--commit", "7e6179afbfc8bc1004c484dc7320c10c4f929886"],
+      "args": ["7e6179afbfc8bc1004c484dc7320c10c4f929886"],
       "exit": 0,
       "stdout": "CI for 7e6179a: 2 runs, all passed.\n  success   Test\n  success   Lint\n"
     },

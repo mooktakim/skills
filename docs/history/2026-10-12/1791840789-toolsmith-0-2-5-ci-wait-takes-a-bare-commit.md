@@ -1,0 +1,2 @@
+- Field review: `toolsmith-ci-wait $(git rev-parse HEAD)` failed with "unknown argument" 11 times in 6 sessions (even right after reading --llm). A bare argument is now the commit (same as --commit); usage and the first guide example show it.
+- Looked at and left: text-replace output (already shortens sides over 6 lines; hidden with tail in 35 of 956 uses), pr-land's method error (documented; the model recovered all 4 times), file-lines comma ranges (1 occurrence).

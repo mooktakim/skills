@@ -124,6 +124,12 @@ fn parse_options(tool: &Tool, args: &[String]) -> Options {
             "--timeout" => options.timeout_minutes = number(tool, "--timeout", value),
             "--interval" => options.interval_seconds = number(tool, "--interval", value),
             "--lines" => options.lines = number(tool, "--lines", value) as usize,
+            // A bare argument is the commit: `toolsmith-ci-wait $(git rev-parse HEAD)`.
+            other if !other.starts_with('-') && options.commit.is_none() => {
+                options.commit = Some(other.to_string());
+                i += 1;
+                continue;
+            }
             other => tool.usage_error(&format!("unknown argument {}", other)),
         }
         i += 2;
