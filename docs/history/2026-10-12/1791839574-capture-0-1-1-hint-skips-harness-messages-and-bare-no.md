@@ -1,0 +1,3 @@
+- Field review 2026-10-12: the correction hint fired 352 times since 2026-10-01, 319 on `<task-notification>` prompts (their boilerplate says "fires each time"). It now skips prompts that start with harness tags (task-notification, local-command-*, bash-*, system-reminder) as well as slash commands.
+- Bare "no"/"nope" no longer count (13 false hits: "no thats fine"); they count only before a rule word ("no, never push..."). "don't ... yet" is a task hold, not a rule.
+- Replayed all 357 past firings: 20 still fire, all human prompts, including the 4 real rules (query params on redirect, dev-server port, branch commit+PR, save info).

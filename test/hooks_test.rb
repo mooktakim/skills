@@ -278,7 +278,8 @@ class HooksTest < Minitest::Test
     "why did you change the header again?",
     "you keep adding a dot to the status badge",
     "update CLAUDE.md so you stop doing this",
-    "stop using inline styles"
+    "stop using inline styles",
+    "no, never push without asking"
   ].freeze
 
   NOT_CORRECTIONS = [
@@ -287,7 +288,13 @@ class HooksTest < Minitest::Test
     "what does this method do?",
     "/rails-context:rails-context",
     "<command-name>/capture:capture</command-name>",
-    "nothing else, thanks"
+    "<task-notification>\n<task-id>a8</task-id>\n<status>completed</status>\n<note>A task-notification fires each time this agent stops.</note>\n</task-notification>",
+    "<local-command-stdout>you keep adding</local-command-stdout>",
+    "nothing else, thanks",
+    "no thats fine",
+    "nope, leave it",
+    "dont deploy yet",
+    "don't merge it yet, I want to check"
   ].freeze
 
   def test_correction_hint_fires_on_corrections_and_rules
