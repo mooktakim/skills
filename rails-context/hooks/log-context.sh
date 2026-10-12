@@ -3,7 +3,9 @@
 # scripts/context_report can measure whether a directory's CLAUDE.md reaches
 # Claude in the sessions that change code there. Local only: one JSONL file in
 # the repo's git directory (shared by worktrees, never committed). Silent, never
-# blocks, and only active in projects set up with rails-context (bin/audit_context).
+# blocks, and only active in projects set up with rails-context (bin/audit_context
+# in the project directory or in an app directly below it). Paths are logged
+# relative to the top of the git repository, so apps in one repository never mix.
 # Modes (one per hook event):
 #   start  SessionStart                 the HEAD the session started from
 #   compact SessionStart (compact)      context compacted: earlier loads are gone
@@ -12,7 +14,11 @@
 #   stop   Stop                         files changed since the session started,
 #                                       by any tool - Bash edits included
 root=${CLAUDE_PROJECT_DIR:-}
-[ -n "$root" ] && [ -x "$root/bin/audit_context" ] || exit 0
+[ -n "$root" ] || exit 0
+. "$(dirname "$0")/app-roots.sh"
+[ -n "$(app_roots "$root")" ] || exit 0
+top=$(git -C "$root" rev-parse --show-toplevel 2>/dev/null) || exit 0
+prefix=$(git -C "$root" rev-parse --show-prefix 2>/dev/null)
 gitdir=$(git -C "$root" rev-parse --git-common-dir 2>/dev/null) || exit 0
 case "$gitdir" in /*) ;; *) gitdir="$root/$gitdir" ;; esac
 log="$gitdir/claude-context-log.jsonl"
@@ -23,12 +29,16 @@ field() { # field <name>: the first string value of "name" in the hook input
     | sed 's/^"[^"]*"[[:space:]]*:[[:space:]]*"//; s/"$//'
 }
 esc() { printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'; }
-rel() { local p=${1#"$root"/}; esc "$p"; }
+rel() { # a path relative to the top of the repository
+  local p=$1
+  case "$p" in "$top"/*) p=${p#"$top"/} ;; "$root"/*) p="$prefix${p#"$root"/}" ;; esac
+  esc "$p"
+}
 emit() { printf '{"t":"%s","s":"%s",%s}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(esc "$(field session_id)")" "$1" >> "$log"; }
 
 case "${1:-}" in
   start)
-    emit "\"e\":\"start\",\"head\":\"$(git -C "$root" rev-parse -q --verify HEAD 2>/dev/null)\""
+    emit "\"e\":\"start\",\"head\":\"$(git -C "$top" rev-parse -q --verify HEAD 2>/dev/null)\""
     ;;
   compact)
     emit "\"e\":\"compact\""
@@ -47,7 +57,7 @@ case "${1:-}" in
     sid=$(esc "$(field session_id)")
     head=$(grep -F "\"s\":\"$sid\",\"e\":\"start\"" "$log" 2>/dev/null | tail -1 | sed -n 's/.*"head":"\([0-9a-f]*\)".*/\1/p')
     [ -n "$head" ] || head=HEAD
-    files=$( { git -C "$root" diff --name-only "$head" 2>/dev/null; git -C "$root" ls-files --others --exclude-standard 2>/dev/null; } \
+    files=$( { git -C "$top" diff --name-only "$head" 2>/dev/null; git -C "$top" ls-files --others --exclude-standard 2>/dev/null; } \
       | sort -u | while IFS= read -r f; do printf '"%s",' "$(esc "$f")"; done)
     [ -n "$files" ] || exit 0
     list="[${files%,}]"

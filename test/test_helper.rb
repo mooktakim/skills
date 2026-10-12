@@ -69,11 +69,12 @@ module ScriptTestHelper
     git "commit", "-q", "--allow-empty", "-m", message
   end
 
-  # Copies a plugin script into the repo's bin/, as the skills' Phase 3 does.
-  def install(plugin, script)
-    FileUtils.mkdir_p(path("bin"))
-    FileUtils.cp(File.join(REPO, plugin, "scripts", script), path("bin/#{script}"))
-    FileUtils.chmod(0o755, path("bin/#{script}"))
+  # Copies a plugin script into the app's bin/, as the skills' Phase 3 does. The
+  # app is the repo itself, or a directory inside it ("web/").
+  def install(plugin, script, app = "")
+    FileUtils.mkdir_p(path("#{app}bin"))
+    FileUtils.cp(File.join(REPO, plugin, "scripts", script), path("#{app}bin/#{script}"))
+    FileUtils.chmod(0o755, path("#{app}bin/#{script}"))
   end
 
   def run_script(script, *args, stdin: "", cwd: @dir, env: {})

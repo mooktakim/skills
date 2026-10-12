@@ -253,6 +253,48 @@ class HooksTest < Minitest::Test
                "a missing file without a slash is just a word"
   end
 
+  # A Rails app inside a larger repository (rihlo/studio, runner/hub), with the
+  # session opened at the repository top.
+  def test_context_hooks_report_and_audit_work_for_an_app_below_the_project
+    write "CLAUDE.md", "# repo\n"
+    install "rails-context", "audit_context", "web/"
+    write "web/CLAUDE.md", "# web root\n"
+    write "web/app/models/CLAUDE.md", "# models\n"
+    File.symlink("CLAUDE.md", path("web/app/models/AGENTS.md"))
+    write "web/app/models/user.rb", "class User; end\n"
+    commit "init"
+
+    log_event("start", "s1")
+    context = injected(tool_call("Bash", { "command" => "sed -i '' 's/User/Person/' web/app/models/user.rb" }))
+    assert_includes context, "Contents of #{@dir}/web/CLAUDE.md:\n\n# web root", "an app's root file does not load at session start"
+    assert_includes context, "Contents of #{@dir}/web/app/models/CLAUDE.md:\n\n# models"
+    refute_includes context, "# repo"
+    append "web/app/models/user.rb", "# edit\n" # a tracked file, changed
+    log_event("stop", "s1")
+    log = File.read(path(".git/claude-context-log.jsonl"))
+    assert_includes log, %("e":"inject","f":"web/app/models/CLAUDE.md")
+    assert_includes log, %("e":"changed","files":["web/app/models/user.rb"])
+
+    # A session opened inside the app logs the same repository-relative paths.
+    hook("rails-context", "log-context.sh", "load", stdin: JSON.generate("session_id" => "s2", "file_path" => path("web/app/models/CLAUDE.md")),
+                                                    env: { "CLAUDE_PROJECT_DIR" => path("web") })
+    assert_includes File.read(path(".git/claude-context-log.jsonl")), %("s":"s2","e":"load","f":"web/app/models/CLAUDE.md")
+
+    out, = Open3.capture3(ruby_bin, File.join(REPO, "rails-context/scripts/context_report"), chdir: path("web/app"))
+    assert_includes out, "Context reach in web/ - 2 session(s)"
+    assert_match(%r{^app/models/CLAUDE.md\s+1\s+2\s+0\s}, out)
+
+    commit "work"
+    audit, = Open3.capture3(ruby_bin, path("web/bin/audit_context"), chdir: @dir)
+    assert_includes audit, "== app/models/CLAUDE.md"
+    assert_includes audit, "     - app/models/user.rb"
+    refute_includes audit, "web/app/models/user.rb"
+
+    6.times { |i| write "web/app/helpers/h#{i}.rb", "module H#{i}; end\n" }
+    commit "helpers"
+    assert_includes system_message(hook("rails-context", "maintenance-nudge.sh")), "web/: 1 director(ies) may need a context file"
+  end
+
   def test_context_report_counts_hook_hand_overs_as_reach
     context_app
     log_event("start", "s1")

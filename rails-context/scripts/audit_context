@@ -27,6 +27,14 @@ def git(*args)
   IO.popen(["git", *args], err: File::NULL, &:read)
 end
 
+# git diff and git status --porcelain print paths from the repository top; this
+# app may sit below it (a Rails app inside a larger repository).
+PREFIX = git("rev-parse", "--show-prefix").strip
+
+def local(path)
+  path && path.start_with?(PREFIX) ? path[PREFIX.length..-1] : path
+end
+
 def size_note(path, max_lines, max_bytes)
   content = File.binread(path)
   lines = content.count("\n")
@@ -54,14 +62,14 @@ def changes_since(commit, dir)
   until committed.empty?
     status = committed.shift
     paths = status.start_with?("R", "C") ? committed.shift(2) : committed.shift(1)
-    changes << [status[0], paths.last]
+    changes << [status[0], local(paths.last)]
   end
   working = git("status", "--porcelain", "-z", "--", dir).split("\0")
   until working.empty?
     entry = working.shift
     status = entry[0, 2].delete(" ")[0]
     working.shift if entry[0] == "R" || entry[0] == "C" # the original path follows
-    changes << [status, entry[3..-1]]
+    changes << [status, local(entry[3..-1])]
   end
   changes.reject { |_, path| path.nil? || path.empty? || context_file?(path) }
 end

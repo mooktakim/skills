@@ -4,7 +4,9 @@
 # Report whether context files reach Claude where it works, from the local log
 # that the rails-context plugin's hooks write (.git/claude-context-log.jsonl).
 # Plain Ruby, standard library only (Ruby 2.6+). Run it from anywhere inside the
-# project: context_report [--days N] (default: the last 30 days).
+# app: context_report [--days N] (default: the last 30 days). The app is the
+# nearest directory up from here with bin/audit_context (a Rails app may sit
+# inside a larger repository), else the top of the repository.
 #
 # For each directory context file it shows:
 #   Worked   sessions that changed code the file owns (by any tool, Bash included)
@@ -24,11 +26,16 @@ if (index = ARGV.index("--days"))
   days = Integer(ARGV[index + 1]) rescue abort("usage: context_report [--days N]")
 end
 
-root = IO.popen(%w[git rev-parse --show-toplevel], err: File::NULL, &:read).strip
-abort "Run this inside the project's git repository." if root.empty?
-Dir.chdir(root)
-git_dir = IO.popen(%w[git rev-parse --git-common-dir], err: File::NULL, &:read).strip
+top = IO.popen(%w[git rev-parse --show-toplevel], err: File::NULL, &:read).strip
+abort "Run this inside the project's git repository." if top.empty?
+git_dir = File.expand_path(IO.popen(%w[git rev-parse --git-common-dir], err: File::NULL, &:read).strip)
 log = File.expand_path("claude-context-log.jsonl", git_dir)
+app = File.realpath(Dir.pwd)
+app = File.dirname(app) until File.executable?(File.join(app, "bin/audit_context")) || app == top || app == "/"
+app = top unless File.executable?(File.join(app, "bin/audit_context"))
+Dir.chdir(app)
+# Logged paths are relative to the repository top; this app's paths start with prefix.
+PREFIX = app == top ? "" : "#{app[(top.length + 1)..-1]}/"
 
 unless File.file?(log)
   puts "No context log yet (#{log})."
@@ -41,8 +48,14 @@ events = File.foreach(log).map { |line| JSON.parse(line) rescue nil }.compact
 events.select! { |event| (Time.parse(event["t"].to_s) rescue Time.at(0)) >= since }
 
 # The directory context file a logged path stands for (AGENTS.md is its symlink).
+def local(path)
+  path = path.to_s
+  path.start_with?(PREFIX) ? path[PREFIX.length..-1] : nil
+end
+
 def context_for(path)
-  path = path.to_s.sub(%r{(\A|/)AGENTS\.md\z}, '\1CLAUDE.md')
+  path = local(path) or return
+  path = path.sub(%r{(\A|/)AGENTS\.md\z}, '\1CLAUDE.md')
   path.end_with?("CLAUDE.md") ? path : nil
 end
 
@@ -68,7 +81,7 @@ events.each do |event|
   when "inject"
     (file = context_for(event["f"])) && session[:reached][file] << "hook"
   when "changed"
-    session[:changed] |= Array(event["files"])
+    session[:changed] |= Array(event["files"]).map { |file| local(file) }.compact
   end
 end
 sessions.reject! { |_, session| session[:reached].empty? && session[:changed].empty? }
@@ -79,7 +92,8 @@ if sessions.empty?
 end
 
 times = sessions.values.flat_map { |session| session[:times] }.sort
-puts "Context reach - #{sessions.size} session(s), #{times.first[0, 10]} to #{times.last[0, 10]} (last #{days} days)"
+app_note = PREFIX.empty? ? "" : " in #{PREFIX}"
+puts "Context reach#{app_note} - #{sessions.size} session(s), #{times.first[0, 10]} to #{times.last[0, 10]} (last #{days} days)"
 puts ""
 
 rows = contexts.map do |context|

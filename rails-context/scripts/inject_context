@@ -6,8 +6,11 @@
 # CLAUDE.md only when the Read tool reads a file there; shell reads and edits,
 # Grep, and a new file written into a directory nothing was read from bypass it.
 # This closes that gap: it finds the paths the call touched, walks each one up to
-# the project root, and returns every CLAUDE.md on the way (root excluded - it
-# loads at session start) that has not reached Claude in this session yet.
+# its app's root, and returns every CLAUDE.md on the way that has not reached
+# Claude in this session yet. The app is the project directory, or an app
+# directly below it (a Rails app inside a larger repository); the project's own
+# root CLAUDE.md loads at session start, but a lower app's root CLAUDE.md does not,
+# so that one is handed over too. Logged paths are relative to the repository top.
 #
 # Run by hooks/inject-context.sh with the hook input on stdin. Plain Ruby,
 # standard library only (Ruby 2.6+). What reached Claude comes from the local log
@@ -19,7 +22,15 @@ require "json"
 
 ROOTS = %w[app lib test spec].freeze # the directories rails-context writes context files in
 
-root = File.realpath(ENV.fetch("CLAUDE_PROJECT_DIR", "")) rescue exit(0)
+project = File.realpath(ENV.fetch("CLAUDE_PROJECT_DIR", "")) rescue exit(0)
+apps = if File.executable?(File.join(project, "bin/audit_context"))
+         [project]
+       else
+         Dir.glob(File.join(project, "*/bin/audit_context")).select { |file| File.executable?(file) }.map { |file| File.dirname(File.dirname(file)) }
+       end
+exit 0 if apps.empty?
+top = IO.popen(["git", "-C", project, "rev-parse", "--show-toplevel"], err: File::NULL, &:read).strip
+exit 0 if top.empty?
 input = JSON.parse($stdin.read) rescue exit(0)
 tool = input["tool_name"].to_s
 tool_input = input["tool_input"].is_a?(Hash) ? input["tool_input"] : {}
@@ -43,32 +54,36 @@ paths = candidates.compact.map(&:to_s).reject(&:empty?).map do |word|
   next full if word.include?("/") && File.directory?(File.dirname(full))
 end.compact
 
-relative = lambda do |full|
-  full.start_with?("#{root}/") ? full[(root.length + 1)..-1] : nil
+from_top = lambda do |full|
+  full.start_with?("#{top}/") ? full[(top.length + 1)..-1] : nil
 end
 
-# Context files read through the shell (cat app/models/CLAUDE.md) reached Claude already.
-read, touched = paths.map(&relative).compact.partition { |rel| rel =~ %r{(\A|/)(CLAUDE|AGENTS)\.md\z} }
-read.map! { |rel| rel.sub(/AGENTS\.md\z/, "CLAUDE.md") }
-
+read = []   # context files read through the shell (cat app/models/CLAUDE.md) reached Claude already
 wanted = []
-touched.each do |rel|
+paths.each do |full|
+  app = apps.find { |dir| full.start_with?("#{dir}/") } or next
+  rel = full[(app.length + 1)..-1]
+  if rel =~ %r{(\A|/)(CLAUDE|AGENTS)\.md\z}
+    read << from_top.call(File.join(app, rel.sub(/AGENTS\.md\z/, "CLAUDE.md")))
+    next
+  end
   next unless ROOTS.include?(rel.split("/").first)
 
-  dir = File.directory?(File.join(root, rel)) ? rel : File.dirname(rel)
+  dir = File.directory?(full) ? rel : File.dirname(rel)
   chain = []
   until dir == "." || dir.empty?
-    file = "#{dir}/CLAUDE.md"
-    chain.unshift(file) if File.file?(File.join(root, file))
+    chain.unshift(File.join(app, dir, "CLAUDE.md")) if File.file?(File.join(app, dir, "CLAUDE.md"))
     dir = File.dirname(dir)
   end
-  wanted |= chain
+  chain.unshift(File.join(app, "CLAUDE.md")) if app != project && File.file?(File.join(app, "CLAUDE.md"))
+  wanted |= chain.map(&from_top).compact
 end
+read.compact!
 exit 0 if wanted.empty? && read.empty?
 
-git_dir = IO.popen(["git", "-C", root, "rev-parse", "--git-common-dir"], err: File::NULL, &:read).strip
+git_dir = IO.popen(["git", "-C", project, "rev-parse", "--git-common-dir"], err: File::NULL, &:read).strip
 exit 0 if git_dir.empty?
-log = File.expand_path("claude-context-log.jsonl", File.expand_path(git_dir, root))
+log = File.expand_path("claude-context-log.jsonl", File.expand_path(git_dir, project))
 
 # What reached Claude since this session started or last compacted.
 reached = []
@@ -93,7 +108,7 @@ File.open(log, "a") do |out|
 end
 exit 0 if wanted.empty?
 
-context = wanted.map { |file| "Contents of #{root}/#{file}:\n\n#{File.read(File.join(root, file)).strip}" }
+context = wanted.map { |file| "Contents of #{top}/#{file}:\n\n#{File.read(File.join(top, file)).strip}" }
 puts JSON.generate(
   "hookSpecificOutput" => {
     "hookEventName" => "PostToolUse",
