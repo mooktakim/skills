@@ -4,9 +4,9 @@
 # Report design drift: colours and utilities that bypass the design-system tokens,
 # plus the project rules in docs/design-system/audit-rules (see below).
 # Plain Ruby, standard library only (Ruby 2.6+): no Bundler, works in any app.
-# Works from any directory: paths resolve from the repo root - the script's parent
+# Works from any directory: paths resolve from the app root - the script's parent
 # directory, or $AUDIT_ROOT when set (the rails-design-system plugin runs its own
-# copy against the project this way).
+# copy against the project this way). The app may sit inside a larger repository.
 # Findings are drift signals to review, not proof of defects.
 # Mark a deliberate exception by putting "design-ok" on the same line.
 # Mailer templates are exempt: email clients require inline styles.
@@ -21,11 +21,14 @@
 #   bin/audit_design --hook             Claude Code PostToolUse hook (Write|Edit):
 #                                       reads the tool-call JSON from stdin and
 #                                       checks the edited file
+#   bin/audit_design --bash             Claude Code PostToolUse hook (Bash): checks
+#                                       the changed view files the command names
+#                                       (most edits run through the shell)
 #   bin/audit_design --stop             Claude Code Stop/SubagentStop hook: checks
 #                                       every view file changed in the working tree,
 #                                       which catches edits made through Bash,
 #                                       generators, or subagents
-# Both hook modes check only lines added since HEAD (the whole file if untracked),
+# The hook modes check only lines added since HEAD (the whole file if untracked),
 # so old drift elsewhere in a file never blocks an unrelated edit. They exit 2
 # with findings on stderr so the agent fixes them before moving on.
 #
@@ -128,7 +131,7 @@ end
 # new there), without lines marked design-ok.
 def added_lines(path, base)
   lines =
-    if git_ok?("rev-parse", "-q", "--verify", base) && git_ok?("cat-file", "-e", "#{base}:#{path}")
+    if git_ok?("rev-parse", "-q", "--verify", base) && git_ok?("cat-file", "-e", "#{base}:./#{path}")
       number = 0
       text_lines(git("diff", "-U0", base, "--", path)).each_with_object([]) do |line, added|
         if (hunk = line.match(/\A@@ -\S+ \+(\d+)/))
@@ -157,7 +160,8 @@ def findings_for(path, base)
 end
 
 def changed_paths(base)
-  (git("diff", "--name-only", base).split("\n") + git("ls-files", "--others", "--exclude-standard").split("\n")).uniq.sort
+  # --relative: paths from the app root, which may sit below the repository top.
+  (git("diff", "--name-only", "--relative", base).split("\n") + git("ls-files", "--others", "--exclude-standard").split("\n")).uniq.sort
 end
 
 def changed_findings(base)
@@ -166,7 +170,9 @@ end
 
 def block(findings, status: 2, where: "the lines just written")
   message = ["Design-system drift in #{where}:", *findings]
-  message << "Untagged lines break the token rule (no raw hex, no literal palette classes, no arbitrary [...] values): use the section's role tokens (see docs/design-system/)."
+  if findings.any? { |line| !line.include?("[rule: ") }
+    message << "Untagged lines break the token rule (no raw hex, no literal palette classes, no arbitrary [...] values): use the section's role tokens (see docs/design-system/)."
+  end
   if findings.any? { |line| line.include?("[rule: ") }
     message << "Lines tagged [rule: ...] break a project rule in docs/design-system/audit-rules: follow the spec it names."
   end
@@ -206,6 +212,18 @@ def hook_mode
   return unless path && File.file?(path) && in_scope?(path)
 
   findings = findings_for(path, "HEAD")
+  block(findings) unless findings.empty?
+end
+
+# After a shell command: the changed view files it names, by path or file name
+# (cd app/views/posts && sed -i ... show.html.erb), checked like an edit.
+def bash_mode
+  input = read_json_stdin
+  command = input.is_a?(Hash) ? input.dig("tool_input", "command").to_s : ""
+  return if command.empty?
+
+  paths = changed_paths("HEAD").select { |path| File.file?(path) && in_scope?(path) && command.include?(File.basename(path)) }
+  findings = paths.flat_map { |path| findings_for(path, "HEAD") }
   block(findings) unless findings.empty?
 end
 
@@ -274,6 +292,7 @@ end
 
 case ARGV[0]
 when "--hook" then hook_mode
+when "--bash" then bash_mode
 when "--stop" then stop_mode
 when "--changed" then changed_mode(ARGV[1])
 else full_scan(strict: ARGV[0] == "--strict")

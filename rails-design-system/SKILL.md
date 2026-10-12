@@ -127,15 +127,16 @@ chmod +x bin/audit_design
 f="$PWD/app/views/audit_smoke_test.html.erb"
 printf '<p class="bg-gray-100">x</p>\n' > "$f"
 (cd app && printf '{"tool_input":{"file_path":"%s"}}' "$f" | "$OLDPWD/bin/audit_design" --hook 2>/dev/null); echo "hook, violation: $? (expect 2)"
+(cd app && printf '{"tool_input":{"command":"sed -i x %s"}}' "$f" | "$OLDPWD/bin/audit_design" --bash 2>/dev/null); echo "bash, violation: $? (expect 2)"
 (cd app && printf '{}' | "$OLDPWD/bin/audit_design" --stop 2>/dev/null); echo "stop, violation: $? (expect 2)"
 printf '<p class="bg-surface">x</p>\n' > "$f"
 (cd app && printf '{"tool_input":{"file_path":"%s"}}' "$f" | "$OLDPWD/bin/audit_design" --hook); echo "hook, clean: $? (expect 0)"
 rm "$f"
 ```
 
-Any result other than the expected one: stop, find the cause, and fix it before step 4. Report the three results in Phase 4.
+Any result other than the expected one: stop, find the cause, and fix it before step 4. Report the four results in Phase 4.
 
-4. Enforcement needs no wiring: this plugin ships the hooks. In every session, in any app with `docs/design-system/README.md`, the plugin runs its own copy of `audit_design` against the project - after each Write/Edit (`--hook`), and before each turn and subagent ends (`--stop`), which catches views written through Bash, heredocs, `sed -i`, or generators that no tool matcher sees. Both modes check only lines added since HEAD, and a violation goes back to the agent as a blocking error, so it gets fixed before the work is handed back - even by an agent that never read the context files. Because the plugin runs its own copy, a fix to the checks reaches every app when the plugin updates. Do not add audit hooks to `.claude/settings.json`; if an older version of this skill put `audit_design` entries there, remove them (and only them), or the checks run twice.
+4. Enforcement needs no wiring: this plugin ships the hooks. In every session, in any app with `docs/design-system/README.md` (the project directory, or an app directly below it in a larger repository), the plugin runs its own copy of `audit_design` against the app - after each Write/Edit (`--hook`), after each Bash command on the changed view files it names (`--bash`; most edits run through the shell), and before each turn and subagent ends (`--stop`), which catches views written by generators or anything else. All modes check only lines added since HEAD, and a violation goes back to the agent as a blocking error, so it gets fixed before the work is handed back - even by an agent that never read the context files. Because the plugin runs its own copy, a fix to the checks reaches every app when the plugin updates. Do not add audit hooks to `.claude/settings.json`; if an older version of this skill put `audit_design` entries there, remove them (and only them), or the checks run twice.
 
 5. Wire the audit into CI, so drift from people and other tools is caught too, and teammates without the plugin are covered. Pick the mode from the full audit result:
    - Audit clean (0 findings): `bin/audit_design --strict` - any drift anywhere fails.

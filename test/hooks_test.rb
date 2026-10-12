@@ -61,6 +61,54 @@ class HooksTest < Minitest::Test
     refute_equal "/nonexistent/ruby", File.read(cache)
   end
 
+  def test_enforce_checks_view_files_a_shell_command_changed
+    design_app
+    bash = ->(command) { hook("rails-design-system", "enforce.sh", "--bash", stdin: JSON.generate("tool_input" => { "command" => command })) }
+    assert_equal 0, bash.call("sed -i '' 's/ok/fine/' app/views/x/a.html.erb").code, "a clean change"
+    append "app/views/x/a.html.erb", %(<p class="bg-red-600">edit</p>\n)
+    result = bash.call("toolsmith-text-replace <<'EOF'\n@@ app/views/x/a.html.erb\n-a\n+b\nEOF")
+    assert_equal 2, result.code
+    assert_includes result.err, "app/views/x/a.html.erb:2:"
+    assert_equal 2, bash.call("cd app/views/x && perl -pi -e 's/a/b/' a.html.erb").code, "named by file name"
+    assert_equal 0, bash.call("git status && bin/rails test").code, "a command that names no changed view"
+  end
+
+  def test_block_names_only_the_rule_a_finding_breaks
+    design_app
+    write "docs/design-system/audit-rules", "Money with a currency prefix :: AED \\d\n"
+    commit "rules"
+    append "app/views/x/a.html.erb", %(<p class="text-primary">AED 5</p>\n)
+    result = hook("rails-design-system", "enforce.sh", "--stop", stdin: "{}")
+    assert_equal 2, result.code
+    assert_includes result.err, "[rule: Money with a currency prefix]"
+    refute_includes result.err, "Untagged lines"
+  end
+
+  # A Rails app inside a larger repository (rihlo/studio, runner/hub), with the
+  # session opened at the repository top.
+  def test_design_hooks_work_for_an_app_below_the_project
+    write "web/docs/design-system/README.md", "# Design system\n"
+    write "web/app/views/x/a.html.erb", %(<p class="bg-gray-100">old drift</p>\n)
+    install "rails-design-system", "audit_design", "web/"
+    write ".github/workflows/web.yml", "run: web/bin/audit_design --strict\n"
+    commit "init"
+    append "web/app/views/x/a.html.erb", %(<p class="bg-red-600">new</p>\n)
+
+    stop = hook("rails-design-system", "enforce.sh", "--stop", stdin: "{}")
+    assert_equal 2, stop.code, "a changed tracked file is checked"
+    assert_includes stop.err, "app/views/x/a.html.erb:2:"
+    refute_includes stop.err, ":1:", "committed drift is not reported as new"
+    edit = hook("rails-design-system", "enforce.sh", "--hook", stdin: hook_json(path("web/app/views/x/a.html.erb")))
+    assert_equal 2, edit.code
+    refute_includes edit.err, ":1:"
+    assert_equal 2, hook("rails-design-system", "enforce.sh", "--bash", stdin: JSON.generate("tool_input" => { "command" => "sed -i '' x web/app/views/x/a.html.erb" })).code
+    refute_nil hook("rails-design-system", "reviewer-context.sh").out[/design-reviewer/]
+
+    message = system_message(hook("rails-design-system", "maintenance-nudge.sh"))
+    assert_includes message, "web/: bin/audit_design reports 2 finding(s)"
+    refute_includes message, "not run in CI", "CI at the repository top counts"
+  end
+
   def test_enforce_is_silent_outside_design_system_projects
     write "app/views/x/a.html.erb", %(<p class="bg-red-600">x</p>\n)
     commit

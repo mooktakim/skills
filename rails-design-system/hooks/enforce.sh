@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # PostToolUse / Stop / SubagentStop hook: run this plugin's own audit_design
-# against the project, so every app with a design system gets the current checks
-# the moment the plugin updates - no per-app wiring, no maintenance run needed.
-# Silent in projects without docs/design-system/.
+# against each app with a design system, so every app gets the current checks the
+# moment the plugin updates - no per-app wiring, no maintenance run needed.
+# Silent in projects without docs/design-system/ (here or one level down).
 root=${CLAUDE_PROJECT_DIR:-}
-[ -n "$root" ] && [ -f "$root/docs/design-system/README.md" ] || exit 0
+[ -n "$root" ] || exit 0
+. "$(dirname "$0")/app-roots.sh"
+apps=$(design_roots "$root")
+[ -n "$apps" ] || exit 0
 plugin=${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}
 
 # Version-manager shims (asdf, rbenv) cost ~150 ms per call, on every edit. Resolve
@@ -17,4 +20,13 @@ if [ ! -x "$ruby" ]; then
   ruby=$(cd "$root" && ruby -e 'print RbConfig.ruby' 2>/dev/null) || exit 0
   mkdir -p "$data" 2>/dev/null && printf '%s' "$ruby" > "$cache"
 fi
-AUDIT_ROOT="$root" exec "$ruby" --disable-gems "$plugin/scripts/audit_design" "$@"
+
+# The worst exit status of the apps' runs: 2 sends the findings back to Claude.
+input=$(cat)
+status=0
+while IFS= read -r app; do
+  printf '%s' "$input" | AUDIT_ROOT="$app" "$ruby" --disable-gems "$plugin/scripts/audit_design" "$@"
+  code=$?
+  [ "$code" -gt "$status" ] && status=$code
+done <<<"$apps"
+exit "$status"
