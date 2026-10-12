@@ -343,6 +343,20 @@ class HooksTest < Minitest::Test
     assert_includes system_message(hook("rails-context", "maintenance-nudge.sh")), "web/: 1 director(ies) may need a context file"
   end
 
+  def test_context_report_counts_only_the_changes_a_session_touched
+    context_app
+    log_event("start", "s1")
+    tool_call("Bash", { "command" => "sed -i '' 's/User/Person/' app/models/user.rb" })
+    append "app/models/user.rb", "# edit\n"
+    append "app/services/pay.rb", "# another session's uncommitted work\n"
+    log_event("stop", "s1")
+    out = report.out
+    assert_match(%r{app/models/CLAUDE.md\s+1\s+1\s+0\s}, out)
+    assert_match(%r{app/services/CLAUDE.md\s+0\s+0\s+0\s}, out, "not this session's change")
+    tool_call("Bash", { "command" => "cat app/models/user.rb" })
+    assert_equal 1, File.read(path(".git/claude-context-log.jsonl")).scan(%("e":"touch")).size, "a path is logged once per session"
+  end
+
   def test_context_report_counts_hook_hand_overs_as_reach
     context_app
     log_event("start", "s1")

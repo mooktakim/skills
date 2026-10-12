@@ -9,7 +9,9 @@
 # inside a larger repository), else the top of the repository.
 #
 # For each directory context file it shows:
-#   Worked   sessions that changed code the file owns (by any tool, Bash included)
+#   Worked   sessions that changed code the file owns (by any tool, Bash included);
+#            a change counts when the session's own tool calls touched that path,
+#            so another session's work in the same checkout does not
 #   Reached  sessions where the file reached Claude - loaded automatically
 #            (nested, path rule, include, after compaction), read on purpose,
 #            or handed over by the plugin's hook after a shell read or edit
@@ -69,7 +71,7 @@ def owner(file, owned_dirs)
   dir && "#{dir}/CLAUDE.md"
 end
 
-sessions = Hash.new { |hash, id| hash[id] = { reached: Hash.new { |h, k| h[k] = [] }, changed: [], times: [] } }
+sessions = Hash.new { |hash, id| hash[id] = { reached: Hash.new { |h, k| h[k] = [] }, changed: [], touched: [], times: [] } }
 events.each do |event|
   session = sessions[event["s"].to_s]
   session[:times] << event["t"]
@@ -82,7 +84,16 @@ events.each do |event|
     (file = context_for(event["f"])) && session[:reached][file] << "hook"
   when "changed"
     session[:changed] |= Array(event["files"]).map { |file| local(file) }.compact
+  when "touch"
+    session[:touched] |= Array(event["files"]).map { |file| local(file) }.compact
   end
+end
+# A session's own changes: changed files its tool calls touched (a touched
+# directory covers the files in it). Logs from before touch events count all.
+sessions.each_value do |session|
+  next if session[:touched].empty?
+
+  session[:changed].select! { |file| session[:touched].any? { |path| file == path || file.start_with?("#{path}/") } }
 end
 sessions.reject! { |_, session| session[:reached].empty? && session[:changed].empty? }
 

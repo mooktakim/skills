@@ -105,8 +105,9 @@ class AuditContextTest < Minitest::Test
     context "app/views", "# small\n"
     commit
     out = audit.out
-    assert_includes out, "== CLAUDE.md (root)\n   oversized: 110 lines, 32 KB (review trigger: 200 lines or 12 KB)"
-    assert_includes out, "oversized: 160 lines, 0 KB (review trigger: 150 lines or 10 KB)"
+    assert_includes out, "== CLAUDE.md (root)\n   oversized: 110 lines, 33110 bytes (review trigger: 200 lines or 12288 bytes)"
+    assert_includes out, "oversized: 160 lines, 532 bytes (review trigger: 150 lines or 10240 bytes)"
+    assert_includes out, "Oversized files: cut inventory"
     refute_includes out, "app/views/CLAUDE.md"
   end
 
@@ -129,6 +130,8 @@ class AuditContextTest < Minitest::Test
     refute_includes out, "app/javascript (", "a CLAUDE.md exists deeper in its tree"
     refute_includes out, "app/services (", "fewer than 5 files"
     refute_includes out, "app/assets"
+    assert out.end_with?("No drift in the existing context files.\n"), "not \"No drift detected\" above a list of candidates"
+    refute_includes out, "Oversized files", "no size advice without an oversized file"
 
     write "CLAUDE.md", "# root\n<!-- context-skip: app/helpers/ app/models/library -->\n"
     commit "skip"

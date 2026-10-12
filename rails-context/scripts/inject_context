@@ -16,7 +16,9 @@
 # standard library only (Ruby 2.6+). What reached Claude comes from the local log
 # that hooks/log-context.sh keeps (.git/claude-context-log.jsonl); each file this
 # hook hands over is logged there too ("inject"), so it is given once per session,
-# and again after a compaction.
+# and again after a compaction. The code paths each call touched are logged once
+# per session ("touch"), so the reach report counts only the changes a session
+# made itself, not other sessions' work in the same checkout.
 
 require "json"
 
@@ -60,6 +62,7 @@ end
 
 read = []   # context files read through the shell (cat app/models/CLAUDE.md) reached Claude already
 wanted = []
+touched = []
 paths.each do |full|
   app = apps.find { |dir| full.start_with?("#{dir}/") } or next
   rel = full[(app.length + 1)..-1]
@@ -69,6 +72,7 @@ paths.each do |full|
   end
   next unless ROOTS.include?(rel.split("/").first)
 
+  touched << from_top.call(full)
   dir = File.directory?(full) ? rel : File.dirname(rel)
   chain = []
   until dir == "." || dir.empty?
@@ -79,7 +83,8 @@ paths.each do |full|
   wanted |= chain.map(&from_top).compact
 end
 read.compact!
-exit 0 if wanted.empty? && read.empty?
+touched.compact!
+exit 0 if wanted.empty? && read.empty? && touched.empty?
 
 git_dir = IO.popen(["git", "-C", project, "rev-parse", "--git-common-dir"], err: File::NULL, &:read).strip
 exit 0 if git_dir.empty?
@@ -87,6 +92,7 @@ log = File.expand_path("claude-context-log.jsonl", File.expand_path(git_dir, pro
 
 # What reached Claude since this session started or last compacted.
 reached = []
+seen = [] # code paths already logged as touched in this session
 if File.file?(log)
   File.foreach(log) do |line|
     next unless line.include?(%("s":#{JSON.generate(session)}))
@@ -95,16 +101,19 @@ if File.file?(log)
     case event["e"]
     when "start", "compact" then reached.clear
     when "load", "read", "inject" then reached << event["f"].to_s.sub(/AGENTS\.md\z/, "CLAUDE.md")
+    when "touch" then seen.concat(Array(event["files"]))
     end
   end
 end
 
+touched = touched.uniq - seen
 read -= reached
 wanted -= reached + read
 stamp = Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ")
 File.open(log, "a") do |out|
   read.each { |file| out.puts(JSON.generate("t" => stamp, "s" => session, "e" => "read", "f" => file)) }
   wanted.each { |file| out.puts(JSON.generate("t" => stamp, "s" => session, "e" => "inject", "f" => file)) }
+  out.puts(JSON.generate("t" => stamp, "s" => session, "e" => "touch", "files" => touched)) unless touched.empty?
 end
 exit 0 if wanted.empty?
 

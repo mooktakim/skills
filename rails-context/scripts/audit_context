@@ -40,7 +40,7 @@ def size_note(path, max_lines, max_bytes)
   lines = content.count("\n")
   return nil unless lines > max_lines || content.bytesize > max_bytes
 
-  "oversized: #{lines} lines, #{content.bytesize / 1024} KB (review trigger: #{max_lines} lines or #{max_bytes / 1024} KB)"
+  "oversized: #{lines} lines, #{content.bytesize} bytes (review trigger: #{max_lines} lines or #{max_bytes} bytes)"
 end
 
 # Regular files (not symlinks) with this name anywhere under the trees, sorted.
@@ -118,9 +118,10 @@ end
 
 found = false
 drift = false
+oversized = false
 
 if File.file?("CLAUDE.md") && (note = size_note("CLAUDE.md", 200, 12_288))
-  drift = true
+  drift = oversized = true
   puts "== CLAUDE.md (root)", "   #{note}", ""
 end
 
@@ -133,6 +134,7 @@ find_regular("CLAUDE.md").each do |context|
   found = true
   dir = File.dirname(context)
   size = size_note(context, 150, 10_240)
+  oversized ||= !size.nil?
   last = git("log", "-1", "--format=%H", "--", context).strip
   if last.empty?
     drift = true
@@ -172,7 +174,9 @@ end
 if drift
   puts "Review flagged directories: most changes are routine and need nothing."
   puts "Edit CLAUDE.md surgically only where a documented pattern changed."
-  puts "Oversized files: cut inventory, or move a growing namespace into a nested CLAUDE.md."
-else
+  puts "Oversized files: cut inventory, or move a growing namespace into a nested CLAUDE.md." if oversized
+elsif list.empty?
   puts "No drift detected."
+else
+  puts "No drift in the existing context files."
 end
