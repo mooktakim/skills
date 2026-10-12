@@ -45,14 +45,19 @@ fn main() {
     let original = fs::read_to_string(file).unwrap_or_else(|e| tool.fail(&format!("cannot read {}: {}", file, e)));
     let mut root = Value::parse(&original).unwrap_or_else(|e| tool.fail(&format!("{} is not valid JSON: {}", file, e)));
     let style = Style::of(&original);
-    let normalised = style.render(&root) != original;
     let shown = value.to_compact();
-    let old = set(&mut root, &path, value).unwrap_or_else(|e| tool.fail(&format!("{}: {}", file, e)));
-    let updated = style.render(&root);
-    if updated == original {
+    let old = set(&mut root, &path, value.clone()).unwrap_or_else(|e| tool.fail(&format!("{}: {}", file, e)));
+    if old.as_ref() == Some(&value) {
         println!("{}: {} is already {}; file unchanged.", file, path_text, shown);
         tool.exit(EXIT_OK);
     }
+    // Change only the value's own text. If that cannot be done (or the result
+    // would not be exactly the changed data), write the whole file pretty.
+    let in_place = locate(&original, &path, value)
+        .map(|spot| splice(&original, spot, &style))
+        .filter(|text| Value::parse(text).ok().as_ref() == Some(&root));
+    let rewritten = in_place.is_none();
+    let updated = in_place.unwrap_or_else(|| style.render(&root));
     if let Err(e) = write_atomically(std::path::Path::new(file), updated.as_bytes()) {
         tool.fail(&format!("writing {} failed: {}", file, e));
     }
@@ -60,7 +65,7 @@ fn main() {
         Some(old) => println!("{}: {} = {} (was {})", file, path_text, shown, cut(&old.to_compact())),
         None => println!("{}: {} = {}", file, path_text, shown),
     }
-    if normalised {
+    if rewritten && Value::parse(&original).map(|v| style.render(&v) != original).unwrap_or(false) {
         println!("Note: the rest of the file was re-formatted too (indent {:?}); check `git diff {}`.", style.indent.as_deref().unwrap_or(""), file);
     }
     tool.exit(EXIT_OK);
@@ -105,6 +110,234 @@ impl Style {
             out.push('\n');
         }
         out
+    }
+}
+
+/// Where a path leads in the file's text.
+#[derive(Debug, PartialEq)]
+enum Spot {
+    /// The value at this byte range is replaced.
+    Replace { start: usize, end: usize, value: Value },
+    /// A new member goes into the object or array that opens at `open`.
+    Insert { open: usize, key: Option<String>, value: Value },
+}
+
+/// One member of an object or array in the text: where its key (or, in an
+/// array, its value) starts, and where its value starts and ends.
+struct Member {
+    key: Option<String>,
+    start: usize,
+    key_end: usize,
+    value_start: usize,
+    value_end: usize,
+}
+
+fn skip_ws(b: &[u8], mut i: usize) -> usize {
+    while i < b.len() && matches!(b[i], b' ' | b'\t' | b'\n' | b'\r') {
+        i += 1;
+    }
+    i
+}
+
+/// The end of the JSON value that starts at `i` (the input is valid JSON).
+fn skip_value(b: &[u8], mut i: usize) -> usize {
+    match b.get(i) {
+        Some(b'"') => {
+            i += 1;
+            while i < b.len() && b[i] != b'"' {
+                i += if b[i] == b'\\' { 2 } else { 1 };
+            }
+            i + 1
+        }
+        Some(b'{') | Some(b'[') => {
+            let mut depth = 0;
+            while i < b.len() {
+                match b[i] {
+                    b'"' => {
+                        i = skip_value(b, i);
+                        continue;
+                    }
+                    b'{' | b'[' => depth += 1,
+                    b'}' | b']' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            return i + 1;
+                        }
+                    }
+                    _ => {}
+                }
+                i += 1;
+            }
+            i
+        }
+        _ => {
+            while i < b.len() && !matches!(b[i], b',' | b'}' | b']' | b' ' | b'\t' | b'\n' | b'\r') {
+                i += 1;
+            }
+            i
+        }
+    }
+}
+
+/// The members of the object or array that opens at `open`, and where it closes.
+fn members(text: &str, open: usize) -> Option<(Vec<Member>, usize)> {
+    let b = text.as_bytes();
+    let object = b[open] == b'{';
+    let close_char = if object { b'}' } else { b']' };
+    let mut list = Vec::new();
+    let mut i = skip_ws(b, open + 1);
+    if b.get(i) == Some(&close_char) {
+        return Some((list, i));
+    }
+    loop {
+        let start = i;
+        let (key, key_end) = if object {
+            let end = skip_value(b, i);
+            match Value::parse(&text[i..end]).ok()? {
+                Value::String(k) => {
+                    i = skip_ws(b, end);
+                    if b.get(i) != Some(&b':') {
+                        return None;
+                    }
+                    i = skip_ws(b, i + 1);
+                    (Some(k), end)
+                }
+                _ => return None,
+            }
+        } else {
+            (None, i)
+        };
+        let value_end = skip_value(b, i);
+        list.push(Member { key, start, key_end, value_start: i, value_end });
+        i = skip_ws(b, value_end);
+        match b.get(i) {
+            Some(b',') => i = skip_ws(b, i + 1),
+            Some(c) if *c == close_char => return Some((list, i)),
+            _ => return None,
+        }
+    }
+}
+
+/// The value to insert for a missing key: `rest` of the path wraps `value` in
+/// the objects (or the array before `[]`) that do not exist yet.
+fn nest(rest: &[Step], value: Value) -> Value {
+    match rest.split_first() {
+        None => value,
+        Some((Step::Key(k), more)) => Value::Object(vec![(k.clone(), nest(more, value))]),
+        Some((_, more)) => Value::Array(vec![nest(more, value)]),
+    }
+}
+
+/// Finds the text the change touches. None when the path does not fit the data
+/// (set() has already said why).
+fn locate(text: &str, path: &[Step], value: Value) -> Option<Spot> {
+    let b = text.as_bytes();
+    let mut pos = skip_ws(b, 0);
+    for (n, step) in path.iter().enumerate() {
+        let last = n + 1 == path.len();
+        let found = match step {
+            Step::Key(key) => {
+                if b.get(pos) != Some(&b'{') {
+                    return None;
+                }
+                let (list, _) = members(text, pos)?;
+                match list.into_iter().find(|m| m.key.as_deref() == Some(key.as_str())) {
+                    Some(m) => m,
+                    None => return Some(Spot::Insert { open: pos, key: Some(key.clone()), value: nest(&path[n + 1..], value) }),
+                }
+            }
+            Step::Index(i) => {
+                if b.get(pos) != Some(&b'[') {
+                    return None;
+                }
+                members(text, pos)?.0.into_iter().nth(*i)?
+            }
+            Step::Append => {
+                if b.get(pos) != Some(&b'[') {
+                    return None;
+                }
+                return Some(Spot::Insert { open: pos, key: None, value });
+            }
+        };
+        if last {
+            return Some(Spot::Replace { start: found.value_start, end: found.value_end, value });
+        }
+        pos = found.value_start;
+    }
+    None
+}
+
+/// The leading whitespace of the line that holds byte `at`.
+fn line_indent(text: &str, at: usize) -> &str {
+    let start = text[..at].rfind('\n').map_or(0, |i| i + 1);
+    let width = text[start..].bytes().take_while(|c| *c == b' ' || *c == b'\t').count();
+    &text[start..start + width]
+}
+
+/// A value's text: on one line, or pretty with its lines at `indent`.
+fn render_at(value: &Value, multiline: bool, indent: &str, style: &Style) -> String {
+    let container = matches!(value, Value::Array(items) if !items.is_empty()) || matches!(value, Value::Object(pairs) if !pairs.is_empty());
+    match (&style.indent, multiline && container) {
+        (Some(unit), true) => value.to_pretty(unit).replace('\n', &format!("\n{}", indent)),
+        _ => value.to_compact(),
+    }
+}
+
+/// The file with the change made in its text, everything else byte for byte.
+fn splice(text: &str, spot: Spot, style: &Style) -> String {
+    match spot {
+        Spot::Replace { start, end, value } => {
+            let multiline = text[start..end].contains('\n');
+            let new = render_at(&value, multiline, line_indent(text, start), style);
+            format!("{}{}{}", &text[..start], new, &text[end..])
+        }
+        Spot::Insert { open, key, value } => {
+            let Some((list, close)) = members(text, open) else { return String::new() };
+            let pretty_colon = if style.indent.is_some() { ": " } else { ":" };
+            match list.last() {
+                Some(last) => {
+                    // Copy the separator and the key-colon spacing of the last member.
+                    let mut gap = last.start;
+                    while gap > 0 && matches!(text.as_bytes()[gap - 1], b' ' | b'\t' | b'\n' | b'\r') {
+                        gap -= 1;
+                    }
+                    // With one member, the space before it is padding, not a separator:
+                    // on one line, follow the file's ", " or ",".
+                    let sep = match &text[gap..last.start] {
+                        sep if list.len() > 1 || sep.contains('\n') => sep,
+                        _ if text.contains(", ") => " ",
+                        _ => "",
+                    };
+                    let colon = if last.key.is_some() { &text[last.key_end..last.value_start] } else { pretty_colon };
+                    let indent = match sep.rfind('\n') {
+                        Some(i) => &sep[i + 1..],
+                        None => line_indent(text, last.start),
+                    };
+                    let member_value = render_at(&value, sep.contains('\n'), indent, style);
+                    let member = match key {
+                        Some(k) => format!("{}{}{}", toolsmith_common::json::quote(&k), colon, member_value),
+                        None => member_value,
+                    };
+                    format!("{},{}{}{}", &text[..last.value_end], sep, member, &text[last.value_end..])
+                }
+                None => {
+                    let inner = &text[open + 1..close];
+                    let member_of = |value: String| match &key {
+                        Some(k) => format!("{}{}{}", toolsmith_common::json::quote(k), pretty_colon, value),
+                        None => value,
+                    };
+                    match (&style.indent, inner.contains('\n')) {
+                        (Some(unit), true) => {
+                            let indent = line_indent(text, open);
+                            let inside = format!("{}{}", indent, unit);
+                            let member = member_of(render_at(&value, true, &inside, style));
+                            format!("{}\n{}{}\n{}{}", &text[..open + 1], inside, member, indent, &text[close..])
+                        }
+                        _ => format!("{}{}{}", &text[..open + 1], member_of(value.to_compact()), &text[close..]),
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -281,6 +514,34 @@ mod tests {
         assert_eq!(set(&mut root, &parse_path("a.b").unwrap(), v("1")).unwrap_err(), "a: is a string, so it has no key \"b\"");
         assert_eq!(set(&mut root, &parse_path("list[3]").unwrap(), v("1")).unwrap_err(), "list[3] is past the end of the array (1 items)");
         assert_eq!(set(&mut root, &parse_path("missing[0]").unwrap(), v("1")).unwrap_err(), "\"missing\" does not exist, so it has no index");
+    }
+
+    fn edit(text: &str, path: &str, value: &str) -> String {
+        let mut root = v(text);
+        let steps = parse_path(path).unwrap();
+        set(&mut root, &steps, v(value)).unwrap();
+        let out = splice(text, locate(text, &steps, v(value)).unwrap(), &Style::of(text));
+        assert_eq!(v(&out), root, "the text holds exactly the changed data");
+        out
+    }
+
+    #[test]
+    fn changes_only_the_value_text() {
+        let manifest = "{\n  \"name\": \"x\",\n  \"version\": \"0.1.0\",\n  \"author\": { \"name\": \"A\" },\n  \"keywords\": [\"a\", \"b\"]\n}\n";
+        assert_eq!(edit(manifest, "version", "\"0.1.1\""), manifest.replace("0.1.0", "0.1.1"));
+        assert_eq!(edit(manifest, "keywords[]", "\"c\""), manifest.replace("\"b\"]", "\"b\", \"c\"]"));
+        assert_eq!(edit(manifest, "author.email", "\"e\""), manifest.replace("\"A\" }", "\"A\", \"email\": \"e\" }"));
+        assert_eq!(edit(manifest, "license", "\"MIT\""), manifest.replace("\"b\"]\n}", "\"b\"],\n  \"license\": \"MIT\"\n}"));
+        assert_eq!(edit(manifest, "keywords", "[\"z\"]"), manifest.replace("[\"a\", \"b\"]", "[\"z\"]"));
+        assert_eq!(edit("{\"a\":{},\"b\":[]}", "a.x.y", "1"), "{\"a\":{\"x\":{\"y\":1}},\"b\":[]}");
+        assert_eq!(edit("{\n  \"tags\": []\n}\n", "tags[]", "\"x\""), "{\n  \"tags\": [\"x\"]\n}\n");
+        assert_eq!(
+            edit("{\n  \"hooks\": {\n  }\n}\n", "hooks.Stop", "[{\"a\":1}]"),
+            "{\n  \"hooks\": {\n    \"Stop\": [\n      {\n        \"a\": 1\n      }\n    ]\n  }\n}\n"
+        );
+        let tricky = "{\"a\": [1, \"x]\\\"{\", {\"k\": [2]}]}";
+        assert_eq!(edit(tricky, "a[2].k[]", "3"), tricky.replace("[2]", "[2, 3]"), "brackets and quotes inside strings");
+        assert_eq!(edit("{\n\t\"a\": [\n\t\t1\n\t]\n}", "a[0]", "{\"b\":2}"), "{\n\t\"a\": [\n\t\t{\"b\":2}\n\t]\n}");
     }
 
     #[test]
