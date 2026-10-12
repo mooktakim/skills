@@ -8,7 +8,7 @@
         ["\\bpython3?\\b", "open\\([^)]*,\\s*['\"][wa]|write_text|\\.write\\(", "\\.replace\\(|re\\.sub"],
         ["\\bruby\\b", "File\\.write|IO\\.write|File\\.open\\([^)]*['\"]w", "\\.sub!?[ (]|gsub!?[ (]"],
         ["\\bsed\\s+(-[a-zA-Z]*\\s+)*-i"],
-        ["\\bperl\\s+-\\w*i"]
+        ["\\bperl\\s+-\\w*i\\b"]
       ]
     },
     {

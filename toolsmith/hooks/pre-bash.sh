@@ -3,5 +3,7 @@
 # Prefers the system Ruby, which starts fastest. Never fails the hook.
 ruby=/usr/bin/ruby
 [ -x "$ruby" ] || ruby=$(command -v ruby) || exit 0
-"$ruby" "$(dirname "${BASH_SOURCE[0]}")/../scripts/registry" check 2>/dev/null
+# --disable-gems: the registry needs only the standard library, and loading
+# RubyGems would add ~40 ms to every Bash call.
+"$ruby" --disable-gems "$(dirname "${BASH_SOURCE[0]}")/../scripts/registry" check 2>/dev/null
 exit 0

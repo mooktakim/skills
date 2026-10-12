@@ -414,6 +414,7 @@ class ToolsmithTest < Minitest::Test
       "git show HEAD:a.rb | sed -n 1,20p",
       "grep -n 'def ' bin/audit_design | head",
       "gh run view 123 --log | grep -i error",
+      "perl -MTime::HiRes=time -e 'print time'",
       "python3 - <<'EOF'\nimport json\nd=json.load(open('a.json')); d['x']=[1]\njson.dump(d, open('a.json','w'))\nEOF"
     ].each { |command| assert_nil reminded(command, session_id: command), command }
   end

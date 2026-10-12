@@ -1,0 +1,3 @@
+- Timed the per-call hooks (maynard, warm): bash alone ~10 ms, Ruby --disable-gems startup ~14 ms, first-touch 13 ms, inject_context 26 ms, audit_design --bash/--stop 33 ms, toolsmith pre-bash 68 ms. The toolsmith hooks ran `/usr/bin/ruby` without --disable-gems: loading RubyGems is ~40 ms of that on every Bash call. Now ~35 ms.
+- Rust rewrite judged not worth it: it would save ~10-25 ms per hook (process start + git dominate), the app scripts are copied into apps and run in CI on Linux where a Ruby is guaranteed but cargo is not, and audit_context's ~330 ms is git log calls, which Rust would not change.
+- literal-replace family: `\bperl\s+-\w*i` matched `perl -MTime::HiRes`; now needs a word end after the i.
