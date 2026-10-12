@@ -1,0 +1,2 @@
+- rails-context SKILL.md description had "Re-runnable: on an app..." - ": " inside a plain YAML scalar is invalid YAML (Psych: mapping values are not allowed). It still listed, but by luck. Changed to " - ".
+- New `test/repo_test.rb` check: every SKILL.md and agents/*.md frontmatter parses with YAML.safe_load and has string name and description.

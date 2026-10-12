@@ -1,6 +1,6 @@
 ---
 name: rails-context
-description: Set up and maintain per-directory CLAUDE.md context files in a Rails application (MVC Context - Model, View, Controller, plus Context). Surveys app/, lib/, and the test suite, proposes which directories deserve a context file, generates intent-focused CLAUDE.md files with AGENTS.md symlinks, and wires up drift auditing via bin/audit_context. Re-runnable: on an app already set up, a run audits existing context files for drift, fills gaps, and slims ancestors that repeat what deeper files own. Use when asked to set up MVC context, add per-directory agent context files, bootstrap CLAUDE.md/AGENTS.md files in a Rails app, or audit/refresh existing context files.
+description: Set up and maintain per-directory CLAUDE.md context files in a Rails application (MVC Context - Model, View, Controller, plus Context). Surveys app/, lib/, and the test suite, proposes which directories deserve a context file, generates intent-focused CLAUDE.md files with AGENTS.md symlinks, and wires up drift auditing via bin/audit_context. Re-runnable - on an app already set up, a run audits existing context files for drift, fills gaps, and slims ancestors that repeat what deeper files own. Use when asked to set up MVC context, add per-directory agent context files, bootstrap CLAUDE.md/AGENTS.md files in a Rails app, or audit/refresh existing context files.
 ---
 
 # MVC Context

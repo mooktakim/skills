@@ -46,6 +46,18 @@ class RepoTest < Minitest::Test
     end
   end
 
+  # Claude Code parses the frontmatter as YAML; a plain value with ": " in it is
+  # invalid YAML even when the listing happens to show it.
+  def test_skill_and_agent_frontmatter_is_valid_yaml
+    Dir.glob(File.join(REPO, "*/{SKILL.md,agents/*.md}")).each do |file|
+      meta = YAML.safe_load(frontmatter(file))
+      assert_kind_of String, meta["name"], file
+      assert_kind_of String, meta["description"], file
+    rescue Psych::SyntaxError => e
+      flunk "#{file}: #{e.message}"
+    end
+  end
+
   def test_hooks_parse_and_point_at_scripts_that_exist
     Dir.glob(File.join(REPO, "*/hooks/hooks.json")).each do |file|
       plugin_root = File.dirname(File.dirname(file))

@@ -5,6 +5,7 @@ require "open3"
 require "tmpdir"
 require "fileutils"
 require "json"
+require "yaml"
 require "rbconfig"
 
 REPO = File.expand_path("..", __dir__)
