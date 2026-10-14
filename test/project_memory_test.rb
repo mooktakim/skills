@@ -227,6 +227,30 @@ class ProjectMemoryTest < Minitest::Test
     assert_includes outside.err, "no docs/MEMORY.md here or above (up to the git root)"
   end
 
+  # Runs the composite action's shell steps the way GitHub Actions does,
+  # leaving out the actions/cache step, so a cache miss builds the command.
+  def test_the_github_action_builds_the_command_and_lints_the_project
+    action = YAML.safe_load(File.read(File.join(PLUGIN, "action.yml")))
+    steps = action.fetch("runs").fetch("steps")
+    assert_equal "composite", action["runs"]["using"]
+    assert_equal ["actions/cache@v6"], steps.map { |step| step["uses"] }.compact
+    temp = File.join(@dir, ".runner")
+    output = File.join(temp, "output")
+    FileUtils.mkdir_p(temp)
+    env = { "GITHUB_ACTION_PATH" => PLUGIN, "RUNNER_TEMP" => temp, "GITHUB_OUTPUT" => output, "RUNNER_OS" => "Linux",
+            "RUNNER_ARCH" => "X64", "CARGO_TARGET_DIR" => File.join(PLUGIN, "target") }
+    write "app/models/money.rb", "class Money\n  CENTS = 100\nend\n"
+    memory "index"
+    # Every step runs at the repository root: the default directory input is ".".
+    results = steps.select { |step| step["run"] }.map do |step|
+      out, err, status = Open3.capture3(env, "bash", "-e", "-c", step["run"], chdir: @dir)
+      assert status.success?, "#{step['name']}: #{out}#{err}"
+      out
+    end
+    assert_match(/\Akey=project-memory-Linux-X64-[0-9a-f]{16}\n\z/, File.read(output))
+    assert_includes results.last, "Memory docs are clean"
+  end
+
   def test_rust_unit_tests_pass
     out, err, status = Open3.capture3({ "CARGO_TARGET_DIR" => File.join(PLUGIN, "target") }, "cargo", "test", "--quiet",
                                       "--manifest-path", File.join(PLUGIN, "Cargo.toml"))

@@ -1,6 +1,6 @@
 {
   "name": "project-memory",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Long-term project memory in git: a protocol for typed notes with citations, a generated index, an inbox for unverified knowledge, lessons, and an append-only log, with lossless migration from older history logs and a bin/memory lint",
   "author": { "name": "Mooktakim Ahmed", "email": "mooktakim@fluxter.co.uk" },
   "homepage": "https://github.com/mooktakim/skills",

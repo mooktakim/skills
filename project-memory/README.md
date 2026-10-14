@@ -23,7 +23,7 @@ The protocol travels with the repository: once set up, Claude follows `docs/MEMO
 - **Notes** carry frontmatter: id, type, status, a one-line summary, aliases, citations to code (`path:line`), sources, and when they were last verified.
 - **The inbox** holds new knowledge until tests pass, its PR merges, or a human approves it.
 - **The log** is one immutable file per finished unit of work, written before the commit and committed with the work, so parallel branches never conflict.
-- **`project-memory lint`** checks frontmatter, folders, citations, links, log file names, the index, size budgets, and common secret patterns. Put it in CI. `project-memory index` writes the index and `project-memory stale` lists what a consolidation pass must look at.
+- **`project-memory lint`** checks frontmatter, folders, citations, links, log file names, the index, size budgets, and common secret patterns. Claude runs it after changing `docs/`; a project can also run it in CI. `project-memory index` writes the index and `project-memory stale` lists what a consolidation pass must look at.
 - **Consolidation passes** (on PR merge or weekly) promote or reject the inbox, merge duplicates, expire notes not verified within 90 days, and retire lessons that mislead more than they help.
 
 ## Project overrides
@@ -36,11 +36,20 @@ Projects that kept the older history log (`docs/history/<YYYY-MM-DD>/<timestamp>
 
 ## The `project-memory` command
 
-A Rust program (standard library only) that the plugin puts on PATH and builds with cargo the first time it runs, so it needs [Rust](https://rustup.rs) installed. It checks a large project (hundreds of notes, thousands of log entries) in a few hundredths of a second, and works from any directory in a project. CI, or a teammate without the plugin, installs it with:
+A Rust program (standard library only) that the plugin puts on PATH and builds with cargo the first time it runs, so it needs [Rust](https://rustup.rs) installed. It checks a large project (hundreds of notes, thousands of log entries) in under a tenth of a second, and works from any directory in a project. A teammate without the plugin installs it with:
 
 ```
 cargo install --locked --git https://github.com/mooktakim/skills project-memory
 ```
+
+### In GitHub Actions (opt-in)
+
+```yaml
+- uses: actions/checkout@v7
+- uses: mooktakim/skills/project-memory@<full commit SHA>
+```
+
+The action builds the command from its own source once per version, caches it, and runs `project-memory lint`, so later runs take about a second. Pin a commit SHA; moving the pin is how a project upgrades. In a monorepo, pass `with: { directory: apps/web }`.
 
 ## Usage
 

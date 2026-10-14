@@ -36,7 +36,7 @@ Show the user, in one message:
 - the files setup creates: `docs/MEMORY.md`, `docs/INDEX.md`, the block in the root `CLAUDE.md`;
 - each migration line from the survey, with counts, and anything that stops a migration;
 - the Project overrides the project's existing rules turn into, and the settings (see step 3 below);
-- a CI step that installs the command and runs `project-memory lint`, naming the file it goes in;
+- whether to add a CI check (step 5). It is opt-in: recommend it when people other than Claude change the code often, since Claude already runs the lint locally; otherwise recommend leaving it out;
 - open questions, each with your recommendation.
 
 Every open question needs an answer, or the user's "use your recommendation", before writing.
@@ -64,16 +64,13 @@ Every open question needs an answer, or the user's "use your recommendation", be
    ```
 
    `CLAUDE.md` is the canonical file; `AGENTS.md` is a relative symlink to it (`ln -s CLAUDE.md AGENTS.md`). A root `AGENTS.md` that is a real file is converted only if the user approved it in the plan (`git mv AGENTS.md CLAUDE.md && ln -s CLAUDE.md AGENTS.md`).
-5. Add the approved CI step. On GitHub Actions (hosted runners include Rust):
+5. If the user opted in to the CI check, add it. On GitHub Actions, add one step after the checkout, pinned to the current full commit SHA of the skills repository (`git ls-remote https://github.com/mooktakim/skills HEAD`):
 
    ```yaml
-   - name: Project memory
-     run: |
-       cargo install --locked --git https://github.com/mooktakim/skills project-memory
-       project-memory lint
+   - uses: mooktakim/skills/project-memory@<full commit SHA>
    ```
 
-   Other CI needs Rust installed before the `cargo install`.
+   The action builds the command from its own source with cargo (hosted runners include Rust) once per version and caches it, so later runs take about a second. In a monorepo, add `with: { directory: <subproject> }`. On other CI, the step installs Rust if the image has none, runs `cargo install --locked --git https://github.com/mooktakim/skills project-memory`, and caches `~/.cargo/bin/project-memory` keyed by the pinned commit; then runs `project-memory lint`.
 6. Run `project-memory index`, then `project-memory lint`, and fix everything it reports.
 7. Write the setup's own log entry: every migration line with its source, target and counts. It is the record of where each piece of knowledge went.
 
@@ -126,7 +123,7 @@ Claude Code keeps per-user memories for this project in `~/.claude/projects/<pro
 When `docs/MEMORY.md` says an older `protocol:` version than `${CLAUDE_SKILL_DIR}/templates/MEMORY.md`:
 1. Replace the text between the frontmatter and `## Project overrides` with the template's. Keep the Project overrides section byte for byte.
 2. Keep every setting's value; add new settings from the template with their default values; set `protocol:` to the template's.
-3. A project set up before the `project-memory` command existed has a copied `bin/memory` script: `git rm` it, and change its CI step and any mention of it in the root `CLAUDE.md` to the command.
+3. A project set up before the `project-memory` command existed has a copied `bin/memory` script: `git rm` it, change any mention of it in the root `CLAUDE.md` to the command, and replace its CI step with the action from setup step 5. A project already using the action gets its pin moved to the current commit SHA, so its CI checks with the same version Claude uses.
 4. Run `project-memory index` and `project-memory lint`. An override that now conflicts with the protocol is reported to the user, never edited.
 
 Show the diff with the plan of the run; it goes through the same approval gate.
