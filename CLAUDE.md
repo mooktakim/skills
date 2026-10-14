@@ -10,7 +10,7 @@ A hand-authored collection of Claude Code skills, not limited to any one domain 
 
 Scripts a plugin copies into apps (`<plugin>/scripts/`, e.g. `audit_design`, `audit_context`) are plain Ruby, standard library only, compatible with Ruby 2.6+ (macOS still ships 2.6 as `/usr/bin/ruby`): every Rails app has Ruby, and one regex engine behaves the same on macOS and Linux CI. Hook scripts (`<plugin>/hooks/*.sh`) stay small `bash` wrappers. Never embed a script in a `SKILL.md`; the skill copies the file with `${CLAUDE_SKILL_DIR}`.
 
-The `toolsmith` plugin is the exception: its tools are Rust crates (`toolsmith/crates/`, standard library only), built on demand by `toolsmith/libexec/shim` and held to `toolsmith/references/contract.md`. Its hooks and analysis scripts follow the Ruby rules above.
+The `toolsmith` plugin is the exception: its tools are Rust crates (`toolsmith/crates/`, standard library only), built on demand by `toolsmith/libexec/shim` and held to `toolsmith/references/contract.md`. Its hooks and analysis scripts follow the Ruby rules above. `project-memory` is the second exception: its `project-memory` command is one Rust crate (`project-memory/src/`, standard library only) that the plugin puts on PATH and `project-memory/bin/project-memory` builds on demand; projects and their CI install it with `cargo install` instead of copying a script.
 
 `bin/test` runs the Minitest suite in `test/`: each test builds a throwaway git repo and runs the real scripts and hooks as subprocesses. Run it after any script or hook change, and once more as `TEST_RUBY=/usr/bin/ruby bin/test` to prove the scripts still work on the old system Ruby. Add a test for every behaviour you add or bug you fix. `.github/workflows/test.yml` runs the suite on every push and pull request: Linux on current Rubies, Linux on Ruby 2.6, and macOS with the system Ruby and bash 3.2. `test/repo_test.rb` also enforces this file's structure rules (marketplace entries, README rows, frontmatter names, hook script paths).
 
@@ -56,10 +56,9 @@ At the start of a task, read docs/INDEX.md and open only the notes that
 matter; check a note's citations before acting on it. Before committing a
 finished unit of work, add its entry under docs/log/ in the same commit, and
 put new facts, gotchas, procedures, and lessons in docs/inbox/ as proposals,
-never straight into curated notes. bin/memory lint checks the docs;
-bin/memory index rebuilds the index. bin/memory is a copy of
-project-memory/scripts/memory: when that script changes, copy it over in the
-same commit (`test/repo_test.rb` checks).
+never straight into curated notes. `project-memory lint` checks the docs;
+`project-memory index` rebuilds the index. In this checkout, run the command
+as `project-memory/bin/project-memory`, so it is built from the source here.
 
 ## Using these skills
 

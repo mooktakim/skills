@@ -92,11 +92,6 @@ class RepoTest < Minitest::Test
     end
   end
 
-  # The repo keeps its own project memory with a copy of the plugin's script.
-  def test_bin_memory_is_the_project_memory_script
-    assert_equal File.read(File.join(REPO, "project-memory/scripts/memory")), File.read(File.join(REPO, "bin/memory"))
-  end
-
   def test_hook_scripts_parse_as_bash
     Dir.glob(File.join(REPO, "*/hooks/*.sh")).each do |script|
       _out, err, status = Open3.capture3(ENV.fetch("TEST_BASH", "bash"), "-n", script)

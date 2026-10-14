@@ -35,8 +35,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: bin/test
-      - name: Project memory docs
-        run: bin/memory lint
 
   macos:
     name: macOS, system bash and Ruby
@@ -50,6 +48,8 @@ jobs:
           ruby-version: "4.0"
       - name: Tests (scripts on the current Ruby)
         run: bin/test
+      - name: Project memory docs
+        run: project-memory/bin/project-memory lint
       - name: Scripts on the system Ruby, hooks on bash 3.2
         run: |
           if [ -x /usr/bin/ruby ]; then

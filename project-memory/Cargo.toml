@@ -1,0 +1,14 @@
+[package]
+name = "project-memory"
+version = "0.3.0"
+edition = "2021"
+publish = false
+license = "MIT"
+description = "Checks and maintains the project memory under docs/ that the project-memory protocol describes"
+
+[[bin]]
+name = "project-memory"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3

@@ -8,7 +8,6 @@ Agents follow what they retrieve closely, so a memory full of stale or unverifie
 
 ```
 CLAUDE.md               # a short block pointing at the protocol and the index
-bin/memory              # lint, index, stale (plain Ruby, standard library only)
 docs/
   MEMORY.md             # the protocol, plus this project's own overrides
   INDEX.md              # generated: one line per curated note, read at task start
@@ -24,7 +23,7 @@ The protocol travels with the repository: once set up, Claude follows `docs/MEMO
 - **Notes** carry frontmatter: id, type, status, a one-line summary, aliases, citations to code (`path:line`), sources, and when they were last verified.
 - **The inbox** holds new knowledge until tests pass, its PR merges, or a human approves it.
 - **The log** is one immutable file per finished unit of work, written before the commit and committed with the work, so parallel branches never conflict.
-- **`bin/memory lint`** checks frontmatter, folders, citations, links, log file names, the index, size budgets, and common secret patterns. Put it in CI.
+- **`project-memory lint`** checks frontmatter, folders, citations, links, log file names, the index, size budgets, and common secret patterns. Put it in CI. `project-memory index` writes the index and `project-memory stale` lists what a consolidation pass must look at.
 - **Consolidation passes** (on PR merge or weekly) promote or reject the inbox, merge duplicates, expire notes not verified within 90 days, and retire lessons that mislead more than they help.
 
 ## Project overrides
@@ -34,6 +33,14 @@ Each project can change the protocol in the **Project overrides** section at the
 ## Migrating from the project history log
 
 Projects that kept the older history log (`docs/history/<YYYY-MM-DD>/<timestamp>-<slug>.md`, or a single `docs/HISTORY.md`) migrate on setup. Claude reads the old log, works out its shape (projects differ), and shows the plan: the rule for each part, example moves, counts, and every line it would drop. Each entry then moves into `docs/log/` with its text unchanged - entry files with `git mv`, so git keeps their history - and the counts and text are checked before the old log is deleted. Setup also offers to move notes out of an oversized root `CLAUDE.md`, existing ADRs, and project facts from Claude's local auto memory, each listed in the plan with counts before anything moves.
+
+## The `project-memory` command
+
+A Rust program (standard library only) that the plugin puts on PATH and builds with cargo the first time it runs, so it needs [Rust](https://rustup.rs) installed. It checks a large project (hundreds of notes, thousands of log entries) in a few hundredths of a second, and works from any directory in a project. CI, or a teammate without the plugin, installs it with:
+
+```
+cargo install --locked --git https://github.com/mooktakim/skills project-memory
+```
 
 ## Usage
 

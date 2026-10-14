@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Runs the project-memory command. Builds the binary first when it is missing
+# or older than its source, so a plugin update needs no install step. Claude
+# Code puts this directory on PATH when the plugin is installed.
+set -u
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
+target=${PROJECT_MEMORY_TARGET_DIR:-$root/target}
+binary=$target/release/project-memory
+
+if [ ! -x "$binary" ] || [ -n "$(find "$root/src" "$root/Cargo.toml" "$root/Cargo.lock" -newer "$binary" 2>/dev/null | head -n 1)" ]; then
+  if ! command -v cargo >/dev/null 2>&1; then
+    echo "project-memory: the command must be built, but cargo is not installed. Install Rust (https://rustup.rs), then run it again." >&2
+    exit 127
+  fi
+  if ! CARGO_TARGET_DIR=$target cargo build --release --quiet --manifest-path "$root/Cargo.toml" >&2; then
+    echo "project-memory: building the command failed" >&2
+    exit 127
+  fi
+  touch "$binary"
+fi
+exec "$binary" "$@"
