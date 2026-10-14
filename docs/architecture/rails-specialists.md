@@ -1,18 +1,21 @@
 ---
-id: rails-specialists-status
-type: decision
-status: proposed
+id: rails-specialists
+type: architecture
+status: active
 summary: rails-specialists plugin - standing design constraints, field results, and what is unproven (as of 2026-10-01)
+aliases: [specialists, agents, delegation, rails-reviewer, roster]
 created: 2026-10-01
+verified_at: 2026-10-15
+citations: [rails-specialists/agents/rails-reviewer.md, rails-specialists/.claude-plugin/plugin.json]
 sources: [auto memory rails-specialists-status.md]
 ---
 
 Standing constraints from the user's planning choices (2026-08-15), still in force: no `model:` pinning (agents inherit the session model); stack-agnostic (the user rejected baking their personal rails.md tech defaults into the agents); advisor agents (debugger, reviewer, security, performance) stay read-only via `disallowedTools`; no orchestrator agent, and agents never ask the user anything - they stop and return plans or commands in their report.
 
-Field result (usage review 2026-10-01, see [[usage-review-2026-10]]): `rails-reviewer` found 12 real bugs in 2 maynard runs, zero false positives - but Claude never delegated to any specialist on its own. Fixed by "Use proactively" description leads (reviewer, security, tester, debugger, performance) plus a SessionStart note in Rails projects.
+Field result (usage review 2026-10-01, see [usage-review-2026-10](../log/2026/10/01/1790812801-usage-review.md)): `rails-reviewer` found 12 real bugs in 2 maynard runs, zero false positives - but Claude never delegated to any specialist on its own. Fixed by "Use proactively" description leads (reviewer, security, tester, debugger, performance) plus a SessionStart note in Rails projects.
 
 **Why:** the agents only earn their place if they actually get used; descriptions alone lost to general-purpose/Explore.
-Roster change (2026-10-08): the user moved test work out - the tester now ships in the new `rails-minitest` plugin, renamed `rails-minitest:minitest-runner` (user's choice, named for its main use) (Minitest only, skill preloaded via `skills:`), rails-specialists 0.4.0 has nine agents. See [[rails-minitest-status]].
+Roster change (2026-10-08): the user moved test work out - the tester now ships in the new `rails-minitest` plugin, renamed `rails-minitest:minitest-runner` (user's choice, named for its main use) (Minitest only, skill preloaded via `skills:`), rails-specialists 0.4.0 has nine agents. See [rails-minitest-status](rails-minitest.md).
 Roster change (2026-10-09): rails-hotwire moved out to the rails-hotwire plugin as `rails-hotwire:hotwire-builder`; rails-specialists 0.5.0 has eight agents. ViewComponent work goes to `rails-view-component:component-builder`. Add `rails-hotwire:` and `rails-view-component:` to the count command's prefixes.
 Roster decision (2026-10-01): option A - change nothing, wait 2-3 weeks (check from about 2026-10-22), then count real delegations per agent in the transcripts. If rails-model, rails-hotwire and rails-jobs stay at zero while the user builds models, Turbo UI and jobs, propose option B: convert them to skills the main session loads (fold in or point to the user's installed turbo-hotwire / viewcomponent / phlex skills). Deploy and upgrade stay agents either way.
 

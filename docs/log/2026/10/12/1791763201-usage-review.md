@@ -1,12 +1,3 @@
----
-id: usage-review-2026-10-12
-type: decision
-status: proposed
-summary: Second field review (all 9 plugins, 89 sessions since 2026-10-01) - findings, what was fixed same day, what was left and why
-created: 2026-10-12
-sources: [auto memory usage-review-2026-10-12.md]
----
-
 2026-10-12 review of transcripts since 2026-10-01 (4 parallel analysis agents). Fixed the same day, all committed on main, NOT pushed at the time:
 - capture 0.1.1: hint fired on 319/352 task-notifications ("each time" in boilerplate); now skips harness-tag prompts and bare "no".
 - toolsmith 0.2.2-0.2.5: reminders once per session/tool, none in subagents (agent_id), tighter families; json-set edits text in place; ci-wait bare commit arg.

@@ -1,9 +1,12 @@
 ---
-id: rails-design-system-status
-type: decision
-status: proposed
+id: rails-design-system
+type: architecture
+status: active
 summary: rails-design-system - standing constraints and user decisions to respect in every edit (as of 2026-10-01)
+aliases: [design system, audit_design, design-reviewer, audit-rules, vendor-paths]
 created: 2026-10-01
+verified_at: 2026-10-15
+citations: [rails-design-system/SKILL.md, rails-design-system/agents/design-reviewer.md, rails-design-system/scripts/audit_design]
 sources: [auto memory rails-design-system-status.md]
 ---
 
@@ -15,7 +18,7 @@ User decisions (2026-10-01) to respect:
 - Islands is the default sharing model, but shared foundation and external library are valid choices the user makes in the Phase 1 plan; never push a project back to islands.
 - Project-specific audit behaviour lives in data files (`vendor-paths`, `audit-rules`), never in edits to the copied script, so every app runs an identical script.
 
-Pending: the first real maintenance run after the 2026-10-01 overhaul (maynard is the planned first) - it is the only test of the text-only changes (approval gate, conventions.md and frames, gem rule, settings.json cleanup, CI wiring). Related: [[usage-review-2026-10]].
+Pending: the first real maintenance run after the 2026-10-01 overhaul (maynard is the planned first) - it is the only test of the text-only changes (approval gate, conventions.md and frames, gem rule, settings.json cleanup, CI wiring). Related: [usage-review-2026-10](../log/2026/10/01/1790812801-usage-review.md).
 
 **Why:** these were explicit user choices or constraints; drifting from them would undo decisions already made.
 **How to apply:** check new edits against this list; when the user reports results from the maynard run, fold fixes into the skill with a version bump.

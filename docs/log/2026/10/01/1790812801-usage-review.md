@@ -1,12 +1,3 @@
----
-id: usage-review-2026-10
-type: decision
-status: proposed
-summary: 2026-10-01 field review of all 3 plugins across 7 Rails projects - verdicts, top defects, report link
-created: 2026-10-01
-sources: [auto memory usage-review-2026-10.md]
----
-
 On 2026-10-01 a usage review of transcripts and prompt history found: rails-context and rails-design-system "partly work"; rails-reviewer found 12 real bugs in 2 runs but no specialist was ever auto-delegated. Report: https://claude.ai/artifact/B6DQVPwp9WisR7fZqKhnf5
 
 All 21 defects from the review were fixed on 2026-10-01 (rails-context 0.10.2, rails-design-system 0.9.1, rails-specialists 0.2.1): hook path/silent pass/Bash writes (Stop hook), changed-lines checks, hard approval gate, KB size limits + root budget, weekly SessionStart maintenance nudge, proactive delegation hook, regex false positives, sharing models (islands/shared foundation/external library + vendor-paths), conventions.md + app-shell frames, reviewed marker/deleted files/candidate dirs, loading model, Phase 3 smoke test, gem re-lock, gitignore check, small agent fixes, no em dashes.

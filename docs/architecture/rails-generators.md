@@ -1,9 +1,12 @@
 ---
-id: rails-generators-status
-type: decision
-status: proposed
+id: rails-generators
+type: architecture
+status: active
 summary: rails-generators plugin - why it exists (hand-written migrations), PreToolUse guard design, no agent/no audit decision, open items
+aliases: [generators, migrations, guard, schema.rb]
 created: 2026-10-09
+verified_at: 2026-10-15
+citations: [rails-generators/hooks/guard.sh, rails-generators/SKILL.md]
 sources: [auto memory rails-generators-status.md]
 ---
 
@@ -13,4 +16,4 @@ rails-generators 0.1.0 (2026-10-09): skill + PreToolUse guard so Claude uses `bi
 - Decided by me, not the user (tell them if they ask): name `rails-generators`; no agent (rails-specialists:rails-model owns migrations and now uses generators); no audit script.
 - Pushed 2026-10-09 (3dcf76a, CI green). Open: watch for guard false positives in real apps.
 
-Related: [[rails-specialists-status]], [[rails-hotwire-status]]
+Related: [rails-specialists-status](rails-specialists.md), [rails-hotwire-status](rails-hotwire.md)

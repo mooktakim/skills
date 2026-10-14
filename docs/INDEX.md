@@ -4,7 +4,11 @@
 
 Read this at the start of a task and open only the notes that matter to it. Protocol: MEMORY.md.
 
-No curated notes yet.
-
-## Inbox
-- inbox/ - 9 proposal(s) awaiting verification; never guidance.
+## Architecture
+- architecture/project-memory.md - project-memory plugin (0.4.0, 2026-10-15) - replaced the global project history log; user decisions on migration, Rust command, opt-in CI (verified 2026-10-15)
+- architecture/rails-design-system.md - rails-design-system - standing constraints and user decisions to respect in every edit (as of 2026-10-01) (verified 2026-10-15)
+- architecture/rails-generators.md - rails-generators plugin - why it exists (hand-written migrations), PreToolUse guard design, no agent/no audit decision, open items (verified 2026-10-15)
+- architecture/rails-hotwire.md - rails-hotwire skill plugin (2026-10-09) - scope, user conventions it encodes, and the open agent and old-skill questions (verified 2026-10-15)
+- architecture/rails-minitest.md - rails-minitest plugin (2026-10-08) - user decisions behind it, how it was verified, and the open fixtures-vs-factory_bot question (verified 2026-10-15)
+- architecture/rails-specialists.md - rails-specialists plugin - standing design constraints, field results, and what is unproven (as of 2026-10-01) (verified 2026-10-15)
+- architecture/rails-view-component.md - rails-view-component plugin (2026-10-09) - user decisions behind it, what replaces what, and the open agent and old-skill questions (verified 2026-10-15)

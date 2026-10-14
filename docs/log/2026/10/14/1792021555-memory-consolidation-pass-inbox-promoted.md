@@ -1,0 +1,6 @@
+- First consolidation pass (user approved the plan). stale/lint before: 9 inbox proposals, nothing else.
+- Promoted 7 to architecture/ (living per-plugin overviews; not decisions/, which holds immutable ADRs): project-memory, rails-design-system, rails-generators, rails-hotwire, rails-minitest, rails-specialists, rails-view-component. Each checked against the code (agents, model/disallowedTools, scripts, config_files rails.md and skills dir); verified_at 2026-10-15, citations to the checked files.
+- Fixes: rails-view-component said turbo-hotwire was kept - it was deleted 2026-10-09 (config_files 96d2aa9); rails-hotwire's stale "Old note ... waits on the user" sentence removed, its still-valid count-prefix instruction kept. [[wiki-links]] became relative links.
+- Moved to the log, text unchanged (history, not guidance): usage-review-2026-10 -> log/2026/10/01/1790812801-usage-review.md, usage-review-2026-10-12 -> log/2026/10/12/1791763201-usage-review.md.
+- Rejected: none. Merged, expired, retired: none. Inbox now empty; lint clean (7 notes).
+- Still open in the notes: maynard design-system maintenance run not yet done; the ~2026-10-22 delegation count.
