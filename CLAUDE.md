@@ -48,6 +48,19 @@ Commit directly on `main`. Never create a branch unless explicitly asked to.
 
 Commit automatically, without asking, whenever a coherent unit of work is done — a skill created or edited, a convention changed, a correction folded in. Don't batch unrelated changes into one commit, and don't leave finished work sitting uncommitted. This overrides the global ask-before-every-commit rule for this repository. Pushing still requires explicit confirmation.
 
+## Project memory
+
+Long-term project knowledge lives in docs/ under the protocol in
+docs/MEMORY.md; its Project overrides section is this project's own rules.
+At the start of a task, read docs/INDEX.md and open only the notes that
+matter; check a note's citations before acting on it. Before committing a
+finished unit of work, add its entry under docs/log/ in the same commit, and
+put new facts, gotchas, procedures, and lessons in docs/inbox/ as proposals,
+never straight into curated notes. bin/memory lint checks the docs;
+bin/memory index rebuilds the index. bin/memory is a copy of
+project-memory/scripts/memory: when that script changes, copy it over in the
+same commit (`test/repo_test.rb` checks).
+
 ## Using these skills
 
 Install via the marketplace: `/plugin marketplace add <path-or-repo>` then install skills individually, e.g. `/plugin install rails-context@mooktakim`. From a local checkout, add the marketplace by path (`/plugin marketplace add ~/Workspace/skills`). To test a change, invoke the skill in a Claude Code session inside a target project.

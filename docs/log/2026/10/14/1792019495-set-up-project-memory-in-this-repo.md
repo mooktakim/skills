@@ -1,0 +1,4 @@
+- First real run of the project-memory setup on this repo (dogfood, user approved).
+- Migration lines: docs/history/ 80 entries -> docs/log/ (previous commit, pure git mv renames, 0 lines changed). Root CLAUDE.md: 53 lines, all sections stay (process and structure rules every task needs); no notes moved. No ADRs or other docs.
+- Added docs/MEMORY.md (protocol 0.1.0, default settings, no overrides), bin/memory (copy of project-memory/scripts/memory; repo_test checks they match), docs/INDEX.md, the Project memory block in CLAUDE.md, and a `bin/memory lint` step in the Ruby 2.6 CI job.
+- Not migrated, left for the user to decide (repo is public): the project-type auto memories in ~/.claude/projects/-Users-mooktakim-Workspace-skills/memory/ (plugin status notes, usage reviews). The feedback memory (CLAUDE.md canonical) stays in auto memory.

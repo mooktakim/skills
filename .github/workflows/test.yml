@@ -35,6 +35,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: bin/test
+      - name: Project memory docs
+        run: bin/memory lint
 
   macos:
     name: macOS, system bash and Ruby
