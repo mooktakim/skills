@@ -1,6 +1,6 @@
 {
   "name": "capture",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Record a rule you state, or a correction you make, into the one checked-in context file where it belongs, so you never have to say it again",
   "author": { "name": "Mooktakim Ahmed", "email": "mooktakim@fluxter.co.uk" },
   "homepage": "https://github.com/mooktakim/skills",

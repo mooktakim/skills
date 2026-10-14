@@ -14,7 +14,7 @@ A correction you have to repeat is a gap in the project's context. Auto memory d
 
 One-off taste ("I don't like this layout") and task instructions are not recorded. The same taste correction a second time is, as a design rule.
 
-Works in any project. In Rails apps set up with `rails-context` and `rails-design-system`, it routes into their files and follows their formats and size limits.
+Works in any project. In Rails apps set up with `rails-context` and `rails-design-system`, it routes into their files and follows their formats and size limits. In projects set up with `project-memory`, project-wide conventions, traps and procedures go to curated notes under `docs/` (your approval counts as the promotion the protocol asks for), and the root `CLAUDE.md` keeps only the few hard rules every task needs.
 
 ## Install
 

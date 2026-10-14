@@ -30,7 +30,7 @@ Every rule lives at exactly one level: the most specific place it applies to, an
 | UI wording, formats, or how a state is shown, across every section | `docs/design-system/conventions.md` |
 | One UI section's look or behaviour | That section's `docs/design-system/<section>/design.md` |
 | One component or page pattern | Its spec: `docs/design-system/<section>/components/<name>.md` or `patterns/<name>.md` |
-| The whole project (process, tooling, architecture) | The root `CLAUDE.md` (or the project's root `AGENTS.md` if that is its canonical file) |
+| The whole project (process, tooling, architecture) | The root `CLAUDE.md` (or the project's root `AGENTS.md` if that is its canonical file); in a project with `docs/MEMORY.md`, usually a note instead - see "Projects with project memory" |
 | The user personally, in every project | The user's global `~/.claude/CLAUDE.md` - see "Global rules" |
 
 Read the target file before drafting, and follow its conventions: its sections, density, and voice. Files written by the `rails-context` skill describe intent, never inventories, and have size limits (a directory file reviews at 150 lines or 10 KB, the root at 200 lines or 12 KB); a capture that would push a file past its limit says so, and proposes where the file should split. Files written by `rails-design-system` keep their formats (the states table in `conventions.md`, a component spec's Contract and Rules sections).
@@ -41,7 +41,7 @@ A correction about a component or page that is being built right now and has no 
 
 ## 3. Already recorded?
 
-Search the candidate files for the rule before drafting (grep its key terms), and look for lines that say the opposite too. A contradicting line anywhere is resolved in the same capture - edited or removed, with the user's approval - never left as a second, opposite rule. If the rule is already written where it belongs, do not add it again: tell the user where it is, and that the problem is that it was not followed. Then propose the fix that makes it stick - clearer or stronger wording, moving it to a more specific file that loads when the relevant code is read, or a mechanical check (below). If it is recorded in the wrong place, propose moving it, not copying it.
+Search the candidate files for the rule before drafting (grep its key terms; in a project with project memory, also the notes under `docs/`, leaving out `docs/archive/` and `docs/log/`), and look for lines that say the opposite too. A contradicting line anywhere is resolved in the same capture - edited or removed, with the user's approval - never left as a second, opposite rule. If the rule is already written where it belongs, do not add it again: tell the user where it is, and that the problem is that it was not followed. Then propose the fix that makes it stick - clearer or stronger wording, moving it to a more specific file that loads when the relevant code is read, or a mechanical check (below). If it is recorded in the wrong place, propose moving it, not copying it.
 
 ## 4. Propose, then wait
 
@@ -63,6 +63,10 @@ Existing code that already breaks the new rule is reported, never fixed silently
 ## 6. Write and commit
 
 Write the approved text surgically: add or edit only those lines, never regenerate the file. Follow the project's commit rules. When the capture came out of work that is not committed yet, it belongs in that same commit; otherwise commit it on its own, with a message that names the rule.
+
+## Projects with project memory
+
+When the project has `docs/MEMORY.md` (the `project-memory` protocol), follow it, including its Project overrides. A project-wide rule goes to the root `CLAUDE.md` only when it is one of the few non-obvious hard rules every task needs; otherwise it goes to a curated note: a convention to `docs/conventions/<topic>.md`, a trap or hidden coupling to `docs/gotchas/<topic>.md`, a procedure to `docs/playbooks/<topic>.md`. Add it to the existing note for the topic when there is one (search by key terms and `aliases`); otherwise create one with the protocol's frontmatter: `status: active`, `created` and `verified_at` today, `sources: [user, YYYY-MM-DD]`, and `citations` when the rule is about specific code. Show the note's frontmatter in the proposal too. The user's approval of the exact text is the human approval the protocol's promotion rule asks for, so an approved capture skips `docs/inbox/`. After writing, run `bin/memory index` and `bin/memory lint`. Rules for one directory, the design system, or the user personally still go where the table above says.
 
 ## Global rules
 
