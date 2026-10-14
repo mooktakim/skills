@@ -5,3 +5,6 @@
 Read this at the start of a task and open only the notes that matter to it. Protocol: MEMORY.md.
 
 No curated notes yet.
+
+## Inbox
+- inbox/ - 9 proposal(s) awaiting verification; never guidance.

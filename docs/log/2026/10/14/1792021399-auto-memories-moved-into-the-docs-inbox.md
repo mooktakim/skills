@@ -1,0 +1,4 @@
+- Copied the 9 project-type auto memories (plugin status notes, the two usage reviews, project-memory status) from ~/.claude/projects/-Users-mooktakim-Workspace-skills/memory/ into docs/inbox/ as proposals: type decision, created = the memory's modified date (file date when missing), sources: [auto memory <file>]. Bodies byte-identical to the originals (checked).
+- Left in auto memory: the feedback memory (CLAUDE.md canonical, AGENTS.md symlink) - it is about the user, not the project. Originals untouched; the user can prune them.
+- The user corrected an earlier assumption: this repo is private, so there was no reason to hold the memories back.
+- Next: a consolidation pass promotes or rejects each proposal (check claims against the code; some status notes may be out of date).
