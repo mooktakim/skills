@@ -13,9 +13,9 @@
     },
     {
       "id": "history-write",
-      "title": "writing a docs/history log entry by hand",
+      "title": "writing a docs/log history entry by hand",
       "rules": [
-        ["docs/history/", "cat\\s*>|mkdir|>\\s*\"?\\$"]
+        ["docs/(?:history|log)/", "cat\\s*>|mkdir|>\\s*\"?\\$"]
       ]
     },
     {

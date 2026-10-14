@@ -7,7 +7,7 @@ Claude repeats the same shell patterns hundreds of times: a Python heredoc that 
 | Command | Job |
 |---------|-----|
 | `toolsmith-text-replace` | Replace exact, literal text in existing files as one all-or-nothing change. |
-| `toolsmith-history-add` | Add one new entry file to the project's `docs/history` log. |
+| `toolsmith-history-add` | Add one new entry file to the project's `docs/log` history. |
 | `toolsmith-file-lines` | Print numbered line ranges from several files in one call. |
 | `toolsmith-check-run` | Run a check command, printing only its outcome with any failures. |
 | `toolsmith-files-write` | Create several new files from one stdin bundle, never overwriting by accident. |

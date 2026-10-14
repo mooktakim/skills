@@ -1,8 +1,8 @@
 //! toolsmith-history-add: adds one new entry file to the project's
-//! docs/history log, as the project-history-log procedure describes:
-//! `docs/history/<YYYY-MM-DD>/<epoch>-<slug>.md`, never overwriting an entry,
-//! staged so it lands in the same commit as the work. See tool.json for the
-//! guide that `--llm` prints.
+//! docs/log history, as the project-memory protocol (docs/MEMORY.md)
+//! describes: `docs/log/<YYYY>/<MM>/<DD>/<epoch>-<slug>.md` with the UTC date
+//! of the epoch, never overwriting an entry, staged so it lands in the same
+//! commit as the work. See tool.json for the guide that `--llm` prints.
 
 use std::fs::{self, OpenOptions};
 use std::io::{ErrorKind, IsTerminal, Read, Write};
@@ -49,11 +49,19 @@ fn main() {
     }
 
     let cwd = std::env::current_dir().unwrap_or_else(|e| tool.fail(&format!("cannot read the current directory: {}", e)));
-    let (base, in_git) = find_base(&cwd).unwrap_or_else(|| {
-        tool.fail("no docs/history directory above here and not inside a git repository; run this from inside the project")
-    });
+    let in_git = cwd.ancestors().any(|d| d.join(".git").exists());
+    let base = match find_base(&cwd) {
+        Base::Memory(base) => base,
+        Base::Legacy(base) => tool.fail(&format!(
+            "{} still has the legacy docs/history log; migrate it to docs/log with the project-memory skill first",
+            shown_path(&base, &cwd)
+        )),
+        Base::None => tool.fail(
+            "no docs/MEMORY.md or docs/log above here; set up project memory with the project-memory skill first",
+        ),
+    };
     let (day, epoch) = now().unwrap_or_else(|e| tool.fail(&e));
-    let dir = base.join("docs/history").join(&day);
+    let dir = base.join("docs/log").join(&day);
     if let Err(e) = fs::create_dir_all(&dir) {
         tool.fail(&format!("cannot create {}: {}", dir.display(), e));
     }
@@ -108,26 +116,39 @@ fn slugify(title: &str) -> String {
     slug
 }
 
-/// The nearest directory at or above `cwd` that has docs/history; else the
-/// git repository root, where the log will start. Also says whether the
-/// result is inside a git repository.
-fn find_base(cwd: &Path) -> Option<(PathBuf, bool)> {
-    let in_git = cwd.ancestors().any(|d| d.join(".git").exists());
-    for dir in cwd.ancestors() {
-        if dir.join("docs/history").is_dir() {
-            return Some((dir.to_path_buf(), in_git));
-        }
-        if dir.join(".git").exists() {
-            return Some((dir.to_path_buf(), true));
-        }
-    }
-    None
+#[derive(Debug, PartialEq)]
+enum Base {
+    /// A project with project memory: docs/MEMORY.md or docs/log.
+    Memory(PathBuf),
+    /// A project that still has the old docs/history or docs/HISTORY.md log.
+    Legacy(PathBuf),
+    None,
 }
 
-/// Today's local date and the Unix time, read in one `date` call so they agree.
+/// The nearest directory at or above `cwd` that has project memory, looking
+/// no higher than the git repository root.
+fn find_base(cwd: &Path) -> Base {
+    for dir in cwd.ancestors() {
+        let docs = dir.join("docs");
+        if docs.join("MEMORY.md").is_file() || docs.join("log").is_dir() {
+            return Base::Memory(dir.to_path_buf());
+        }
+        if docs.join("history").is_dir() || docs.join("HISTORY.md").is_file() {
+            return Base::Legacy(dir.to_path_buf());
+        }
+        if dir.join(".git").exists() {
+            break;
+        }
+    }
+    Base::None
+}
+
+/// Today's UTC date as YYYY/MM/DD and the Unix time, read in one `date` call
+/// so they agree.
 fn now() -> Result<(String, String), String> {
     let out = Command::new("date")
-        .arg("+%Y-%m-%d %s")
+        .arg("-u")
+        .arg("+%Y/%m/%d %s")
         .output()
         .map_err(|e| format!("could not run date: {}", e))?;
     let text = String::from_utf8_lossy(&out.stdout);
@@ -152,6 +173,9 @@ fn shown_path(file: &Path, cwd: &Path) -> String {
     }
     for part in &file_parts[shared..] {
         out.push(part);
+    }
+    if out.as_os_str().is_empty() {
+        return ".".to_string();
     }
     out.display().to_string()
 }
@@ -178,20 +202,27 @@ mod tests {
 
     #[test]
     fn paths_are_shown_relative_to_the_current_directory() {
-        let file = Path::new("/r/apps/web/docs/history/d/1-x.md");
-        assert_eq!(shown_path(file, Path::new("/r/apps/web")), "docs/history/d/1-x.md");
-        assert_eq!(shown_path(file, Path::new("/r/apps/web/app/models")), "../../docs/history/d/1-x.md");
+        let file = Path::new("/r/apps/web/docs/log/d/1-x.md");
+        assert_eq!(shown_path(file, Path::new("/r/apps/web")), "docs/log/d/1-x.md");
+        assert_eq!(shown_path(file, Path::new("/r/apps/web/app/models")), "../../docs/log/d/1-x.md");
     }
 
     #[test]
-    fn the_nearest_history_wins_then_the_git_root() {
-        let root = std::env::temp_dir().join(format!("toolsmith-history-{}", std::process::id()));
+    fn the_nearest_project_memory_wins_up_to_the_git_root() {
+        let outer = std::env::temp_dir().join(format!("toolsmith-history-{}", std::process::id()));
+        let root = outer.join("repo");
         let sub = root.join("apps/web/app");
         fs::create_dir_all(&sub).unwrap();
         fs::create_dir_all(root.join(".git")).unwrap();
-        assert_eq!(find_base(&sub), Some((root.clone(), true)));
+        fs::create_dir_all(outer.join("docs/log")).unwrap();
+        assert_eq!(find_base(&sub), Base::None, "never above the git root");
+        fs::create_dir_all(root.join("docs")).unwrap();
+        fs::write(root.join("docs/MEMORY.md"), "x").unwrap();
+        assert_eq!(find_base(&sub), Base::Memory(root.clone()));
         fs::create_dir_all(root.join("apps/web/docs/history")).unwrap();
-        assert_eq!(find_base(&sub), Some((root.join("apps/web"), true)));
-        fs::remove_dir_all(&root).unwrap();
+        assert_eq!(find_base(&sub), Base::Legacy(root.join("apps/web")));
+        fs::create_dir_all(root.join("apps/web/docs/log")).unwrap();
+        assert_eq!(find_base(&sub), Base::Memory(root.join("apps/web")));
+        fs::remove_dir_all(&outer).unwrap();
     }
 }

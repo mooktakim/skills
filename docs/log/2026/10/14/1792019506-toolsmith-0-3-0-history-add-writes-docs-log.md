@@ -1,0 +1,4 @@
+- toolsmith-history-add now writes the project-memory layout: docs/log/YYYY/MM/DD/EPOCH-slug.md with the UTC date of the epoch (`date -u`). Base is the nearest dir with docs/MEMORY.md or docs/log, never above the git root.
+- It refuses (exit 1) in a project that still has docs/history or docs/HISTORY.md ("migrate ... with the project-memory skill first") and in one without project memory; it no longer starts a log at the git root.
+- families.json history-write rule matches docs/history/ and docs/log/. Guide examples, unit tests and toolsmith_test updated. Minor bump 0.2.6 -> 0.3.0.
+- Seen while setting up: the installed toolsmith 0.2.6 copy on PATH still writes docs/history until the plugin is updated; bin/memory lint flags such a stray entry.

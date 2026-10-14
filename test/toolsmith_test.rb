@@ -272,9 +272,9 @@ class ToolsmithTest < Minitest::Test
   def test_history_add_never_overwrites_an_entry
     need_cargo
     assert_equal 0, run_tool("toolsmith-history-add", "--help").code, "build first, so the build time cannot pass the entries below"
-    day = Time.now.strftime("%Y-%m-%d")
+    write "docs/MEMORY.md", "# Memory Protocol\n"
     now = Time.now.to_i
-    (now..now + 60).each { |epoch| write "docs/history/#{day}/#{epoch}-same-title.md", "- First.\n" }
+    (now..now + 60).each { |epoch| write "docs/log/#{Time.at(epoch).utc.strftime('%Y/%m/%d')}/#{epoch}-same-title.md", "- First.\n" }
     before = tree(@dir)
     result = run_tool("toolsmith-history-add", "Same title", stdin: "- Second.\n")
     assert_equal 1, result.code, result.out
