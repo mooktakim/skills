@@ -11,17 +11,12 @@ class ProjectMemoryTest < Minitest::Test
   def setup
     super
     install "project-memory", "memory"
-    install "project-memory", "migrate_history"
     write "docs/MEMORY.md", File.read(TEMPLATE)
     write "app/models/money.rb", "class Money\n  CENTS = 100\nend\n"
   end
 
   def memory(*args, cwd: @dir)
     run_script "memory", *args, cwd: cwd
-  end
-
-  def migrate(*args)
-    run_script "migrate_history", *args
   end
 
   def note(rel, fields = {}, body = "Money is integer cents.\n")
@@ -192,79 +187,5 @@ class ProjectMemoryTest < Minitest::Test
 
   def test_stale_with_nothing_to_do
     assert_equal "Nothing to consolidate.\n", memory("stale").out
-  end
-
-  # -- migrate_history ------------------------------------------------------
-
-  def test_migrates_the_history_folder_keeping_text_order_and_git_history
-    write "docs/history/2026-08-07/0000000001-first-old.md", "- first\n"
-    write "docs/history/2026-08-07/0000000002-second-old.md", "- second\n  - nested\n"
-    write "docs/history/2026-08-07/1786124944-real.md", "- real, no trailing newline"
-    write "docs/history/2026-10-14/1792022399-late-local.md", "- late\n"
-    commit "history"
-    dry = migrate
-    assert_equal 0, dry.code, dry.out
-    assert_includes dry.out, "docs/history/2026-08-07/0000000001-first-old.md -> docs/log/2026/08/07/1786060801-first-old.md"
-    assert_includes dry.out, "4 entries to migrate. Nothing was changed; run again with --apply."
-    assert File.exist?(path("docs/history/2026-08-07/1786124944-real.md"))
-
-    result = migrate("--apply")
-    assert_equal 0, result.code, result.out
-    assert_includes result.out, "Migrated 4 entries into docs/log/; every entry's text is unchanged."
-    assert_equal "- second\n  - nested\n", File.read(path("docs/log/2026/08/07/1786060802-second-old.md"))
-    assert_equal "- real, no trailing newline", File.read(path("docs/log/2026/08/07/1786124944-real.md"))
-    assert File.exist?(path("docs/log/2026/10/14/1792022399-late-local.md"))
-    refute File.exist?(path("docs/history"))
-    assert_equal 4, git("diff", "--cached", "-M", "--name-status").lines.count { |line| line.start_with?("R100") }
-    memory "index"
-    assert_equal 0, memory("lint").code, memory("lint").out
-  end
-
-  def test_splits_a_single_history_file_into_one_entry_per_bullet
-    write "docs/HISTORY.md", <<~MD
-      # Project history
-
-      ## 2026-08-07
-      - **Added billing**: Stripe checkout.
-        - nested detail
-          more detail
-
-      - Fixed `cache` keys
-      ## 2026-08-08
-      * Second day
-    MD
-    commit "legacy"
-    result = migrate("--apply")
-    assert_equal 0, result.code, result.out
-    assert_includes result.out, "dropped (no entry text): docs/HISTORY.md:1: # Project history"
-    base = Time.utc(2026, 8, 7).to_i
-    assert_equal "- **Added billing**: Stripe checkout.\n  - nested detail\n    more detail\n",
-                 File.read(path("docs/log/2026/08/07/#{base + 1}-added-billing.md"))
-    assert_equal "- Fixed `cache` keys\n", File.read(path("docs/log/2026/08/07/#{base + 2}-fixed-cache-keys.md"))
-    assert_equal "* Second day\n", File.read(path("docs/log/2026/08/08/#{base + 86_400 + 1}-second-day.md"))
-    refute File.exist?(path("docs/HISTORY.md"))
-    assert_includes git("status", "--short"), "D  docs/HISTORY.md"
-  end
-
-  def test_refuses_and_changes_nothing_when_content_would_be_lost
-    write "docs/HISTORY.md", "# History\n\nAn intro paragraph.\n\n## 2026-08-07\n- one\n"
-    write "docs/history/2026-08-07/notes.txt", "stray\n"
-    write "docs/history/2026-08-07/0000000001-one.md", "- one\n"
-    write "docs/log/2026/08/07/1786060801-one.md", "- already here\n"
-    before = Dir.glob(path("docs/**/*")).sort
-    result = migrate("--apply")
-    assert_equal 1, result.code
-    assert_includes result.out, "docs/HISTORY.md:3: not part of a top-level bullet under a ## YYYY-MM-DD heading: An intro paragraph."
-    assert_includes result.out, "docs/history/2026-08-07/notes.txt: not a docs/history/<YYYY-MM-DD>/<number>-<slug>.md entry"
-    assert_includes result.out, "docs/log/2026/08/07/1786060801-one.md already exists"
-    assert_includes result.out, "Nothing was changed."
-    assert_equal before, Dir.glob(path("docs/**/*")).sort
-    assert_equal "- already here\n", File.read(path("docs/log/2026/08/07/1786060801-one.md"))
-  end
-
-  def test_nothing_to_migrate
-    result = migrate
-    assert_equal 0, result.code
-    assert_includes result.out, "No legacy log found"
   end
 end

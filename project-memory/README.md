@@ -33,7 +33,7 @@ Each project can change the protocol in the **Project overrides** section at the
 
 ## Migrating from the project history log
 
-Projects that kept the older history log (`docs/history/<YYYY-MM-DD>/<timestamp>-<slug>.md`, or a single `docs/HISTORY.md`) migrate on setup. `migrate_history` moves every entry into `docs/log/` with its text unchanged and tracked files moved with `git mv`, and refuses to change anything if a file does not fit. Setup also offers to move notes out of an oversized root `CLAUDE.md`, existing ADRs, and project facts from Claude's local auto memory, each listed in the plan with counts before anything moves.
+Projects that kept the older history log (`docs/history/<YYYY-MM-DD>/<timestamp>-<slug>.md`, or a single `docs/HISTORY.md`) migrate on setup. Claude reads the old log, works out its shape (projects differ), and shows the plan: the rule for each part, example moves, counts, and every line it would drop. Each entry then moves into `docs/log/` with its text unchanged - entry files with `git mv`, so git keeps their history - and the counts and text are checked before the old log is deleted. Setup also offers to move notes out of an oversized root `CLAUDE.md`, existing ADRs, and project facts from Claude's local auto memory, each listed in the plan with counts before anything moves.
 
 ## Usage
 

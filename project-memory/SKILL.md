@@ -9,7 +9,7 @@ This skill gives a project long-term memory that lives in git: markdown notes wi
 
 Routine work does not need this skill. Once a project has `docs/MEMORY.md`, follow that file: read `docs/INDEX.md` at the start of a task, write a log entry before each commit of finished work, put new knowledge in `docs/inbox/`.
 
-`${CLAUDE_SKILL_DIR}` is this skill's directory (resolve it yourself if the variable is not expanded). It holds `templates/MEMORY.md` (the protocol), `scripts/memory` (copied into projects as `bin/memory`) and `scripts/migrate_history` (run from here, never copied).
+`${CLAUDE_SKILL_DIR}` is this skill's directory (resolve it yourself if the variable is not expanded). It holds `templates/MEMORY.md` (the protocol) and `scripts/memory` (copied into projects as `bin/memory`).
 
 ## Project rules come first
 
@@ -28,8 +28,7 @@ Every run has one approval gate: show the plan and wait. Only a reply to the pla
 ### 1. Survey
 
 1. Read the root `CLAUDE.md` (and `AGENTS.md`), the README, the CI config, and list everything under `docs/`.
-2. Run `ruby "${CLAUDE_SKILL_DIR}/scripts/migrate_history"` from the project directory. Without `--apply` it changes nothing: it prints each legacy entry and where it would go, or the lines that stop it.
-3. List every other source of project knowledge that should move into the memory (see "Migration" below). Each becomes one line in the plan: source, target, and how many items.
+2. Find every source of project knowledge that should move into the memory, the old history log first (see "Migration" below), and read enough of each to learn its shape. Each becomes one line in the plan: source, target, and how many items.
 
 ### 2. Plan, then wait
 
@@ -46,7 +45,7 @@ Every open question needs an answer, or the user's "use your recommendation", be
 
 1. Copy `${CLAUDE_SKILL_DIR}/templates/MEMORY.md` to `docs/MEMORY.md`. Replace "None yet..." in Project overrides with the approved overrides. Keep the settings at their defaults unless the project needs otherwise: when the project uses the `rails-context` skill (`bin/audit_context` exists), set `root_context_max_lines: 200` to match that skill's root review trigger, so the two never disagree.
 2. Copy `${CLAUDE_SKILL_DIR}/scripts/memory` to `bin/memory` and make it executable. Copy it unchanged.
-3. Run `ruby "${CLAUDE_SKILL_DIR}/scripts/migrate_history" --apply`, then do the other approved migrations.
+3. Migrate the history log, then do the other approved migrations.
 4. Add this block to the root `CLAUDE.md` (create the file if there is none; adapt the wording to fit, keep the substance):
 
    ```markdown
@@ -69,7 +68,7 @@ Every open question needs an answer, or the user's "use your recommendation", be
 
 ### 4. Commit
 
-Follow the project's commit rules. Commit the history migration on its own first, so its diff shows only renames (`git diff --cached -M --stat` reports 0 insertions and 0 deletions for moved entries); then commit the rest of the setup with its log entry. Report the counts and the final `bin/memory lint` result to the user.
+Follow the project's commit rules. Commit the history migration on its own first, so its diff is easy to review (moved entry files show as renames with 0 insertions and 0 deletions); then commit the rest of the setup with its log entry. Report the counts and the final `bin/memory lint` result to the user.
 
 ## Migration
 
@@ -77,14 +76,22 @@ Nothing is lost: every item moves with its text unchanged, the plan lists every 
 
 ### The legacy history log
 
-This replaces the older per-user "project history log" instructions: one file per update at `docs/history/<YYYY-MM-DD>/<timestamp>-<slug>.md`, and before that a single `docs/HISTORY.md` with `## YYYY-MM-DD` sections. `migrate_history` moves both into `docs/log/YYYY/MM/DD/EPOCH-slug.md`:
-- an entry with a real Unix timestamp keeps it and gets the UTC date folder of that time;
-- an entry numbered in sequence by an earlier migration (`0000000001`) becomes its date's UTC midnight plus the number, so the order is kept;
-- each top-level bullet of `docs/HISTORY.md` becomes one entry, with its nested lines; only blank lines, one `# ` title and the date headings are dropped (the dates live on in the folder names).
+This replaces the older per-user "project history log" instructions, which kept one file per update at `docs/history/<YYYY-MM-DD>/<timestamp>-<slug>.md`, and before that a single `docs/HISTORY.md` with `## YYYY-MM-DD` sections. Projects have drifted from those shapes, and some keep an agent-written log elsewhere (a `NOTES.md` or `docs/changelog.md` with dated sections), so read the log and decide how each part maps; do not assume the shape. A human-facing `CHANGELOG.md` (release notes for users) is not memory: leave it.
 
-It refuses and changes nothing when a file does not fit these shapes or a target exists. When it refuses, fix the source by hand without dropping content (move a stray paragraph into the bullet it belongs to, rename a misnamed file) and run it again; ask the user before removing any line. Tracked files move with `git mv`, so `git log --follow` still finds their history. Entries keep their original text and need not follow the new entry template.
+Every entry ends up as one file at `docs/log/YYYY/MM/DD/EPOCH-slug.md`, its text unchanged. Entries keep their original text and need not follow the new entry template.
 
-An agent-maintained log in another shape (a `NOTES.md` or `docs/changelog.md` written by agents, with dated sections) migrates by hand with the same rules: one file per top-level item, text verbatim, `EPOCH` = that date's UTC midnight plus the item's position, and a count check of items in against files out. A human-facing `CHANGELOG.md` (release notes for users) is not memory: leave it.
+- **One entry per file already**: move each file with `git mv`, so its content cannot change and `git log --follow` still finds its history. Keep its slug. A real Unix timestamp stays the `EPOCH`; a sequence number or no number becomes that date's UTC midnight plus the entry's position in the day, so the order is kept.
+- **Many entries in one file**: one new file per entry - what the log treats as one update, usually a top-level bullet with its nested lines. Copy the text exactly; never reword, fix, or merge entries. `EPOCH` is the entry's own time if it has one, otherwise its date's UTC midnight plus its position.
+- **The date folder** is always the UTC date of the `EPOCH` (`date -u -r EPOCH +%Y/%m/%d` on macOS, `date -u -d @EPOCH +%Y/%m/%d` on Linux), even when the old folder said another day.
+- **Lines that are not entries**: a title and date headings can be dropped, because the dates live on in the folder names. Anything else - an intro, a stray paragraph, a note between sections - is content: list it in the plan with your proposal (attach it to the entry it belongs to, or make it its own entry), and never drop it without the user's approval.
+
+The plan shows the shape you found, the rule you will apply, a few example moves (source → target), the counts, and every line that will be dropped. Before deleting any source, verify:
+1. Entries in equals files out.
+2. Moved files: `git diff --cached -M --stat` shows only renames, with 0 insertions and 0 deletions.
+3. Split files: the source's non-blank lines, without the dropped lines the plan listed, equal the new entries' non-blank lines joined in order - a `diff` of the two is empty.
+4. `bin/memory lint` reports no problem in `docs/log/` and no legacy log left.
+
+Then delete the old file (`git rm`) and the empty folders, and commit the migration on its own.
 
 ### Root context file content
 
