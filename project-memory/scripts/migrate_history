@@ -1,0 +1,188 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# Moves a legacy project history log into docs/log/YYYY/MM/DD/EPOCH-slug.md
+# without changing a byte of any entry. Plain Ruby, standard library only (Ruby
+# 2.6+). Run it from the plugin; it is not copied into projects.
+#
+#   migrate_history [--apply] [PROJECT_DIR]
+#
+# PROJECT_DIR is the directory that holds docs/ (default: the current one).
+# Without --apply it only prints the plan. It migrates:
+#   - docs/history/<YYYY-MM-DD>/<number>-<slug>.md files. A real Unix time keeps
+#     its number and gets the UTC date folder of that time. A sequence number
+#     from an earlier migration (0000000001) becomes that date's UTC midnight
+#     plus the number, so the order is kept.
+#   - docs/HISTORY.md: each top-level bullet under a "## YYYY-MM-DD" heading
+#     becomes one entry, its indented lines with it, numbered like a sequence.
+#     Only blank lines, one "# " title and the date headings are dropped (the
+#     dates live on in the folder names). Any other line stops the migration.
+# It refuses, and changes nothing, when a file does not fit these shapes or a
+# target exists. Tracked files move with git mv, so git keeps their history.
+
+require "fileutils"
+require "open3"
+require "time"
+
+SEQUENCE_LIMIT = 100_000_000 # numbers below this are sequence numbers, not times
+SLUG_MAX = 60
+
+Entry = Struct.new(:source, :target, :content, :tracked)
+
+def slugify(text)
+  slug = text.downcase.gsub(/[^a-z0-9]+/, "-").gsub(/\A-+|-+\z/, "")
+  slug = slug[0, slug[0..SLUG_MAX].rindex("-") || SLUG_MAX] if slug.size > SLUG_MAX
+  slug.empty? ? "entry" : slug
+end
+
+def midnight(day)
+  Time.utc(*day.split("-").map(&:to_i)).to_i
+end
+
+def target_for(epoch, slug)
+  File.join("docs/log", Time.at(epoch).utc.strftime("%Y/%m/%d"), format("%010d-%s.md", epoch, slug))
+end
+
+def git(dir, *args)
+  out, err, status = Open3.capture3("git", *args, chdir: dir)
+  raise "git #{args.join(' ')} failed: #{err.strip}" unless status.success?
+
+  out
+end
+
+def tracked?(dir, file)
+  _out, _err, status = Open3.capture3("git", "ls-files", "--error-unmatch", "--", file, chdir: dir)
+  status.success?
+end
+
+def git_repo?(dir)
+  _out, _err, status = Open3.capture3("git", "rev-parse", "--is-inside-work-tree", chdir: dir)
+  status.success?
+end
+
+def history_dir_entries(dir, problems)
+  Dir.glob(File.join(dir, "docs/history/**/*"), File::FNM_DOTMATCH).sort.each_with_object([]) do |file, entries|
+    next unless File.file?(file)
+    next if File.basename(file) == ".DS_Store"
+
+    rel = file[(dir.length + 1)..-1]
+    match = rel.match(%r{\Adocs/history/(\d{4}-\d{2}-\d{2})/(\d+)-([^/]+)\.md\z})
+    unless match
+      problems << "#{rel}: not a docs/history/<YYYY-MM-DD>/<number>-<slug>.md entry; move or rename it by hand first"
+      next
+    end
+    number = match[2].to_i
+    epoch = number < SEQUENCE_LIMIT ? midnight(match[1]) + number : number
+    entries << Entry.new(rel, target_for(epoch, match[3]), File.binread(file), nil)
+  end
+end
+
+# One entry per top-level bullet under a "## YYYY-MM-DD" heading.
+def history_file_entries(dir, problems, dropped)
+  rel = "docs/HISTORY.md"
+  file = File.join(dir, rel)
+  return [] unless File.file?(file)
+
+  entries = []
+  day = nil
+  current = nil
+  sequence = 0
+  title_seen = false
+  finish = lambda do
+    next unless current
+
+    current[:lines].pop while current[:lines].last.to_s.strip.empty?
+    first = current[:lines].first.sub(/\A[-*]\s+/, "")
+    headline = first[/\A\*\*(.+?)\*\*/, 1] || first[/\A__(.+?)__/, 1] || first
+    entries << Entry.new(rel, target_for(midnight(current[:day]) + current[:sequence], slugify(headline.gsub(/[`*_\[\]]/, ""))),
+                         current[:lines].join, nil)
+    current = nil
+  end
+  File.readlines(file).each_with_index do |line, index|
+    number = index + 1
+    if line.strip.empty?
+      current[:lines] << line if current
+    elsif (heading = line.match(/\A##\s+(\d{4}-\d{2}-\d{2})\s*\z/))
+      finish.call
+      day = heading[1]
+      sequence = 0
+      dropped << "#{rel}:#{number}: #{line.strip}"
+    elsif line =~ /\A#\s/ && day.nil? && !title_seen
+      title_seen = true
+      dropped << "#{rel}:#{number}: #{line.strip}"
+    elsif line =~ /\A[-*]\s/ && day
+      finish.call
+      sequence += 1
+      current = { day: day, sequence: sequence, lines: [line] }
+    elsif line =~ /\A\s/ && current
+      current[:lines] << line
+    else
+      problems << "#{rel}:#{number}: not part of a top-level bullet under a ## YYYY-MM-DD heading: #{line.strip[0, 80]}"
+    end
+  end
+  finish.call
+  entries
+end
+
+apply = ARGV.delete("--apply")
+if ARGV.size > 1 || ARGV.any? { |arg| arg.start_with?("-") }
+  warn "usage: migrate_history [--apply] [PROJECT_DIR]"
+  exit 2
+end
+dir = File.expand_path(ARGV.first || ".")
+problems = []
+dropped = []
+entries = history_dir_entries(dir, problems) + history_file_entries(dir, problems, dropped)
+
+if entries.empty? && problems.empty?
+  puts "No legacy log found in #{dir}/docs (docs/history/ or docs/HISTORY.md)."
+  exit 0
+end
+entries.group_by(&:target).each do |target, group|
+  problems << "#{target}: #{group.map(&:source).uniq.join(' and ')} would both move here" if group.size > 1
+end
+entries.each { |entry| problems << "#{entry.target} already exists" if File.exist?(File.join(dir, entry.target)) }
+unless problems.empty?
+  puts problems
+  puts "Nothing was changed. Fix the #{problems.size} problem(s) above, then run this again."
+  exit 1
+end
+
+entries.each { |entry| puts "#{entry.source} -> #{entry.target}" }
+dropped.each { |line| puts "dropped (no entry text): #{line}" }
+in_git = git_repo?(dir)
+unless apply
+  puts "#{entries.size} entr#{entries.size == 1 ? 'y' : 'ies'} to migrate. Nothing was changed; run again with --apply."
+  exit 0
+end
+
+entries.each do |entry|
+  target = File.join(dir, entry.target)
+  FileUtils.mkdir_p(File.dirname(target))
+  if entry.source == "docs/HISTORY.md"
+    File.binwrite(target, entry.content)
+    git(dir, "add", "--", entry.target) if in_git
+  elsif in_git && tracked?(dir, entry.source)
+    git(dir, "mv", "--", entry.source, entry.target)
+  else
+    File.rename(File.join(dir, entry.source), target)
+  end
+end
+
+legacy_file = File.join(dir, "docs/HISTORY.md")
+if File.file?(legacy_file)
+  in_git && tracked?(dir, "docs/HISTORY.md") ? git(dir, "rm", "-q", "--", "docs/HISTORY.md") : File.delete(legacy_file)
+end
+history = File.join(dir, "docs/history")
+Dir.glob(File.join(history, "**", ".DS_Store")).each { |path| File.delete(path) }
+Dir.glob(File.join(history, "**", "*/")).map { |path| path.chomp("/") }.sort.reverse.each do |path|
+  Dir.rmdir(path) if (Dir.entries(path) - %w[. ..]).empty?
+end
+Dir.rmdir(history) if File.directory?(history) && (Dir.entries(history) - %w[. ..]).empty?
+
+mismatched = entries.reject { |entry| File.binread(File.join(dir, entry.target)) == entry.content }
+unless mismatched.empty?
+  mismatched.each { |entry| puts "#{entry.target}: content differs from #{entry.source}" }
+  exit 1
+end
+puts "Migrated #{entries.size} entr#{entries.size == 1 ? 'y' : 'ies'} into docs/log/; every entry's text is unchanged."
