@@ -5,7 +5,7 @@ description: Set up, migrate to, and maintain a project's long-term memory in gi
 
 # Project memory
 
-This skill gives a project long-term memory that lives in git: markdown notes with citations to code, a generated index read at the start of every task, an inbox where unverified knowledge waits, and an append-only log of finished work. The protocol itself is copied into the project as `docs/MEMORY.md` and linked from the root `CLAUDE.md`, so every session and every teammate follows it without this plugin. The skill does the work one project cannot do on its own: setup, lossless migration from older ways of keeping history, consolidation passes, and protocol upgrades.
+This skill gives a project long-term memory that lives in git: markdown notes with citations to code, a generated index read at the start of every task, an inbox where unverified knowledge waits, and an append-only log of finished work. The protocol itself is copied into the project as `docs/MEMORY.md` and linked from the root `AGENTS.md` (which `CLAUDE.md` imports), so every session and every teammate follows it without this plugin. The skill does the work one project cannot do on its own: setup, lossless migration from older ways of keeping history, consolidation passes, and protocol upgrades.
 
 Routine work does not need this skill. Once a project has `docs/MEMORY.md`, follow that file: read `docs/INDEX.md` at the start of a task, write a log entry before each commit of finished work, put new knowledge in `docs/inbox/`.
 
@@ -13,7 +13,7 @@ Routine work does not need this skill. Once a project has `docs/MEMORY.md`, foll
 
 ## Project rules come first
 
-Each project can change the protocol. Before doing anything, read the root `CLAUDE.md` (and a real `AGENTS.md`), the **Project overrides** section and settings frontmatter of `docs/MEMORY.md` if it exists, and anything else the project says about docs, logs, or memory. Where the project differs from this skill or the template, the project wins: follow it, and never "fix" it back to the default. During setup, rules the project already states about its docs or logs become entries in the new Project overrides section, moved verbatim, not copied. If an override cannot work with a `project-memory` check (the command only reads the settings in the frontmatter), tell the user and propose either a setting or a change to the override.
+Each project can change the protocol. Before doing anything, read the root `AGENTS.md` and `CLAUDE.md`, the **Project overrides** section and settings frontmatter of `docs/MEMORY.md` if it exists, and anything else the project says about docs, logs, or memory. Where the project differs from this skill or the template, the project wins: follow it, and never "fix" it back to the default. During setup, rules the project already states about its docs or logs become entries in the new Project overrides section, moved verbatim, not copied. If an override cannot work with a `project-memory` check (the command only reads the settings in the frontmatter), tell the user and propose either a setting or a change to the override.
 
 ## Which run is this
 
@@ -27,13 +27,13 @@ Every run has one approval gate: show the plan and wait. Only a reply to the pla
 
 ### 1. Survey
 
-1. Read the root `CLAUDE.md` (and `AGENTS.md`), the README, the CI config, and list everything under `docs/`.
+1. Read the root `AGENTS.md` and `CLAUDE.md`, the README, the CI config, and list everything under `docs/`.
 2. Find every source of project knowledge that should move into the memory, the old history log first (see "Migration" below), and read enough of each to learn its shape. Each becomes one line in the plan: source, target, and how many items.
 
 ### 2. Plan, then wait
 
 Show the user, in one message:
-- the files setup creates: `docs/MEMORY.md`, `docs/INDEX.md`, the block in the root `CLAUDE.md`;
+- the files setup creates: `docs/MEMORY.md`, `docs/INDEX.md`, the block in the root `AGENTS.md`, and the root layout change when the project needs one (step 4);
 - each migration line from the survey, with counts, and anything that stops a migration;
 - the Project overrides the project's existing rules turn into, and the settings (see step 3 below);
 - whether to add a CI check (step 5). It is opt-in: recommend it when people other than Claude change the code often, since Claude already runs the lint locally; otherwise recommend leaving it out;
@@ -46,7 +46,7 @@ Every open question needs an answer, or the user's "use your recommendation", be
 1. Copy `${CLAUDE_SKILL_DIR}/templates/MEMORY.md` to `docs/MEMORY.md`. Replace "None yet..." in Project overrides with the approved overrides. Keep the settings at their defaults unless the project needs otherwise: when the project uses the `rails-context` skill (`bin/audit_context` exists), set `root_context_max_lines: 200` to match that skill's root review trigger, so the two never disagree.
 2. Run `project-memory --help` to check the command works. The first run builds it with cargo; if cargo is missing, ask the user to install Rust (https://rustup.rs).
 3. Migrate the history log, then do the other approved migrations.
-4. Add this block to the root `CLAUDE.md` (create the file if there is none; adapt the wording to fit, keep the substance):
+4. Add this block to the root `AGENTS.md` (create the file if there is none; adapt the wording to fit, keep the substance):
 
    ```markdown
    ## Project memory
@@ -63,7 +63,7 @@ Every open question needs an answer, or the user's "use your recommendation", be
    https://github.com/mooktakim/skills project-memory`).
    ```
 
-   `CLAUDE.md` is the canonical file; `AGENTS.md` is a relative symlink to it (`ln -s CLAUDE.md AGENTS.md`). A root `AGENTS.md` that is a real file is converted only if the user approved it in the plan (`git mv AGENTS.md CLAUDE.md && ln -s CLAUDE.md AGENTS.md`).
+   `AGENTS.md` holds the root context, for every agent; `CLAUDE.md` beside it is the one line `@AGENTS.md` (Claude Code reads only `CLAUDE.md` and expands the import), plus any rule for Claude alone below it. No symlinks. Convert an older root layout as "Root layout" under Migration says.
 5. If the user opted in to the CI check, add it. On GitHub Actions, add one step after the checkout, pinned to the current full commit SHA of the skills repository (`git ls-remote https://github.com/mooktakim/skills HEAD`):
 
    ```yaml
@@ -101,16 +101,27 @@ The plan shows the shape you found, the rule you will apply, a few example moves
 
 Then delete the old file (`git rm`) and the empty folders, and commit the migration on its own.
 
+### Root layout
+
+The root files end up as `AGENTS.md` with the content and `CLAUDE.md` holding `@AGENTS.md`. Convert an older layout only when the user approved it in the plan, since other tools write to these files too, moving the content unchanged:
+
+- **`CLAUDE.md` with content, `AGENTS.md` a symlink to it, or no `AGENTS.md`**: `git rm -q AGENTS.md` (only when the symlink exists), `git mv CLAUDE.md AGENTS.md`, `printf '@AGENTS.md\n' > CLAUDE.md`, `git add CLAUDE.md`.
+- **`AGENTS.md` with content and no `CLAUDE.md`**: add `CLAUDE.md` holding `@AGENTS.md`.
+- **`CLAUDE.md` a symlink to `AGENTS.md`**: replace it with the importing file.
+- **Both real, with different content**: show both and ask how to merge; never merge on your own.
+
+Check it with `git diff --cached -M --stat` (the content file shows as a rename with no changed lines). In a Rails app set up with `rails-context`, its maintenance run converts the directory files the same way; the root conversion here covers the root only.
+
 ### Root context file content
 
-Sort each section of the root `CLAUDE.md` into one of two kinds. **Stays**: build, test and lint commands, a few non-obvious hard rules every task needs, pointers, and blocks other tools own (such as the `rails-context` block). **Moves**: conventions, traps, procedures, decisions and their reasons, subsystem overviews - each to one note of the matching type, its text unchanged under new frontmatter. A moved rule was already guidance, so it becomes an active note when its citations check out against the code today; if it cannot be verified, it goes to `inbox/` instead. The plan lists every section with its kind and target. If the file is over `root_context_max_lines`, moving is required, not optional.
+Sort each section of the root context file (`AGENTS.md`, or a `CLAUDE.md` still holding content) into one of two kinds. **Stays**: build, test and lint commands, a few non-obvious hard rules every task needs, pointers, and blocks other tools own (such as the `rails-context` block). **Moves**: conventions, traps, procedures, decisions and their reasons, subsystem overviews - each to one note of the matching type, its text unchanged under new frontmatter. A moved rule was already guidance, so it becomes an active note when its citations check out against the code today; if it cannot be verified, it goes to `inbox/` instead. The plan lists every section with its kind and target. If the file is over `root_context_max_lines`, moving is required, not optional.
 
 ### Existing docs
 
 - ADRs anywhere (`docs/adr/`, `doc/decisions/`): `git mv` into `docs/decisions/` keeping their numbers, and add frontmatter above the unchanged text (`type: decision`, `status: active`, or `superseded` in `archive/decisions/` for ones already superseded).
 - Notes in a shape close to the protocol (a gotchas file, a runbook): one note per topic, text unchanged.
 - A folder whose name the protocol uses but that holds human-facing docs without frontmatter (a `docs/architecture/` of guides): ask whether to add frontmatter or rename the folder; do not guess.
-- Directory `CLAUDE.md` files (from `rails-context` or written by hand) stay where they are: they are scoped context, not notes.
+- Directory context files (`AGENTS.md` and its importing `CLAUDE.md`, from `rails-context` or written by hand) stay where they are: they are scoped context, not notes.
 
 ### Claude's auto memory
 
@@ -123,8 +134,9 @@ Claude Code keeps per-user memories for this project in `~/.claude/projects/<pro
 When `docs/MEMORY.md` says an older `protocol:` version than `${CLAUDE_SKILL_DIR}/templates/MEMORY.md`:
 1. Replace the text between the frontmatter and `## Project overrides` with the template's. Keep the Project overrides section byte for byte.
 2. Keep every setting's value; add new settings from the template with their default values; set `protocol:` to the template's.
-3. A project set up before the `project-memory` command existed has a copied `bin/memory` script: `git rm` it, change any mention of it in the root `CLAUDE.md` to the command, and replace its CI step with the action from setup step 5. A project already using the action gets its pin moved to the current commit SHA, so its CI checks with the same version Claude uses.
-4. Run `project-memory index` and `project-memory lint`. An override that now conflicts with the protocol is reported to the user, never edited.
+3. A project set up before the `project-memory` command existed has a copied `bin/memory` script: `git rm` it, change any mention of it in the root context file to the command, and replace its CI step with the action from setup step 5. A project already using the action gets its pin moved to the current commit SHA, so its CI checks with the same version Claude uses.
+4. A root still in an older layout (content in `CLAUDE.md`, `AGENTS.md` a symlink) is converted as "Root layout" under Migration says, as part of this run's plan; move the project memory block into `AGENTS.md` with it.
+5. Run `project-memory index` and `project-memory lint`. An override that now conflicts with the protocol is reported to the user, never edited.
 
 Show the diff with the plan of the run; it goes through the same approval gate.
 

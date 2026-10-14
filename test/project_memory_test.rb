@@ -177,6 +177,17 @@ class ProjectMemoryTest < Minitest::Test
     refute_includes out, "a" * 36, "the secret itself is never printed"
   end
 
+  # Claude Code loads the root AGENTS.md through CLAUDE.md's import, plus any
+  # Claude-only lines below the import: the budget counts both, not the stub.
+  def test_root_budget_counts_agents_md_through_the_claude_md_import
+    write "AGENTS.md", "rule\n" * 140
+    write "CLAUDE.md", "@AGENTS.md\n"
+    memory "index"
+    assert_equal 0, memory("lint").code, memory("lint").out
+    write "CLAUDE.md", "@AGENTS.md\n\n" + ("claude only\n" * 20)
+    assert_includes memory("lint").out, "AGENTS.md + CLAUDE.md: 160 lines, over root_context_max_lines (150)"
+  end
+
   def test_settings_come_from_the_protocol_frontmatter
     File.write(path("docs/MEMORY.md"), File.read(TEMPLATE).sub("root_context_max_lines: 150", "root_context_max_lines: 200"))
     write "CLAUDE.md", "line\n" * 180

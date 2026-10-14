@@ -7,7 +7,8 @@ Agents follow what they retrieve closely, so a memory full of stale or unverifie
 ## What a project gets
 
 ```
-CLAUDE.md               # a short block pointing at the protocol and the index
+AGENTS.md               # a short block pointing at the protocol and the index
+CLAUDE.md               # @AGENTS.md: Claude Code reads only CLAUDE.md and expands the import
 docs/
   MEMORY.md             # the protocol, plus this project's own overrides
   INDEX.md              # generated: one line per curated note, read at task start

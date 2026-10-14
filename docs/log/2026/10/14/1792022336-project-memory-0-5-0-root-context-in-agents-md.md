@@ -1,0 +1,3 @@
+- Same layout decision as rails-context 0.15.0: the root context is AGENTS.md; CLAUDE.md holds `@AGENTS.md` plus Claude-only rules. Protocol template 0.5.0 (layout, what-goes-where, task start, lint rules, checklist).
+- `project-memory lint` measures the root as AGENTS.md + CLAUDE.md lines besides the import ("AGENTS.md + CLAUDE.md: N lines"); a single file or a symlinked pair counts once, so old-layout projects keep their old message. Test added.
+- SKILL.md: setup writes the block to AGENTS.md; new Migration section "Root layout" (commands per old layout, user approval, check with git diff -M); upgrade step 4 converts an old root and moves the block. README tree updated.

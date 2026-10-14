@@ -353,18 +353,33 @@ impl Memory {
         problems
     }
 
+    /// The root context Claude Code loads, as (label, lines): AGENTS.md plus the
+    /// lines of a CLAUDE.md that imports it besides the import, or the one file
+    /// that holds it (a symlinked pair counts once).
+    fn root_context(&self) -> Option<(String, usize)> {
+        let agents = self.root.join("AGENTS.md");
+        let claude = self.root.join("CLAUDE.md");
+        let same = matches!((fs::canonicalize(&agents), fs::canonicalize(&claude)), (Ok(a), Ok(c)) if a == c);
+        let claude_text = claude.is_file().then(|| read(&claude));
+        let imports = claude_text.as_deref().is_some_and(|text| text.lines().any(is_import));
+        match (agents.is_file(), claude_text) {
+            (true, Some(text)) if imports && !same => {
+                let extra: String = text.lines().filter(|line| !is_import(line)).map(|line| format!("{}\n", line)).collect();
+                let lines = line_count(&read(&agents)) + line_count(extra.trim_start_matches('\n'));
+                Some(("AGENTS.md + CLAUDE.md".to_string(), lines))
+            }
+            (_, Some(text)) => Some(("CLAUDE.md".to_string(), line_count(&text))),
+            (true, None) => Some(("AGENTS.md".to_string(), line_count(&read(&agents)))),
+            _ => None,
+        }
+    }
+
     fn size_problems(&self) -> Vec<String> {
         let mut problems = Vec::new();
-        if let Some(root) = ["CLAUDE.md", "AGENTS.md"].iter().map(|n| self.root.join(n)).find(|p| p.is_file()) {
-            let lines = line_count(&read(&root));
+        if let Some((label, lines)) = self.root_context() {
             let max = self.settings.root_context_max_lines;
             if lines > max {
-                problems.push(format!(
-                    "{}: {} lines, over root_context_max_lines ({}); move detail into docs/ notes",
-                    self.rel(&root),
-                    lines,
-                    max
-                ));
+                problems.push(format!("{}: {} lines, over root_context_max_lines ({}); move detail into docs/ notes", label, lines, max));
             }
         }
         let index = self.docs.join("INDEX.md");
@@ -604,6 +619,11 @@ impl Memory {
         let text: Vec<String> = sections.iter().map(|(title, lines)| format!("{}:\n{}", title, lines.join("\n"))).collect();
         println!("{}", text.join("\n\n"));
     }
+}
+
+/// A CLAUDE.md line that imports the AGENTS.md beside it.
+fn is_import(line: &str) -> bool {
+    matches!(line.trim_end(), "@AGENTS.md" | "@./AGENTS.md")
 }
 
 /// A citation's file and, when given, its first and last line.
