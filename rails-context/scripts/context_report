@@ -17,8 +17,9 @@
 #            or handed over by the plugin's hook after a shell read or edit
 #   Gap      worked minus reached: sessions that changed this code without its
 #            context file reaching Claude - the number that matters
-# A code file is owned by the nearest context file above it; the root CLAUDE.md
-# loads in every session, so it is listed for its size cost only.
+# A code file is owned by the nearest context file above it; the root context
+# loads in every session, so it is listed for its size cost only. A directory's
+# context is its AGENTS.md (imported by its CLAUDE.md), or an old-layout CLAUDE.md.
 
 require "json"
 require "time"
@@ -61,9 +62,17 @@ def context_for(path)
   path.end_with?("CLAUDE.md") ? path : nil
 end
 
-contexts = (%w[app lib test spec].select { |dir| File.directory?(dir) }
-             .flat_map { |dir| Dir.glob("#{dir}/**/CLAUDE.md") }
-             .select { |path| File.file?(path) && !File.symlink?(path) }).sort
+# Every directory with a context file, as its CLAUDE.md path (the key the log
+# uses); shown() names the file that holds the content.
+contexts = %w[app lib test spec].select { |dir| File.directory?(dir) }
+                                .flat_map { |dir| Dir.glob("#{dir}/**/{AGENTS,CLAUDE}.md") }
+                                .select { |path| File.file?(path) && !File.symlink?(path) }
+                                .map { |path| File.join(File.dirname(path), "CLAUDE.md") }.uniq.sort
+
+def shown(context)
+  agents = File.join(File.dirname(context), "AGENTS.md").sub(%r{\A\./}, "")
+  File.file?(agents) && !File.symlink?(agents) ? agents : context
+end
 owned_dirs = contexts.map { |path| File.dirname(path) }.sort_by { |dir| -dir.length }
 
 def owner(file, owned_dirs)
@@ -118,7 +127,7 @@ rows = contexts.map do |context|
   end
   how = reached_sessions.flat_map { |session| session[:reached][context].uniq }
                         .group_by(&:itself).map { |reason, list| "#{reason.sub('nested_traversal', 'nested').sub('path_glob_match', 'path rule')} #{list.size}" }
-  [context, worked, reached_sessions.size, gap, how.join(", "), File.size(context)]
+  [shown(context), worked, reached_sessions.size, gap, how.join(", "), File.size(shown(context))]
 end
 
 width = [rows.map { |row| row[0].length }.max.to_i, 4].max
@@ -127,9 +136,10 @@ rows.sort_by { |row| [-row[3], row[0]] }.each do |file, worked, reached, gap, ho
   puts format("%-#{width}s  %6d  %7d  %3d  %-24s  %d KB", file, worked, reached, gap, how.empty? ? "-" : how, (size / 1024.0).ceil)
 end
 
-if File.file?("CLAUDE.md")
+if File.file?("CLAUDE.md") || File.file?("AGENTS.md")
+  root = shown("CLAUDE.md")
   root_loads = sessions.values.count { |session| session[:reached].key?("CLAUDE.md") }
-  puts "", "Root CLAUDE.md: #{(File.size('CLAUDE.md') / 1024.0).ceil} KB, loaded in #{root_loads} of #{sessions.size} session(s)."
+  puts "", "Root #{root}: #{(File.size(root) / 1024.0).ceil} KB, loaded in #{root_loads} of #{sessions.size} session(s)."
 end
 
 never = rows.select { |row| row[2].zero? }.map(&:first)

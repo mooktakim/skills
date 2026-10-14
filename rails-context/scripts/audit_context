@@ -1,20 +1,24 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
-# Report drift between CLAUDE.md context files and the code they describe.
+# Report drift between directory context files and the code they describe.
 # Plain Ruby, standard library only (Ruby 2.6+): no Bundler, works in any app.
 # Works from any directory: paths resolve from the repo root (the script's parent
 # directory, or $AUDIT_ROOT when set).
-# Output is a drift SIGNAL, not proof of staleness. It reports:
-#   - an oversized root CLAUDE.md (over 200 lines or 12 KB)
-#   - real AGENTS.md files that should be symlinks to CLAUDE.md
-#   - per context file: files changed or deleted since the file was last
-#     committed, a missing or wrong AGENTS.md symlink, and size over the review
-#     trigger (150 lines or 10 KB). Committing a "<!-- reviewed: YYYY-MM-DD -->"
-#     line in a still-accurate file moves its baseline and clears the flag.
-#   - candidate directories: 5+ source files, no CLAUDE.md in their tree, not
-#     named as "<dir>/" in the parent's CLAUDE.md, and not listed in a
-#     "<!-- context-skip: app/helpers app/mailers -->" line in the root CLAUDE.md
+# A directory's context lives in AGENTS.md (read by every agent), beside a
+# CLAUDE.md that imports it with the line "@AGENTS.md" (Claude Code reads only
+# CLAUDE.md). Output is a drift SIGNAL, not proof of staleness. It reports:
+#   - an oversized root context (over 200 lines or 12 KB, AGENTS.md and the rest
+#     of CLAUDE.md together), and a root that is not in that layout
+#   - per context file: files changed or deleted since the context was last
+#     committed, a layout other than AGENTS.md + importing CLAUDE.md (with the
+#     command that fixes it; the old layout, content in CLAUDE.md with AGENTS.md
+#     as a symlink, is still audited), and size over the review trigger (150
+#     lines or 10 KB). Committing a "<!-- reviewed: YYYY-MM-DD -->" line in a
+#     still-accurate file moves its baseline and clears the flag.
+#   - candidate directories: 5+ source files, no context file in their tree, not
+#     named as "<dir>/" in the parent's context file, and not listed in a
+#     "<!-- context-skip: app/helpers app/mailers -->" line in the root context
 
 ROOT = File.expand_path(ENV["AUDIT_ROOT"] || File.join(__dir__, ".."))
 Dir.chdir(ROOT)
@@ -35,20 +39,61 @@ def local(path)
   path && path.start_with?(PREFIX) ? path[PREFIX.length..-1] : path
 end
 
-def size_note(path, max_lines, max_bytes)
-  content = File.binread(path)
+IMPORT = /^@(?:\.\/)?AGENTS\.md[ \t]*$/.freeze
+
+def regular?(path)
+  File.file?(path) && !File.symlink?(path)
+end
+
+# A real CLAUDE.md that imports the AGENTS.md beside it.
+def import?(path)
+  regular?(path) && File.binread(path).force_encoding("UTF-8").scrub.match?(IMPORT)
+end
+
+# [the file holding a directory's context, a note when the layout is not AGENTS.md
+# beside an importing CLAUDE.md], or nil when the directory has no context file.
+def context_layout(dir)
+  agents = File.join(dir, "AGENTS.md").sub(%r{\A\./}, "")
+  claude = File.join(dir, "CLAUDE.md").sub(%r{\A\./}, "")
+  run = ->(command) { dir == "." ? command : "(cd #{dir} && #{command})" }
+  if regular?(agents)
+    return [agents, nil] if import?(claude)
+    return [agents, "CLAUDE.md is a symlink - replace it with an import: #{run.call("rm CLAUDE.md && printf '@AGENTS.md\\n' > CLAUDE.md && git add CLAUDE.md")}"] if File.symlink?(claude)
+    return [agents, "CLAUDE.md and AGENTS.md are both real files - merge CLAUDE.md into AGENTS.md, then make CLAUDE.md the line @AGENTS.md"] if regular?(claude)
+
+    return [agents, "missing CLAUDE.md - run: #{run.call("printf '@AGENTS.md\\n' > CLAUDE.md && git add CLAUDE.md")}"]
+  end
+  return [claude, "CLAUDE.md imports AGENTS.md, but there is no AGENTS.md here"] if import?(claude)
+  return nil unless regular?(claude)
+
+  unlink = File.symlink?(agents) || File.exist?(agents) ? "git rm -q AGENTS.md && " : ""
+  [claude, "old layout (content in CLAUDE.md) - migrate: #{run.call("#{unlink}git mv CLAUDE.md AGENTS.md && printf '@AGENTS.md\\n' > CLAUDE.md && git add CLAUDE.md")}"]
+end
+
+# What Claude Code loads for a directory: the context file, plus any lines of an
+# importing CLAUDE.md besides the import.
+def loaded_text(dir, context)
+  claude = File.join(dir, "CLAUDE.md").sub(%r{\A\./}, "")
+  text = File.binread(context)
+  return text unless context.end_with?("AGENTS.md") && import?(claude)
+
+  text + File.binread(claude).lines.reject { |line| line.force_encoding("UTF-8").scrub.match?(IMPORT) }.join
+end
+
+def size_note(content, max_lines, max_bytes)
   lines = content.count("\n")
   return nil unless lines > max_lines || content.bytesize > max_bytes
 
   "oversized: #{lines} lines, #{content.bytesize} bytes (review trigger: #{max_lines} lines or #{max_bytes} bytes)"
 end
 
-# Regular files (not symlinks) with this name anywhere under the trees, sorted.
-def find_regular(name)
+# [directory, context file, layout note] for every directory under the trees
+# with a context file, sorted.
+def find_contexts
   TREES.select { |tree| File.directory?(tree) }
-       .flat_map { |tree| Dir.glob("#{tree}/**/#{name}") }
-       .select { |path| File.file?(path) && !File.symlink?(path) }
-       .sort
+       .flat_map { |tree| Dir.glob("#{tree}/**/{AGENTS,CLAUDE}.md") }
+       .map { |path| File.dirname(path) }.uniq.sort
+       .map { |dir| (layout = context_layout(dir)) && [dir, *layout] }.compact
 end
 
 def context_file?(path)
@@ -74,23 +119,12 @@ def changes_since(commit, dir)
   changes.reject { |_, path| path.nil? || path.empty? || context_file?(path) }
 end
 
-def symlink_note(dir)
-  agents = File.join(dir, "AGENTS.md")
-  if !File.exist?(agents) && !File.symlink?(agents)
-    "missing AGENTS.md symlink - run: (cd #{dir} && ln -s CLAUDE.md AGENTS.md)"
-  elsif File.symlink?(agents) && File.readlink(agents) != "CLAUDE.md"
-    "AGENTS.md symlink points to #{File.readlink(agents)}, expected CLAUDE.md"
-  end
-end
-
 def listed(header, paths)
   ["   #{paths.size} file(s) #{header}", *paths.map { |path| "     - #{path}" }]
 end
 
 def skip_list
-  return [] unless File.file?("CLAUDE.md")
-
-  File.read("CLAUDE.md").scan(/<!--\s*context-skip:\s*(.*?)-->/).flatten.flat_map(&:split).map { |dir| dir.chomp("/") }
+  %w[AGENTS.md CLAUDE.md].select { |file| File.file?(file) }.map { |file| File.read(file) }.join("\n").scan(/<!--\s*context-skip:\s*(.*?)-->/).flatten.flat_map(&:split).map { |dir| dir.chomp("/") }
 end
 
 def candidates
@@ -100,11 +134,11 @@ def candidates
                                           .uniq.sort
   dirs = dirs.reject { |dir| dir.start_with?("app/assets") || File.symlink?(dir) }
   dirs.map do |dir|
-    next if Dir.glob("#{dir}/**/CLAUDE.md").any?
+    next if Dir.glob("#{dir}/**/{AGENTS,CLAUDE}.md").any?
     next if skips.include?(dir)
 
-    parent = File.join(File.dirname(dir), "CLAUDE.md")
-    next if File.file?(parent) && File.read(parent).include?("#{File.basename(dir)}/")
+    parents = %w[AGENTS.md CLAUDE.md].map { |name| File.join(File.dirname(dir), name) }.select { |file| File.file?(file) }
+    next if parents.any? { |parent| File.read(parent).include?("#{File.basename(dir)}/") }
 
     count = Dir.glob("#{dir}/**/*").count { |path| File.file?(path) && !File.symlink?(path) && SOURCE_EXTENSIONS.include?(File.extname(path)) }
     "     - #{dir} (#{count} files)" if count >= 5
@@ -120,25 +154,28 @@ found = false
 drift = false
 oversized = false
 
-if File.file?("CLAUDE.md") && (note = size_note("CLAUDE.md", 200, 12_288))
-  drift = oversized = true
-  puts "== CLAUDE.md (root)", "   #{note}", ""
+if (root = context_layout("."))
+  size = size_note(loaded_text(".", root[0]), 200, 12_288)
+  if size || root[1]
+    drift = true
+    oversized ||= !size.nil?
+    puts "== #{root[0]} (root)"
+    puts "   #{root[1]} (ask before changing the root)" if root[1]
+    puts "   #{size}" if size
+    puts ""
+  end
 end
 
-find_regular("AGENTS.md").each do |legacy|
-  found = drift = true
-  puts "== #{legacy}", "   real AGENTS.md - migrate: git mv AGENTS.md CLAUDE.md && ln -s CLAUDE.md AGENTS.md", ""
-end
-
-find_regular("CLAUDE.md").each do |context|
+find_contexts.each do |dir, context, note|
   found = true
-  dir = File.dirname(context)
-  size = size_note(context, 150, 10_240)
+  size = size_note(loaded_text(dir, context), 150, 10_240)
   oversized ||= !size.nil?
-  last = git("log", "-1", "--format=%H", "--", context).strip
+  files = %w[AGENTS.md CLAUDE.md].map { |name| File.join(dir, name) }
+  last = git("log", "-1", "--format=%H", "--", *files).strip
   if last.empty?
     drift = true
     puts "== #{context}", "   never committed - commit it or review now"
+    puts "   #{note}" if note
     puts "   #{size}" if size
     puts ""
     next
@@ -147,11 +184,10 @@ find_regular("CLAUDE.md").each do |context|
   changes = changes_since(last, dir)
   deleted = changes.select { |status, _| status == "D" }.map(&:last).uniq.sort
   changed = changes.reject { |status, _| status == "D" }.map(&:last).uniq.sort
-  note = symlink_note(dir)
   next if deleted.empty? && changed.empty? && note.nil? && size.nil?
 
   drift = true
-  puts "== #{context} (last updated #{git('log', '-1', '--format=%cs', '--', context).strip})"
+  puts "== #{context} (last updated #{git('log', '-1', '--format=%cs', '--', *files).strip})"
   puts "   #{note}" if note
   puts "   #{size}" if size
   puts listed("deleted since - remove anything that still describes them:", deleted) unless deleted.empty?
@@ -161,8 +197,9 @@ end
 
 list = candidates
 unless list.empty?
-  puts "Directories with 5+ files and no context file - give each one a CLAUDE.md, or"
-  puts "list it in a <!-- context-skip: ... --> line in the root CLAUDE.md if it needs none:"
+  puts "Directories with 5+ files and no context file - give each one an AGENTS.md (and a"
+  puts "CLAUDE.md that imports it), or list it in a <!-- context-skip: ... --> line in the"
+  puts "root AGENTS.md if it needs none:"
   puts list, ""
 end
 
@@ -173,8 +210,8 @@ end
 
 if drift
   puts "Review flagged directories: most changes are routine and need nothing."
-  puts "Edit CLAUDE.md surgically only where a documented pattern changed."
-  puts "Oversized files: cut inventory, or move a growing namespace into a nested CLAUDE.md." if oversized
+  puts "Edit AGENTS.md surgically only where a documented pattern changed."
+  puts "Oversized files: cut inventory, or move a growing namespace into a nested AGENTS.md." if oversized
 elsif list.empty?
   puts "No drift detected."
 else

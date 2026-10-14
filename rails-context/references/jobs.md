@@ -1,6 +1,6 @@
 # app/jobs - generation guide
 
-Read this before generating `app/jobs/CLAUDE.md` in the target app. Derive every statement from that app's code; skip any question the app has no answer to. Only generate the file if the directory qualified in Phase 1.
+Read this before generating `app/jobs/AGENTS.md` in the target app. Derive every statement from that app's code; skip any question the app has no answer to. Only generate the file if the directory qualified in Phase 1.
 
 ## Questions to answer from the code
 

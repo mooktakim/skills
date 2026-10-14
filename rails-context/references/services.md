@@ -1,6 +1,6 @@
 # app/services - generation guide
 
-Read this before generating `app/services/CLAUDE.md` in the target app. Derive every statement from that app's code; skip any question the app has no answer to. Only generate the file if the directory qualified in Phase 1 - if the app has no `app/services/`, no file (and never create the directory).
+Read this before generating `app/services/AGENTS.md` in the target app. Derive every statement from that app's code; skip any question the app has no answer to. Only generate the file if the directory qualified in Phase 1 - if the app has no `app/services/`, no file (and never create the directory).
 
 ## Questions to answer from the code
 
@@ -18,7 +18,7 @@ Read this before generating `app/services/CLAUDE.md` in the target app. Derive e
 ```markdown
 ## Purpose
 Cross-cutting utilities and third-party API clients only. Business operations
-belong to their model (`app/models/<model>/` - see app/models/CLAUDE.md); if a
+belong to their model (`app/models/<model>/` - see app/models/AGENTS.md); if a
 new class has an obvious owning model, it does not belong here.
 
 ## Conventions

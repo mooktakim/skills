@@ -1,6 +1,6 @@
 ---
 name: rails-context
-description: Set up and maintain per-directory CLAUDE.md context files (with AGENTS.md symlinks) in a Rails app, plus a bin/audit_context drift check. Use when asked to set up MVC context or per-directory agent context files, or to audit, refresh, or slim existing context files; a run on an app already set up does maintenance.
+description: Set up and maintain per-directory AGENTS.md context files (each imported by a one-line CLAUDE.md) in a Rails app, plus a bin/audit_context drift check. Use when asked to set up MVC context or per-directory agent context files, or to audit, refresh, or slim existing context files; a run on an app already set up does maintenance.
 ---
 
 # MVC Context
@@ -13,18 +13,29 @@ The approval gate is a hard stop. Write nothing until I approve this run's Phase
 
 ## File naming convention
 
-- The canonical context file is `CLAUDE.md`.
-- `AGENTS.md` is a relative symlink to it, created inside the directory: `ln -s CLAUDE.md AGENTS.md`.
-- All edits go to `CLAUDE.md`. Never write to `AGENTS.md` directly. Never use absolute paths in symlinks.
-- If a directory already has a real (non-symlink) `AGENTS.md`, migrate it first:
+- A directory's context lives in `AGENTS.md`, the file every coding agent reads.
+- Beside it, `CLAUDE.md` imports it with one line, `@AGENTS.md`: Claude Code reads only `CLAUDE.md`, and expands the import when the directory loads (also for directory files that load later in a session).
+- All edits go to `AGENTS.md`. `CLAUDE.md` holds only the import, plus a rule for Claude alone when one is needed, below the import. Never a symlink, in either direction.
+- Create a new pair with: write `AGENTS.md`, then `printf '@AGENTS.md\n' > CLAUDE.md`.
 
-```bash
-git mv AGENTS.md CLAUDE.md
-ln -s CLAUDE.md AGENTS.md
-git add AGENTS.md
-```
+### Migrating from older layouts
 
-Move content unchanged in the migration commit. If a directory has BOTH a real `CLAUDE.md` and a real `AGENTS.md`, do not run the `mv` - show me the diff and ask how to merge before converting `AGENTS.md` into the symlink. Do not migrate the root `AGENTS.md` without asking me first.
+Earlier versions of this skill made `CLAUDE.md` the content file, with `AGENTS.md` a relative symlink to it. `bin/audit_context` reports every directory still in an older layout, with the command that converts it. Migrate them in a maintenance run (Phase 1 lists them; they are part of the approved plan), each with the content moved unchanged:
+
+- **`CLAUDE.md` with content, `AGENTS.md` a symlink to it (or no `AGENTS.md`)**: in the directory,
+
+  ```bash
+  git rm -q AGENTS.md            # only when the symlink exists
+  git mv CLAUDE.md AGENTS.md
+  printf '@AGENTS.md\n' > CLAUDE.md
+  git add CLAUDE.md
+  ```
+
+- **`AGENTS.md` with content and no `CLAUDE.md`**: add the importing `CLAUDE.md` (`printf '@AGENTS.md\n' > CLAUDE.md`).
+- **`CLAUDE.md` a symlink to `AGENTS.md`**: replace the symlink with the importing file (`rm CLAUDE.md && printf '@AGENTS.md\n' > CLAUDE.md`).
+- **Both real, with different content**: do not merge on your own - show me both and ask how to merge, then make `CLAUDE.md` the import.
+
+The root files follow the same rules, but convert the root only after I approve it in the plan: other tools write to it too. Check the migration with `git diff --cached -M --stat` (each content file shows as a rename with no changed lines) and a clean `bin/audit_context` run. The Phase 3 block in the root context file still says "symlinked as AGENTS.md" in apps set up before this layout: replace it with the current block in the same run.
 
 ## The one rule that matters: intent, not inventory
 
@@ -37,7 +48,7 @@ Inventory goes stale the moment anyone adds a file, and a stale context file is 
 
 ## Size discipline
 
-Aim for 30-100 lines per `CLAUDE.md`. The limit is a density check, not a token budget: a directory file loads only when a file inside that directory is read, so length is cheap - but every line competes for the agent's attention, so padding is not, and growth is usually the first sign of inventory creep.
+Aim for 30-100 lines per `AGENTS.md`. The limit is a density check, not a token budget: a directory file loads only when a file inside that directory is read, so length is cheap - but every line competes for the agent's attention, so padding is not, and growth is usually the first sign of inventory creep.
 
 A file may grow past 100 lines only after passing this checklist:
 
@@ -47,17 +58,17 @@ A file may grow past 100 lines only after passing this checklist:
 
 150 lines or 10 KB, whichever comes first, is the review trigger: maintenance-mode size repair flags anything past it for a restructuring proposal. A file that big almost always contains a nested file waiting to be split out. Count bytes as well as lines: a file written in paragraph-long lines can hold 30 KB in 100 lines and never trip a line count.
 
-The root `CLAUDE.md` is different: it loads in every session, so its size is a real token cost. Aim for under 8 KB; 200 lines or 12 KB is its review trigger. The root also collects content from other tools (`/init`, other skills, the user), so root size repair never cuts what this skill did not write without asking - it proposes moving directory-specific sections down into the directory file that owns them ("one fact, one level") and flags the rest for me.
+The root context (`AGENTS.md`, through the root `CLAUDE.md`) is different: it loads in every session, so its size is a real token cost. Aim for under 8 KB; 200 lines or 12 KB is its review trigger. The root also collects content from other tools (`/init`, other skills, the user), so root size repair never cuts what this skill did not write without asking - it proposes moving directory-specific sections down into the directory file that owns them ("one fact, one level") and flags the rest for me.
 
 ## One fact, one level
 
 Context files form a chain - root → `app/<dir>/` → nested namespace - and an agent working deep in the tree ends up with every file on that path in context. So every fact lives at exactly one level: the most specific level it applies to. A directory file never repeats the root; a nested file never repeats its parent. And it works upward too: when a more specific file exists (or gets created), the parent sheds whatever it covers, keeping only a one-line pointer ("`cloudflare/` - Cloudflare API wrapper; see its CLAUDE.md"). Deeper means more specific and shorter. A file restating something from another level is duplicate context, and duplicates drift.
 
-How the chain loads matters. Claude Code loads the root `CLAUDE.md` at session start, but a directory's `CLAUDE.md` only when Claude reads a file in that directory with its Read tool. Shell reads (`cat`, `grep`), shell edits (`sed -i`, heredocs, scripts), and a new file written into a directory nothing was read from do not load it - and agents do much of their work through the shell. The plugin closes most of that gap with a `PostToolUse` hook: after a Bash, Write, Edit, or Grep call that touches code under app/, lib/, or the test suite, it hands Claude the directory context files on that path that have not reached it this session. The hook fires only after the call, so the root block (Phase 3) still tells agents to read the directory's context files before changing code there; never rely on automatic loading alone.
+How the chain loads matters. Claude Code loads the root `CLAUDE.md` (and the `AGENTS.md` it imports) at session start, but a directory's `CLAUDE.md` and its `AGENTS.md` only when Claude reads a file in that directory with its Read tool. Shell reads (`cat`, `grep`), shell edits (`sed -i`, heredocs, scripts), and a new file written into a directory nothing was read from do not load it - and agents do much of their work through the shell. The plugin closes most of that gap with a `PostToolUse` hook: after a Bash, Write, Edit, or Grep call that touches code under app/, lib/, or the test suite, it hands Claude the directory context files on that path that have not reached it this session. The hook fires only after the call, so the root block (Phase 3) still tells agents to read the directory's context files before changing code there; never rely on automatic loading alone.
 
 ## Phase 1: Survey and plan
 
-1. Read the `Gemfile`, the root `CLAUDE.md`/`AGENTS.md` if present, and list directories under `app/`, `lib/`, and `test/` (or `spec/`). `test/` qualifies only when the suite has non-obvious infrastructure (stub helpers, factory conventions, job-testing quirks), not merely because tests exist.
+1. Read the `Gemfile`, the root `AGENTS.md` and `CLAUDE.md` if present, and list directories under `app/`, `lib/`, and `test/` (or `spec/`). `test/` qualifies only when the suite has non-obvious infrastructure (stub helpers, factory conventions, job-testing quirks), not merely because tests exist.
 2. For each candidate directory, skim several representative files.
 3. A directory qualifies for a context file when at least one is true:
    - 5+ files following a local convention (services, components, jobs).
@@ -71,8 +82,8 @@ How the chain loads matters. Claude Code loads the root `CLAUDE.md` at session s
 
 Re-running on an app that already has context files is maintenance, not a rewrite. The survey then also covers the existing context files, and the Phase 1 plan proposes five kinds of work:
 
-- **Gap-fill**: new files for newly qualifying directories (start from the candidates `bin/audit_context` lists), missing `AGENTS.md` symlinks added, real `AGENTS.md` files migrated. A candidate that does not qualify gets added to the root `<!-- context-skip: ... -->` line instead, so it is not proposed again.
-- **Drift review**: run `bin/audit_context` (if it doesn't exist yet or differs from `scripts/audit_context` in this skill, copy it over first - Phase 3). For each flagged pre-existing file, read the changed files and the current `CLAUDE.md`, then propose a surgical edit only where a documented pattern is now false or a new convention has emerged. Deleted files are the strongest signal: remove anything that still describes them. A flagged file that is still accurate gets reported as "checked, still accurate", and its `<!-- reviewed: YYYY-MM-DD -->` line (last line of the file; add it if missing) is set to today, so committing it resets the audit baseline and the flag clears (if it already shows today, add the time, `<!-- reviewed: 2026-10-12 14:05 -->`: the file must change, and an empty commit does not move its baseline) - never edit content to look busy, and never silently skip a file.
+- **Gap-fill**: new files for newly qualifying directories (start from the candidates `bin/audit_context` lists), missing importing `CLAUDE.md` files added, and every directory in an older layout migrated (see "Migrating from older layouts"). A candidate that does not qualify gets added to the root `<!-- context-skip: ... -->` line instead, so it is not proposed again.
+- **Drift review**: run `bin/audit_context` (if it doesn't exist yet or differs from `scripts/audit_context` in this skill, copy it over first - Phase 3). For each flagged pre-existing file, read the changed files and the current `AGENTS.md`, then propose a surgical edit only where a documented pattern is now false or a new convention has emerged. Deleted files are the strongest signal: remove anything that still describes them. A flagged file that is still accurate gets reported as "checked, still accurate", and its `<!-- reviewed: YYYY-MM-DD -->` line (last line of the file; add it if missing) is set to today, so committing it resets the audit baseline and the flag clears (if it already shows today, add the time, `<!-- reviewed: 2026-10-12 14:05 -->`: the file must change, and an empty commit does not move its baseline) - never edit content to look busy, and never silently skip a file.
 - **One fact, one level repair**: where an existing file (the root included) states a fact that a deeper file owns - or will own after this run's gap-fill - propose slimming the ancestor to a one-line pointer.
 - **Size repair**: flag files outside the size discipline (`bin/audit_context` reports them) - past the review trigger (150 lines or 10 KB; the root 200 lines or 12 KB), propose a restructuring (usually a nested-file split, or moving root content down); under the 30-line floor, note whether the file is legitimately short or missing its layer's substance.
 - **Reach review**: run `ruby "${CLAUDE_SKILL_DIR}/scripts/context_report"` from the app. It reads the local log this plugin's hooks keep and shows, per context file, the sessions that changed its code and whether the file reached Claude in them. A file with a coverage gap is not being read where it matters: propose making it reach - a sharper pointer in its parent, moving its key rules up a level, or splitting a nested file - and check the root block's "read the CLAUDE.md before changing code" rule is present. A file that never reaches Claude in sessions that work there is a candidate to merge into its parent. No log yet (a new install) means no reach review this run; say so.
@@ -112,39 +123,40 @@ The guides are prompts, not content: every statement in a generated file must st
 
 For `lib/` and anything without a guide: use the skeleton; if you cannot fill Purpose and Conventions with app-specific content, tell me the directory does not need a file instead of writing filler.
 
-After writing each `CLAUDE.md`, create the `AGENTS.md` symlink beside it.
+After writing each `AGENTS.md`, create the importing `CLAUDE.md` beside it (`printf '@AGENTS.md\n' > CLAUDE.md`).
 
 If an ancestor file (the root included) already states a fact the new file now owns, slim the ancestor to a one-line pointer in the same commit. "One fact, one level" applies to pre-existing content too - the maintenance-mode rule against regenerating existing files does not forbid these surgical shed-edits; it requires them to be listed in the plan.
 
 ### Nested context files
 
-An agent working in a nested directory gets the full chain of context files down to it (root → `app/services/` → `app/services/cloudflare/`), so a nested file contains ONLY the delta from its ancestors - never repeat a parent or root convention; duplication is drift waiting to happen. Keep nested files shorter (10-60 lines). Their value is the knowledge the code cannot show: the external system's auth model and rate limits, environment differences (sandbox vs live), invariants ("zone ids are cached at boot; never fetch per request"), known failure modes and how the app expects them handled. The same rules apply as everywhere else: intent not inventory, `AGENTS.md` symlink beside it, and the audit script picks nested files up automatically.
+An agent working in a nested directory gets the full chain of context files down to it (root → `app/services/` → `app/services/cloudflare/`), so a nested file contains ONLY the delta from its ancestors - never repeat a parent or root convention; duplication is drift waiting to happen. Keep nested files shorter (10-60 lines). Their value is the knowledge the code cannot show: the external system's auth model and rate limits, environment differences (sandbox vs live), invariants ("zone ids are cached at boot; never fetch per request"), known failure modes and how the app expects them handled. The same rules apply as everywhere else: intent not inventory, importing `CLAUDE.md` beside it, and the audit script picks nested files up automatically.
 
 "One fact, one level" applies with force here: creating a nested file where the parent already covers the namespace means moving that content down and slimming the parent to a one-line pointer, in the same commit.
 
 ## Phase 3: Wire up maintenance
 
-Append this block to the root context file (adapt wording to fit, keep the substance). If the app has no root `CLAUDE.md`, create one with this block as its content, plus the root `AGENTS.md` symlink if no `AGENTS.md` exists:
+Append this block to the root context file (adapt wording to fit, keep the substance). The root context file is the root `AGENTS.md`. If the app has none, create it with this block as its content, plus a root `CLAUDE.md` holding `@AGENTS.md` if there is no `CLAUDE.md` (an existing root `CLAUDE.md` with content is migrated only with my approval - see "Migrating from older layouts"):
 
 ```markdown
 ## Context files (MVC Context)
 
-Directories under app/, lib/, and the test suite carry their own CLAUDE.md
-(symlinked as AGENTS.md) describing local conventions. Before changing code
-in a directory, read its CLAUDE.md and those of its parents up to app/ - they
-load automatically only when a file there is read with the Read tool, not
-through shell commands. After changing code, before finishing the task,
-check each directory you touched that has a CLAUDE.md and ask: did this change
-introduce a new pattern, break a documented one, or add a new namespace or
-convention? If yes, update that CLAUDE.md surgically - edit the affected lines
-only, never regenerate the file. Routine changes that follow documented
-patterns need no update. If a change deliberately contradicts a CLAUDE.md,
-update the file to match the new reality and mention it. Context files
-describe intent and patterns, never file inventories. Keep each directory
-CLAUDE.md under 150 lines and 10 KB, and this root file under 200 lines and
-12 KB: when an update would push a file past that, cut inventory or move the
-growing part into a deeper CLAUDE.md instead of appending. Context file edits
-ship in the same commit as the code change that caused them.
+Directories under app/, lib/, and the test suite carry their own AGENTS.md
+(imported by a CLAUDE.md beside it) describing local conventions. Before
+changing code in a directory, read its AGENTS.md and those of its parents up
+to app/ - they load automatically only when a file there is read with the
+Read tool, not through shell commands. After changing code, before finishing
+the task, check each directory you touched that has an AGENTS.md and ask: did
+this change introduce a new pattern, break a documented one, or add a new
+namespace or convention? If yes, update that AGENTS.md surgically - edit the
+affected lines only, never regenerate the file; CLAUDE.md stays the one line
+@AGENTS.md. Routine changes that follow documented patterns need no update.
+If a change deliberately contradicts an AGENTS.md, update the file to match
+the new reality and mention it. Context files describe intent and patterns,
+never file inventories. Keep each directory AGENTS.md under 150 lines and
+10 KB, and this root file under 200 lines and 12 KB: when an update would push
+a file past that, cut inventory or move the growing part into a deeper
+AGENTS.md instead of appending. Context file edits ship in the same commit as
+the code change that caused them.
 bin/audit_context reports drift; a periodic MVC Context maintenance run
 works through what it flags.
 ```
@@ -161,7 +173,7 @@ Do not create any slash command for auditing: re-running this skill IS the audit
 
 ## Phase 4: Review
 
-Show me every generated or edited `CLAUDE.md` grouped in one message. I will correct anything that misstates intent; my stated intent always outranks what you inferred from code. Wait for my reply. Fold corrections in, then commit everything with a clear message once I approve. If I move on without answering, tell me once that the run's files are still uncommitted.
+Show me every generated or edited `AGENTS.md` (and any `CLAUDE.md` with more than the import) grouped in one message. I will correct anything that misstates intent; my stated intent always outranks what you inferred from code. Wait for my reply. Fold corrections in, then commit everything with a clear message once I approve. If I move on without answering, tell me once that the run's files are still uncommitted.
 
 Close every run - first run or maintenance - by running `bin/audit_context` and reporting what it still flags: items I chose to defer, plus anything the run didn't cover. Nothing flagged gets silently ignored.
 

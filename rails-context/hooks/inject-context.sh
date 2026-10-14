@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PostToolUse hook (Bash, Write, Edit, Grep): hand Claude the directory CLAUDE.md
+# PostToolUse hook (Bash, Write, Edit, Grep): hand Claude the directory context
 # files for the code a tool call touched, when the Read tool's automatic loading
 # was bypassed. The logic lives in scripts/inject_context. Silent, never blocks,
 # and only active in projects set up with rails-context (bin/audit_context in the

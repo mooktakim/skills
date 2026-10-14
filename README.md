@@ -22,7 +22,7 @@ Browse everything interactively with `/plugin`.
 
 | Skill | Domain | What it does |
 |-------|--------|--------------|
-| [`rails-context`](rails-context/) | Rails | Sets up per-directory `CLAUDE.md` context files across a Rails app (MVC Context — Model, View, Controller, plus Context), with `AGENTS.md` symlinks and drift-audit tooling. |
+| [`rails-context`](rails-context/) | Rails | Sets up per-directory `AGENTS.md` context files across a Rails app (MVC Context — Model, View, Controller, plus Context), each imported by a one-line `CLAUDE.md`, with drift-audit tooling and a migration from the old symlink layout. |
 | [`rails-design-system`](rails-design-system/) | Rails | Codifies a Rails app's UI into per-section design-system docs (role tokens, component specs, page patterns) on Tailwind v4, with drift auditing, edit-time enforcement, and a design-reviewer agent. |
 | [`rails-specialists`](rails-specialists/) | Rails | Ships a team of eight Rails specialist agents (models, jobs, debugging, review, security, performance, deploy, upgrades) that detect the project's stack and follow its conventions. |
 | [`rails-minitest`](rails-minitest/) | Rails | Sets one standard for Minitest suites in Rails apps - every kind of test, fixtures, shared helpers, shortcuts to a known state, speed, coverage, and flaky tests - with a suite audit and a `minitest-runner` agent that runs and writes tests. |

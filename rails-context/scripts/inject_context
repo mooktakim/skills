@@ -6,8 +6,11 @@
 # CLAUDE.md only when the Read tool reads a file there; shell reads and edits,
 # Grep, and a new file written into a directory nothing was read from bypass it.
 # This closes that gap: it finds the paths the call touched, walks each one up to
-# its app's root, and returns every CLAUDE.md on the way that has not reached
-# Claude in this session yet. The app is the project directory, or an app
+# its app's root, and returns every directory context on the way that has not
+# reached Claude in this session yet - what Claude Code would load: the CLAUDE.md
+# with its "@AGENTS.md" import replaced by the AGENTS.md beside it (or the
+# AGENTS.md alone, or an old-layout CLAUDE.md). Files are logged by their
+# directory's CLAUDE.md path, whichever file holds the content. The app is the project directory, or an app
 # directly below it (a Rails app inside a larger repository); the project's own
 # root CLAUDE.md loads at session start, but a lower app's root CLAUDE.md does not,
 # so that one is handed over too. Logged paths are relative to the repository top.
@@ -23,6 +26,24 @@
 require "json"
 
 ROOTS = %w[app lib test spec].freeze # the directories rails-context writes context files in
+IMPORT = /^@(?:\.\/)?AGENTS\.md[ \t]*$/.freeze
+
+def context_file?(dir)
+  File.file?(File.join(dir, "CLAUDE.md")) || File.file?(File.join(dir, "AGENTS.md"))
+end
+
+# [the file to name, the text Claude Code would load] for a directory.
+def context_text(dir)
+  claude = File.join(dir, "CLAUDE.md")
+  agents = File.join(dir, "AGENTS.md")
+  shared = File.file?(agents) ? File.read(agents).strip : nil
+  return [agents, shared] unless File.file?(claude)
+
+  text = File.read(claude)
+  return [claude, text.strip] unless shared && text.scrub.match?(IMPORT)
+
+  [agents, text.scrub.gsub(IMPORT) { shared }.strip]
+end
 
 project = File.realpath(ENV.fetch("CLAUDE_PROJECT_DIR", "")) rescue exit(0)
 apps = if File.executable?(File.join(project, "bin/audit_context"))
@@ -76,10 +97,10 @@ paths.each do |full|
   dir = File.directory?(full) ? rel : File.dirname(rel)
   chain = []
   until dir == "." || dir.empty?
-    chain.unshift(File.join(app, dir, "CLAUDE.md")) if File.file?(File.join(app, dir, "CLAUDE.md"))
+    chain.unshift(File.join(app, dir, "CLAUDE.md")) if context_file?(File.join(app, dir))
     dir = File.dirname(dir)
   end
-  chain.unshift(File.join(app, "CLAUDE.md")) if app != project && File.file?(File.join(app, "CLAUDE.md"))
+  chain.unshift(File.join(app, "CLAUDE.md")) if app != project && context_file?(app)
   wanted |= chain.map(&from_top).compact
 end
 read.compact!
@@ -117,7 +138,10 @@ File.open(log, "a") do |out|
 end
 exit 0 if wanted.empty?
 
-context = wanted.map { |file| "Contents of #{top}/#{file}:\n\n#{File.read(File.join(top, file)).strip}" }
+context = wanted.map do |file|
+  shown, text = context_text(File.dirname(File.join(top, file)))
+  "Contents of #{shown}:\n\n#{text}"
+end
 puts JSON.generate(
   "hookSpecificOutput" => {
     "hookEventName" => "PostToolUse",

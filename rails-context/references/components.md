@@ -1,6 +1,6 @@
 # app/components - generation guide
 
-Read this before generating `app/components/CLAUDE.md` in the target app. Derive every statement from that app's code; skip any question the app has no answer to. Only generate the file if the directory qualified in Phase 1 - an app with no component framework gets no components file.
+Read this before generating `app/components/AGENTS.md` in the target app. Derive every statement from that app's code; skip any question the app has no answer to. Only generate the file if the directory qualified in Phase 1 - an app with no component framework gets no components file.
 
 ## Questions to answer from the code
 

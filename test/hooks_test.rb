@@ -273,6 +273,32 @@ class HooksTest < Minitest::Test
     refute_nil injected(tool_call("Bash", { "command" => "cat app/models/user.rb" })), "and again after a compaction"
   end
 
+  # The current layout: AGENTS.md holds the context and CLAUDE.md imports it. The
+  # hook hands over what Claude Code would load - the import expanded, plus any
+  # Claude-only lines - never the one-line stub; the report names the AGENTS.md.
+  def test_inject_context_and_report_follow_the_agents_md_import
+    install "rails-context", "audit_context"
+    write "AGENTS.md", "# root\n"
+    write "CLAUDE.md", "@AGENTS.md\n"
+    write "app/models/AGENTS.md", "# models\nshared rule\n"
+    write "app/models/CLAUDE.md", "@AGENTS.md\n\nClaude-only rule\n"
+    write "app/services/AGENTS.md", "# services\n"
+    write "app/models/user.rb", "class User; end\n"
+    write "app/services/pay.rb", "class Pay; end\n"
+    commit "init"
+    log_event("start", "s1")
+    context = injected(tool_call("Bash", { "command" => "sed -i '' 's/User/Person/' app/models/user.rb" }))
+    assert_includes context, "Contents of #{@dir}/app/models/AGENTS.md:\n\n# models\nshared rule\n\nClaude-only rule"
+    refute_includes context, "@AGENTS.md"
+    assert_includes injected(tool_call("Edit", { "file_path" => path("app/services/pay.rb") })),
+                    "Contents of #{@dir}/app/services/AGENTS.md:\n\n# services", "an AGENTS.md without its CLAUDE.md yet"
+    append "app/models/user.rb", "# edit\n"
+    log_event("stop", "s1")
+    out = report.out
+    assert_match(%r{^app/models/AGENTS.md\s+1\s+1\s+0\s+hook 1}, out)
+    assert_includes out, "Root AGENTS.md: 1 KB"
+  end
+
   def test_inject_context_skips_files_that_already_reached_claude
     context_app
     log_event("start", "s1")

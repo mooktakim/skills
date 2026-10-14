@@ -4,10 +4,10 @@ Rails is MVC. This skill adds a fourth letter: **Context**. It sets up per-direc
 
 ## What it creates
 
-- A `CLAUDE.md` in each significant directory under `app/` and `lib/`, describing that directory's conventions: naming, base classes, call signatures, return shapes, what a correct new addition looks like, and gotchas.
-- An `AGENTS.md` relative symlink beside each one (`ln -s CLAUDE.md AGENTS.md`), so tools that read either filename get the same content. `CLAUDE.md` is canonical; edits never go to the symlink.
+- An `AGENTS.md` in each significant directory under `app/` and `lib/`, describing that directory's conventions: naming, base classes, call signatures, return shapes, what a correct new addition looks like, and gotchas.
+- A one-line `CLAUDE.md` beside each one that imports it (`@AGENTS.md`): every coding agent reads `AGENTS.md`, and Claude Code, which reads only `CLAUDE.md`, gets the same content through the import. Edits go to `AGENTS.md`; `CLAUDE.md` holds only the import, plus any rule for Claude alone. Plain files, no symlinks.
 - A maintenance rule appended to the root context file: agents must check the context files of directories they touched and surgically update them when a change breaks or adds a documented pattern - in the same commit as the change.
-- `bin/audit_context` - a drift-detection script that flags directories whose code has changed since their context file was last touched, plus missing or mis-pointed symlinks and unmigrated real `AGENTS.md` files. Its output is a signal to review, not proof of staleness.
+- `bin/audit_context` - a drift-detection script that flags directories whose code has changed since their context file was last touched, plus directories whose files are not yet in the `AGENTS.md` + importing `CLAUDE.md` layout, each with the command that converts it. Its output is a signal to review, not proof of staleness.
 
 There is no separate audit command: re-running the skill is the audit (see below).
 
@@ -26,6 +26,10 @@ The skill works in four phases, with you approving between them:
 3. **Wire up maintenance** - adds the root maintenance rule and `bin/audit_context`.
 4. **Review** - shows you every generated or edited file; your stated intent outranks anything inferred from code. Corrections are folded in before committing, and every run closes with an audit report so nothing is silently ignored.
 
+## Upgrading from the symlink layout
+
+Versions before 0.15.0 made `CLAUDE.md` the content file and `AGENTS.md` a symlink to it. Apps set up that way keep working: the audit and the hooks still read the old layout. `bin/audit_context` lists each old-layout directory with the command that converts it, and the next maintenance run (`/rails-context:rails-context`) converts them all in one approved step, moving the content unchanged (`git mv CLAUDE.md AGENTS.md`, then a `CLAUDE.md` holding `@AGENTS.md`). The root is converted only with your approval.
+
 ## Install
 
 ```
@@ -40,16 +44,16 @@ Open a Claude Code session inside your Rails app and either ask in plain words -
 What to expect:
 
 1. Claude surveys the app and proposes a list of directories with one line each on what its context file would say. **Nothing is written until you approve** - trim, add, or redirect the list here.
-2. The files are generated from your actual code, with the `AGENTS.md` symlinks created alongside, and the maintenance rule and `bin/audit_context` wired up.
+2. The files are generated from your actual code, with the importing `CLAUDE.md` files created alongside, and the maintenance rule and `bin/audit_context` wired up.
 3. Claude shows you every generated file in one message. Correct anything that misstates intent - your word outranks whatever was inferred from the code - then it commits.
 
-Re-running later is how you maintain the setup. A run on an app that already has context files proposes (behind the same approval gate): new files for newly qualifying directories, missing symlinks, drift fixes for files `bin/audit_context` flags (surgical edits where a documented pattern changed or a described file was deleted; "checked, still accurate" where it didn't, recorded with a `<!-- reviewed: YYYY-MM-DD -->` line so the flag clears), context files for the candidate directories the audit lists (5+ files, no context file; ones that need none go in a root `<!-- context-skip: ... -->` line), and slimming of any ancestor file that repeats a fact a deeper file owns. Existing files are never regenerated.
+Re-running later is how you maintain the setup. A run on an app that already has context files proposes (behind the same approval gate): new files for newly qualifying directories, missing importing `CLAUDE.md` files, conversion of directories still in the old layout, drift fixes for files `bin/audit_context` flags (surgical edits where a documented pattern changed or a described file was deleted; "checked, still accurate" where it didn't, recorded with a `<!-- reviewed: YYYY-MM-DD -->` line so the flag clears), context files for the candidate directories the audit lists (5+ files, no context file; ones that need none go in a root `<!-- context-skip: ... -->` line), and slimming of any ancestor file that repeats a fact a deeper file owns. Existing files are never regenerated.
 
 Afterwards, day to day:
 
-- The maintenance rule in your root `CLAUDE.md` makes agents update affected context files as part of normal work, in the same commit as the change.
+- The maintenance rule in your root `AGENTS.md` makes agents update affected context files as part of normal work, in the same commit as the change.
 - Re-run the skill periodically - or after a big refactor - to catch drift; `bin/audit_context` gives the same signal from the shell.
 - You don't have to remember: the plugin ships a `SessionStart` hook that runs `bin/audit_context` quietly when a session starts and, at most once a week per project, tells you when a maintenance run is due (oversized files, 5 or more flagged files, or an audit script older than the installed skill). It stays silent in projects without `bin/audit_context` and never starts a run on its own.
-- **Shell work gets the context too.** Claude Code loads a directory's `CLAUDE.md` only when its Read tool reads a file there, and agents do much of their work through the shell. The plugin's `PostToolUse` hook watches Bash, Write, Edit, and Grep calls: when one touches code under `app/`, `lib/`, `test/`, or `spec/`, it hands Claude the context files on that path (the root excluded) that have not reached it yet - once per session, and again after a compaction. Silent in projects without `bin/audit_context`.
+- **Shell work gets the context too.** Claude Code loads a directory's `CLAUDE.md` (and the `AGENTS.md` it imports) only when its Read tool reads a file there, and agents do much of their work through the shell. The plugin's `PostToolUse` hook watches Bash, Write, Edit, and Grep calls: when one touches code under `app/`, `lib/`, `test/`, or `spec/`, it hands Claude the context on that path (the root excluded) that has not reached it yet - what Claude Code would load, with the import expanded - - once per session, and again after a compaction. Silent in projects without `bin/audit_context`.
 - **Apps inside a larger repository work too.** When the Rails app is a directory of the repository you open (for example `studio/` or `hub/`), the hooks find it by its `bin/audit_context`, hand over the app's own root `CLAUDE.md` (Claude Code does not load it at session start), and `audit_context` and `context_report` list paths from the app.
 - **Do the files actually reach Claude?** The plugin's hooks keep a local log in `.git/claude-context-log.jsonl` (never committed): when a context file loads into Claude's context, Claude reads one, or the hook hands one over, and which files each session changed - by any tool, Bash included. `scripts/context_report` turns it into a table per context file: sessions that worked in the directory, sessions where its file reached Claude, and the gap between them. Maintenance runs use it to fix files that are not read where it matters, and to merge files that never are.

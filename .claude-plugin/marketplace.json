@@ -9,7 +9,7 @@
     {
       "name": "rails-context",
       "source": "./rails-context",
-      "description": "Per-directory CLAUDE.md context files for Rails apps (MVC Context)"
+      "description": "Per-directory AGENTS.md context files for Rails apps (MVC Context), imported by a one-line CLAUDE.md"
     },
     {
       "name": "rails-design-system",

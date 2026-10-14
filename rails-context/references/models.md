@@ -1,6 +1,6 @@
 # app/models - generation guide
 
-Read this before generating `app/models/CLAUDE.md` in the target app. Every statement you write must be derived from that app's code - this guide only tells you what to look for and how dense the result should be. Only generate the file if the directory qualified in Phase 1; skip any question below that the app has no answer to.
+Read this before generating `app/models/AGENTS.md` in the target app. Every statement you write must be derived from that app's code - this guide only tells you what to look for and how dense the result should be. Only generate the file if the directory qualified in Phase 1; skip any question below that the app has no answer to.
 
 ## Questions to answer from the code
 

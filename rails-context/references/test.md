@@ -1,6 +1,6 @@
 # test/ or spec/ - generation guide
 
-Read this before generating the test suite's context file - `test/CLAUDE.md` for minitest apps, `spec/CLAUDE.md` for RSpec apps (whichever directory the project actually has; never both, never scaffolded). The directory qualifies when the suite has non-obvious infrastructure - stubbing helpers, factory conventions, job-testing quirks - not merely because tests exist. Derive every statement from the app's code; skip questions the app has no answer to.
+Read this before generating the test suite's context file - `test/AGENTS.md` for minitest apps, `spec/AGENTS.md` for RSpec apps (whichever directory the project actually has; never both, never scaffolded). The directory qualifies when the suite has non-obvious infrastructure - stubbing helpers, factory conventions, job-testing quirks - not merely because tests exist. Derive every statement from the app's code; skip questions the app has no answer to.
 
 ## Questions to answer from the code
 
@@ -29,4 +29,4 @@ Read this before generating the test suite's context file - `test/CLAUDE.md` for
   login form except in the auth system tests themselves.
 ```
 
-The excerpt is minitest-flavoured; an RSpec suite's `spec/CLAUDE.md` carries the same kinds of statements (support helpers, stubbing policy, job assertion quirks) at the same density.
+The excerpt is minitest-flavoured; an RSpec suite's `spec/AGENTS.md` carries the same kinds of statements (support helpers, stubbing policy, job assertion quirks) at the same density.

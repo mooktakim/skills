@@ -1,6 +1,6 @@
 # app/views - generation guide
 
-Read this before generating `app/views/CLAUDE.md` in the target app. Only generate this file when the view layer is genuinely non-trivial (multiple layouts/audiences, a component boundary, Turbo conventions, multi-domain rendering) - a conventional CRUD view tree gets nothing. Derive every statement from the app's code; skip questions the app has no answer to.
+Read this before generating `app/views/AGENTS.md` in the target app. Only generate this file when the view layer is genuinely non-trivial (multiple layouts/audiences, a component boundary, Turbo conventions, multi-domain rendering) - a conventional CRUD view tree gets nothing. Derive every statement from the app's code; skip questions the app has no answer to.
 
 ## Questions to answer from the code
 
