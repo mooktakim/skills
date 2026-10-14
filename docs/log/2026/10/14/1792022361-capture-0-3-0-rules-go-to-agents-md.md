@@ -1,0 +1,2 @@
+- capture routes directory and project rules to AGENTS.md (the CLAUDE.md beside it only imports it); new row: Claude-only behaviour goes below the import in the root CLAUDE.md. Global ~/.claude/CLAUDE.md unchanged (Claude-only by nature).
+- Old-layout projects (content in CLAUDE.md, AGENTS.md symlink): the rule goes where the project keeps it, and capture says once that rails-context (directories) or project-memory (root) can migrate the layout; capture itself never migrates.
