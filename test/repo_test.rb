@@ -2,7 +2,7 @@
 
 require_relative "test_helper"
 
-# The marketplace's own structure rules from CLAUDE.md, checked so a broken
+# The marketplace's own structure rules from AGENTS.md, checked so a broken
 # manifest, a missing README row, or a hook pointing at a missing script fails CI
 # instead of failing for users after an update.
 class RepoTest < Minitest::Test

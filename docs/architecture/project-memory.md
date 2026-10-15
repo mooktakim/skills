@@ -13,7 +13,8 @@ sources: [auto memory project-memory-status.md]
 `project-memory` plugin built 2026-10-14/15 from the user's MEMORY.md protocol doc; it replaced the global "Project History Log" instructions (config_files commit 0e1974b removed claude/project-history-log.md).
 
 User decisions:
-- Name `project-memory`. CLAUDE.md canonical, AGENTS.md symlink (the user preference kept in auto memory). One log file per unit of work, not per session.
+- Name `project-memory`. One log file per unit of work, not per session.
+- Context file layout (changed 2026-10-15, project-memory 0.5.0): AGENTS.md holds the content, for every agent; CLAUDE.md is the line `@AGENTS.md` plus any Claude-only rules. It replaced the earlier CLAUDE.md-canonical + AGENTS.md-symlink layout after a headless test showed Claude Code expands the import in directory CLAUDE.md files that load later in a session.
 - No migration script: the user wants Claude to read each project's old log and decide the mapping (projects logged differently); no-loss is enforced by checks in SKILL.md.
 - The `project-memory` command is Rust (user wanted speed: 0.09 s vs Ruby 0.32 s on a big project), on PATH through the plugin; not a toolsmith command (one job per tool rule).
 - CI is opt-in per project, through the composite action `mooktakim/skills/project-memory@<sha>` (cached build). Committed binaries and a cross-platform binary were rejected.

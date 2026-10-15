@@ -1,0 +1,3 @@
+- Converted this repo's root: CLAUDE.md content moved to AGENTS.md (git mv; title and first line edited to name the right file), CLAUDE.md is now `@AGENTS.md`. docs/MEMORY.md upgraded to protocol 0.5.0 (no overrides, settings unchanged). repo_test comment points at AGENTS.md.
+- docs/architecture/project-memory.md: layout decision updated by delta (changed 2026-10-15) instead of the old "CLAUDE.md canonical" line.
+- Auto memory: the feedback memory now records the new layout (old file replaced), project-memory-status updated. Global config has no layout rule, nothing to change there.
