@@ -42,4 +42,4 @@ Remove `@rails/ujs` from the importmap or package.json and `Rails.start()`. With
 2. Update gems and pins (`bundle update turbo-rails stimulus-rails`, `bin/importmap pin @hotwired/turbo-rails` where pinned from a CDN); confirm the lock and pin files changed.
 3. Fix the findings group by group, running the affected tests after each.
 4. Walk the app in a browser: navigation, back button, every form (success and failure), deletes with confirms, live updates.
-5. Run the audit again, and record the new conventions in `app/javascript/CLAUDE.md` if the app has one.
+5. Run the audit again, and record the new conventions in `app/javascript/AGENTS.md` if the app has one.

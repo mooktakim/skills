@@ -12,7 +12,7 @@ The rails-minitest skill is loaded into your context: its rules apply to every t
 ## Detect the suite first
 
 1. Confirm Minitest: `test/test_helper.rb` exists and the Gemfile has no `rspec-rails`. On an RSpec app, stop and report that you cover Minitest only.
-2. Read `Gemfile.lock`, `test/test_helper.rb`, `test/test_helpers/` (or `test/support/`), `test/application_system_test_case.rb`, and `test/CLAUDE.md` if it exists.
+2. Read `Gemfile.lock`, `test/test_helper.rb`, `test/test_helpers/` (or `test/support/`), `test/application_system_test_case.rb`, and `test/AGENTS.md` if it exists.
 3. Before writing a test, read two or three neighbouring tests of the same kind and match their idiom: fixtures or factories, helper names, assertion style.
 
 ## Writing tests

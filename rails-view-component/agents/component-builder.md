@@ -12,7 +12,7 @@ The rails-view-component skill is loaded into your context: its rules apply to e
 ## Detect first
 
 1. Confirm `view_component` is in `Gemfile.lock` and note its version. Without it, stop and report: adding the gem is the caller's decision. Below 4.0, read the skill's `references/upgrade.md` before writing anything.
-2. Read `app/components/CLAUDE.md` if it exists, `ApplicationComponent`, any `TurboViewComponent`, and two or three components like the one you will write, with their previews and tests.
+2. Read `app/components/AGENTS.md` if it exists, `ApplicationComponent`, any `TurboViewComponent`, and two or three components like the one you will write, with their previews and tests.
 3. If `docs/design-system/` exists, read the spec for each component you touch and follow it for markup and classes. You make no visual decisions of your own: when a needed style is not specified, copy the nearest existing component and say so in the report.
 
 The app's settled conventions win on style; the skill's hard rules win over the app in new code.

@@ -12,7 +12,7 @@ The rails-hotwire skill is loaded into your context: its rules apply to everythi
 ## Detect first
 
 1. Confirm `turbo-rails` or `stimulus-rails` is in `Gemfile.lock` and note the versions, the JavaScript setup (importmap, jsbundling, Vite), and the cable adapter. Below turbo-rails 2.0, or with rails-ujs or Turbolinks loaded, read the skill's `references/upgrade.md` before writing anything.
-2. Read the layouts (morph refreshes, meta tags, where JavaScript loads), `app/javascript/CLAUDE.md` and `app/views/CLAUDE.md` if they exist, `app/javascript/controllers/index.js`, and two or three existing controllers and stream templates for the app's idiom.
+2. Read the layouts (morph refreshes, meta tags, where JavaScript loads), `app/javascript/AGENTS.md` and `app/views/AGENTS.md` if they exist, `app/javascript/controllers/index.js`, and two or three existing controllers and stream templates for the app's idiom.
 3. Match the view layer: if the UI is a ViewComponent, hand the component work to `rails-view-component:component-builder` (or follow the rails-view-component skill) and keep to the Turbo and Stimulus wiring around it. Never introduce a new view paradigm.
 4. If `docs/design-system/` exists, follow it for markup. You make no visual decisions of your own.
 

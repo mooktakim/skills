@@ -17,7 +17,7 @@ In the target app, under `docs/design-system/`:
   - `patterns/<name>.md` - page archetypes (index page, form page, app shell...) composing components by reference; `app-shell.md` defines the page frames the others name.
   - `divergences.md` - the migration backlog: every off-system value found, and what it should become.
 
-Plus, outside `docs/`: a design-system block in the root `CLAUDE.md` so agents load the standard before any view work; `bin/audit_design` - a drift script (plain Ruby, no gem dependencies) that flags raw hex, arbitrary `[...]` values, and literal palette classes; and a CI step (`bin/audit_design --strict`, or `--changed <branch>` while old drift remains). Enforcement during Claude Code sessions needs no wiring in the app: the plugin ships the hooks - a `PostToolUse` hook on every Write/Edit and on Bash commands that change a view file, plus `Stop`/`SubagentStop` hooks that catch edits made by generators or anything else - and runs its own copy of the audit (also for an app in a directory of a larger repository), so a fix to the checks reaches every app when the plugin updates. Violations go back to the agent as blocking errors. Only lines added since the last commit are checked, so old drift never blocks an unrelated edit.
+Plus, outside `docs/`: a design-system block in the root `AGENTS.md` (which the root `CLAUDE.md` imports) so agents load the standard before any view work; `bin/audit_design` - a drift script (plain Ruby, no gem dependencies) that flags raw hex, arbitrary `[...]` values, and literal palette classes; and a CI step (`bin/audit_design --strict`, or `--changed <branch>` while old drift remains). Enforcement during Claude Code sessions needs no wiring in the app: the plugin ships the hooks - a `PostToolUse` hook on every Write/Edit and on Bash commands that change a view file, plus `Stop`/`SubagentStop` hooks that catch edits made by generators or anything else - and runs its own copy of the audit (also for an app in a directory of a larger repository), so a fix to the checks reaches every app when the plugin updates. Violations go back to the agent as blocking errors. Only lines added since the last commit are checked, so old drift never blocks an unrelated edit.
 
 ## Philosophy
 
@@ -33,7 +33,7 @@ A curated component catalog ships with the skill (buttons, forms, tables, naviga
 
 1. **Survey and plan** - detects Tailwind v4 (hard requirement), the view layer, and the candidate sections, then proposes the section split and every file it would write. Nothing is written until you approve.
 2. **Generate** - derives each section's tokens and aesthetics from its actual views (interviewing you where none exist) and specs the components and patterns in use. Sections are independent, so they generate in parallel - one subagent per section, with the agent count declared in the plan you approved.
-3. **Wire up maintenance** - root `CLAUDE.md` block, `bin/audit_design`, and the CI step.
+3. **Wire up maintenance** - root `AGENTS.md` block, `bin/audit_design`, and the CI step.
 4. **Review** - shows you everything; your stated design intent outranks anything inferred. Commits after corrections, and closes with an audit report.
 
 Re-running later is how you maintain it: drift review, gap-fill for new sections and components, and promotion of repeated one-offs into specs - all behind the same approval gate. Existing docs are never regenerated, only surgically edited.
@@ -60,6 +60,6 @@ Open a Claude Code session inside your Rails app and ask in plain words - "set u
 
 Afterwards, day to day:
 
-- The root `CLAUDE.md` block makes agents read the standard before touching views, and update affected specs in the same commit as the change.
+- The root `AGENTS.md` block makes agents read the standard before touching views, and update affected specs in the same commit as the change.
 - Re-run the skill periodically - or after a big UI push - to catch drift; `bin/audit_design` gives the same signal from the shell.
 - You don't have to remember: the plugin ships a `SessionStart` hook that runs `bin/audit_design` quietly when a session starts and, at most once a week per project, tells you when a maintenance run is due (audit findings, an audit script that differs from the installed skill, leftover audit hooks in `.claude/settings.json`, or no audit step in CI). It stays silent in projects without `bin/audit_design` and never starts a run on its own.

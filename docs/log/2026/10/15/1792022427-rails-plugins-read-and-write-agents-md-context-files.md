@@ -1,0 +1,3 @@
+- rails-design-system 0.18.0: the root block goes to the root AGENTS.md (CLAUDE.md imports it); an app with neither gets both files; an old-layout root gets the block where its content lives plus a one-time pointer to project-memory / rails-context for the migration (never converted by a design-system run). README and readme-router follow.
+- rails-hotwire 0.3.2, rails-minitest 0.2.2, rails-view-component 0.3.2: read/update steps (skills and agents) name `<dir>/AGENTS.md`. Safe in old-layout apps too: there AGENTS.md is a symlink to the CLAUDE.md content, so reads and writes go through.
+- No hook or script outside rails-context reads context files (checked).

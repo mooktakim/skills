@@ -26,7 +26,7 @@ You write and maintain Minitest suites in Rails apps to one standard: tests that
 
 1. Confirm the app uses Minitest: `test/test_helper.rb` exists and the Gemfile has no `rspec-rails`. On an RSpec app, stop and say this skill covers Minitest only.
 2. Read `Gemfile.lock`: the Rails and Minitest versions, and whether the app has `factory_bot_rails`, `mocha` or `minitest-mock`, `webmock`, `vcr`, `simplecov`, `test-prof`, and `capybara` with its driver.
-3. Read `test/test_helper.rb`, everything in `test/test_helpers/` (or `test/support/`), `test/application_system_test_case.rb`, and `test/CLAUDE.md` if it exists.
+3. Read `test/test_helper.rb`, everything in `test/test_helpers/` (or `test/support/`), `test/application_system_test_case.rb`, and `test/AGENTS.md` if it exists.
 4. Read two or three existing tests of the kind you are about to write.
 
 The app's settled conventions win on style: naming, assertion style, helper names, fixtures or factories. The rules marked **hard** below win over the app. In writing mode, follow them in new code and report the old violations you saw; fix old ones only in suite mode.
@@ -103,5 +103,5 @@ Work in this order: infrastructure, helpers, fixtures, then test changes. Add ge
 
 1. Run the full suite twice, with two different seeds. Both runs must pass.
 2. Compare with the baseline - wall time, test count, slowest tests, coverage - and run the audit again.
-3. If the app has `test/CLAUDE.md`, update it with the conventions this run set up: the helpers and what each is for, the personas, the stubbing policy.
+3. If the app has `test/AGENTS.md`, update it with the conventions this run set up: the helpers and what each is for, the personas, the stubbing policy.
 4. Report what changed, the numbers before and after, and what is left. Commit only when the user or the project's rules say so.

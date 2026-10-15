@@ -34,7 +34,7 @@ In the main conversation, when subagents are available, hand component work to `
 ## Detect first
 
 1. Read `Gemfile.lock`: the `view_component` version, and `turbo-rails`, `stimulus-rails`, `importmap-rails` or `jsbundling-rails` or `vite_rails`, `lookbook`, and any forms gem (`simple_form`, `view_component-form`, ...). With no `view_component`, stop: adding the gem is a library-mode change that needs approval. Below 4.0, read `references/upgrade.md` before writing anything, because v3 APIs differ. Below 4.14, tell the user once that 4.14 fixes a security issue (CVE-2026-54497).
-2. Read `app/components/CLAUDE.md` if it exists, `app/components/application_component.rb`, any other base class (`TurboViewComponent`), and the `config.view_component` settings in `config/`.
+2. Read `app/components/AGENTS.md` if it exists, `app/components/application_component.rb`, any other base class (`TurboViewComponent`), and the `config.view_component` settings in `config/`.
 3. Read two or three existing components like the one you are about to write, with their previews and tests.
 4. If the app has `docs/design-system/`, read the spec for any component you touch and follow it for markup and styling.
 
@@ -99,5 +99,5 @@ Work in this order: upgrade, infrastructure, structure, violations, gaps. Gem ch
 
 1. Run the full suite (`bin/rails test:all` when there are system tests) and the audit again. Both must be no worse than the baseline.
 2. Open the changed previews or pages in a browser and check that they render.
-3. If the app has `app/components/CLAUDE.md`, update it with the conventions this run set up: base classes, namespaces, template style, Stimulus loading.
+3. If the app has `app/components/AGENTS.md`, update it with the conventions this run set up: base classes, namespaces, template style, Stimulus loading.
 4. Report what changed, the findings before and after, and what is left. Commit only when the user or the project's rules say so.

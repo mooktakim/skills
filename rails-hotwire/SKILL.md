@@ -34,7 +34,7 @@ In the main conversation, when subagents are available, hand Hotwire work to `ra
 
 1. Read `Gemfile.lock`: `turbo-rails` (2.x ships Turbo 8), `stimulus-rails`, `importmap-rails` or `jsbundling-rails` or `vite_rails`, `requestjs-rails`, `view_component`, and the cable adapter in `config/cable.yml` (production). Below turbo-rails 2.0, or with rails-ujs or Turbolinks loaded, read `references/upgrade.md` first.
 2. Read the layouts: `turbo_refreshes_with` (morph refreshes), view-transition and prefetch meta tags, `yield :head`, where the JavaScript loads.
-3. Read `app/javascript/CLAUDE.md` and `app/views/CLAUDE.md` if they exist, `app/javascript/controllers/index.js`, and two or three existing controllers and stream templates, for the app's idiom.
+3. Read `app/javascript/AGENTS.md` and `app/views/AGENTS.md` if they exist, `app/javascript/controllers/index.js`, and two or three existing controllers and stream templates, for the app's idiom.
 4. Look for the app's own Hotwire helpers (`app/helpers/*turbo*`, `*stream*`, a flash stream helper, form helpers that add Stimulus attributes) and use them.
 
 The app's settled conventions win on style: naming, where streams live, how flash is shown, how state is styled. The rules marked **hard** below win over the app. In writing mode, follow them in new code and report the old violations you saw; fix old ones only in app mode.
@@ -114,5 +114,5 @@ Work in this order: upgrade, correctness, structure, morphing, Stimulus hygiene,
 
 1. Run the full suite (`bin/rails test:all`) and the audit again. Both must be no worse than the baseline.
 2. Walk the changed pages in a browser: navigation, back button, forms (success and failure), live updates in two windows.
-3. If the app has `app/javascript/CLAUDE.md` or `app/views/CLAUDE.md`, update them with the conventions this run set up.
+3. If the app has `app/javascript/AGENTS.md` or `app/views/AGENTS.md`, update them with the conventions this run set up.
 4. Report what changed, the findings before and after, and what is left. Commit only when the user or the project's rules say so.

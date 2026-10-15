@@ -32,4 +32,4 @@ Added in v4 and later: `around_render`, default slots (`default_<slot>`), `Turbo
 3. Fix config keys (`v3-config`), then removed APIs (`removed-api`): each `use_helpers` becomes an `include` of the helper module, or a `delegate ... to: :helpers` for helpers that need the view.
 4. Run the component tests, then the full suite. Errors to expect: `NoMethodError` for app helpers (step 3 missed one), `ReusedInstanceError` (an instance kept in a constant or rendered twice - build one per render), changed selectors from the HTML5 parser.
 5. Open the previews and the main pages in a browser.
-6. Run the audit again; record what changed in `app/components/CLAUDE.md` if the app has one.
+6. Run the audit again; record what changed in `app/components/AGENTS.md` if the app has one.

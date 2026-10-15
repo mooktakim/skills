@@ -93,7 +93,7 @@ Rules that govern all generation:
 
 ## Phase 3: Wire up maintenance
 
-1. Append this block to the root `CLAUDE.md` (adapt wording to fit, keep the substance; create the file if the app has none):
+1. Append this block to the root `AGENTS.md`, the file every agent reads and the root `CLAUDE.md` imports with `@AGENTS.md` (adapt wording to fit, keep the substance). If the app has neither file, create `AGENTS.md` with the block and a `CLAUDE.md` holding `@AGENTS.md`. If the root is still in the older layout (content in `CLAUDE.md`, `AGENTS.md` a symlink to it), append the block where the content lives, and say once that the root layout can be migrated - the `project-memory` skill, or a `rails-context` maintenance run, does it with the user's approval; a design-system run never converts it on its own:
 
 ```markdown
 ## Design system
@@ -161,7 +161,7 @@ Close every run - first run or maintenance - by running `bin/audit_design` and r
 - Emit a raw hex value, a literal palette class, or an arbitrary `[...]` value in any spec or recipe.
 - Restate a component's markup inside a pattern - patterns compose by reference.
 - Paste a catalog entry into an app unadapted, or spec a component the section does not use.
-- Write per-directory `CLAUDE.md` files - that is the rails-context skill's job, not this one's.
+- Write per-directory context files (`AGENTS.md` and its importing `CLAUDE.md`) - that is the rails-context skill's job, not this one's.
 - Regenerate an existing doc when a surgical edit will do.
 - Let a spec and its realized component contradict silently - one of them is the bug; flag it.
 - Restyle existing views beyond fixes I approved from the drift review.
