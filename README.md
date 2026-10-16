@@ -96,6 +96,12 @@ claude plugin validate .          # validate the marketplace manifest
 
 CI runs the suite on Linux with current Rubies and Ruby 2.6, and on macOS with the system Ruby and bash 3.2.
 
+## Author
+
+Built and maintained by [Mooktakim Ahmed](https://mooktakim.com). Every plugin here started as a fix for a problem met while building real Rails apps with coding agents, and each one is still used daily on those projects. Read more about my work at [mooktakim.com](https://mooktakim.com).
+
+Issues and pull requests are welcome.
+
 ## License
 
 [MIT](LICENSE)
