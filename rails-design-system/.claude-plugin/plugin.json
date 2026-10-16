@@ -8,5 +8,6 @@
   },
   "homepage": "https://github.com/mooktakim/skills",
   "repository": "https://github.com/mooktakim/skills",
-  "keywords": ["rails", "design-system", "tailwind", "components", "tokens", "ui"]
+  "keywords": ["rails", "design-system", "tailwind", "components", "tokens", "ui"],
+  "license": "MIT"
 }

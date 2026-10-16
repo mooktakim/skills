@@ -5,5 +5,6 @@
   "author": { "name": "Mooktakim Ahmed", "email": "mooktakim@fluxter.co.uk" },
   "homepage": "https://github.com/mooktakim/skills",
   "repository": "https://github.com/mooktakim/skills",
-  "keywords": ["rails", "migrations", "generators", "schema", "credentials"]
+  "keywords": ["rails", "migrations", "generators", "schema", "credentials"],
+  "license": "MIT"
 }

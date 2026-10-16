@@ -8,5 +8,6 @@
   },
   "homepage": "https://github.com/mooktakim/skills",
   "repository": "https://github.com/mooktakim/skills",
-  "keywords": ["rails", "claude-md", "agents-md", "context", "conventions"]
+  "keywords": ["rails", "claude-md", "agents-md", "context", "conventions"],
+  "license": "MIT"
 }

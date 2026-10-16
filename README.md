@@ -86,7 +86,7 @@ The Rails plugins work alone, and each one knows about the others:
 
 ## Development
 
-Every plugin is a directory at the repository root with a `.claude-plugin/plugin.json` manifest and a `SKILL.md`, an `agents/` directory, or both. [`AGENTS.md`](AGENTS.md) holds the full authoring conventions.
+Every plugin is a directory at the repository root with a `.claude-plugin/plugin.json` manifest and a `SKILL.md`, an `agents/` directory, or both. [`AGENTS.md`](AGENTS.md) holds the full authoring conventions, and [`docs/`](docs/) holds this repository's own project memory (design decisions and a log of past work), not user documentation.
 
 ```sh
 bin/test                          # Minitest suite: runs the real scripts and hooks in throwaway git repos

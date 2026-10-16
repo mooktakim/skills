@@ -5,5 +5,6 @@
   "author": { "name": "Mooktakim Ahmed", "email": "mooktakim@fluxter.co.uk" },
   "homepage": "https://github.com/mooktakim/skills",
   "repository": "https://github.com/mooktakim/skills",
-  "keywords": ["rails", "minitest", "testing", "fixtures", "agents"]
+  "keywords": ["rails", "minitest", "testing", "fixtures", "agents"],
+  "license": "MIT"
 }
