@@ -37,6 +37,15 @@ Run any command with `--help` for a summary, or `--llm` for the full guide: when
 
 The `toolsmith` skill has three workflows. Ask in plain words ("scan my Claude history for tool ideas", "build that tool", "are the toolsmith tools helping?") or run `/toolsmith:toolsmith`.
 
+```mermaid
+flowchart LR
+  hist[("Claude Code<br/>history")] -->|"scan"| rank["Ranked repeated<br/>shell patterns"]
+  rank -->|"you choose"| build["New toolsmith-* command<br/>with an --llm guide<br/>and tested examples"]
+  build --> hook["Hook reminds Claude<br/>when it uses the old pattern"]
+  hook --> log[("Usage log")]
+  log -->|"adoption review"| rank
+```
+
 1. **Scan.** `scripts/analyse scan` reads `~/.claude/projects` (2.5 GB in about 8 seconds) and ranks the repeated patterns. `scripts/analyse examples` shows real commands for a pattern. Claude proposes a shortlist; you choose.
 2. **Build.** Claude writes the tool's manifest first and shows you the design, then the code, the tests and a real trial run.
 3. **Review adoption.** `scripts/analyse adoption` shows, per tool and week, tool calls against calls that still use the old pattern, plus failures, guide reads, and how often a reminder led to a run.

@@ -18,6 +18,13 @@ Makes Claude use the Rails framework's own generators and commands instead of wr
 - **A `PreToolUse` guard** - in any directory with `bin/rails`, it refuses a new migration written with Write, Edit, or a shell command, and any write to `db/schema.rb`, `db/structure.sql`, `db/<name>_schema.rb`, encrypted credentials, or `Gemfile.lock`, and tells Claude the command to run instead. Editing a migration that has already run gets a note on how to change it safely. Tool calls that name none of those files never start Ruby.
 - **A `SessionStart` hook** - in Rails apps only, it tells the main session to use the commands and when to load the skill.
 
+```mermaid
+flowchart LR
+  call["Write, Edit,<br/>or Bash call"] --> owned{"Hand-writes a file<br/>Rails owns?"}
+  owned -->|"no"| run["Runs as normal"]
+  owned -->|"yes"| refuse["Refused, with the<br/>command to run instead"]
+```
+
 ## Where the standard comes from
 
 The Rails source and CHANGELOGs (8.0, 8.1.4, and `main`), the Active Record migrations, generators, and configuring guides, every generator run under `--pretend` on a fresh Rails 8.1.4 app, the strong_migrations README (2.8.0), and the importmap-rails, stimulus-rails, view_component, and Solid gems' source.

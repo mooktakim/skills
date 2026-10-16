@@ -34,6 +34,18 @@ The protocol travels with the repository: once set up, Claude follows `docs/MEMO
 - **`project-memory lint`** checks frontmatter, folders, citations, links, log file names, the index, size budgets, and common secret patterns. Claude runs it after changing `docs/`; a project can also run it in CI. `project-memory index` writes the index and `project-memory stale` lists what a consolidation pass must look at.
 - **Consolidation passes** (on PR merge or weekly) promote or reject the inbox, merge duplicates, expire notes not verified within 90 days, and retire lessons that mislead more than they help.
 
+How knowledge moves through the project:
+
+```mermaid
+flowchart LR
+  work["Finished work"] --> log["docs/log/ entry<br/>in the same commit"]
+  work --> inbox["docs/inbox/<br/>proposed knowledge"]
+  inbox -->|"tests pass, PR merges,<br/>or a human approves"| notes["Curated notes<br/>with code citations"]
+  notes -->|"project-memory index"| index["docs/INDEX.md"]
+  index -->|"read at task start"| next["Next task"]
+  notes -->|"not verified in 90 days"| archive["docs/archive/"]
+```
+
 ## Project overrides
 
 Each project can change the protocol in the **Project overrides** section at the end of its `docs/MEMORY.md`, and tune the size budgets and expiry window in its frontmatter. Overrides win over the protocol, and protocol upgrades keep them unchanged.

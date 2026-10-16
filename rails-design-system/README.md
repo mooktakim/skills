@@ -24,6 +24,19 @@ In the target app, under `docs/design-system/`:
 
 Plus, outside `docs/`: a design-system block in the root `AGENTS.md` (which the root `CLAUDE.md` imports) so agents load the standard before any view work; `bin/audit_design` - a drift script (plain Ruby, no gem dependencies) that flags raw hex, arbitrary `[...]` values, and literal palette classes; and a CI step (`bin/audit_design --strict`, or `--changed <branch>` while old drift remains). Enforcement during Claude Code sessions needs no wiring in the app: the plugin ships the hooks - a `PostToolUse` hook on every Write/Edit and on Bash commands that change a view file, plus `Stop`/`SubagentStop` hooks that catch edits made by generators or anything else - and runs its own copy of the audit (also for an app in a directory of a larger repository), so a fix to the checks reaches every app when the plugin updates. Violations go back to the agent as blocking errors. Only lines added since the last commit are checked, so old drift never blocks an unrelated edit.
 
+How a view change is checked:
+
+```mermaid
+flowchart TD
+  edit["Agent edits a view"] --> hook["Hook audits the added lines"]
+  hook -->|"raw hex, palette class,<br/>arbitrary value"| block["Blocking error:<br/>the agent fixes it"]
+  block --> edit
+  hook -->|"clean"| rev["design-reviewer checks the<br/>change against the specs"]
+  rev -->|"a finding that<br/>keeps coming back"| rule["New audit-rules line"]
+  rule -.->|"enforced from then on"| hook
+  rev --> ci["CI runs<br/>bin/audit_design --strict"]
+```
+
 ## Philosophy
 
 - **Sections share only what you choose.** By default sections are islands: admin and marketing never share tokens or components, and duplication between them is fine - coupling is the bug. When every section is built on one component library or brand, the plan can instead propose a *shared foundation* (`shared/` tokens and components that sections build on), and a single section can adopt an *external library* as-is (its palette classes allowed on its paths only). The choice is made once in the plan and recorded in the design system's README; maintenance runs respect it.

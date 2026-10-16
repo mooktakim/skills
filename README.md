@@ -7,11 +7,7 @@ A hand-authored collection of skills, agents, and hooks for coding agents, packa
 
 The plugins share one aim: make the agent follow a project's real conventions, every session, without being told twice. They write those conventions into checked-in files, load them at the moment they matter, and back the most important rules with checks that run in hooks and CI.
 
-## Not only Claude Code
-
-What the plugins write into a project is agent-neutral. Context and rules go to `AGENTS.md`, the open standard read by Codex, Cursor, Gemini CLI, and other coding agents, and Claude Code gets the same content through a one-line `CLAUDE.md` that imports it (`@AGENTS.md`). Project memory, the design system, and the audit scripts are plain markdown and Ruby in your repository, so they keep working for every agent and every teammate, with or without the plugins installed.
-
-The plugins themselves (skills, subagents, and hooks) install through Claude Code. Every one is used daily on real projects in Claude Code and covered by the test suite in this repository.
+The conventions go to `AGENTS.md`, so any coding agent can read them. The plugins themselves run in Claude Code, where each one is used daily on real projects and covered by this repository's test suite.
 
 ## Install
 
@@ -54,6 +50,26 @@ Run `/plugin` to browse and manage everything interactively, and `/plugin market
 Each plugin's README covers what it ships, how to use it, and what it needs.
 
 ## How the Rails plugins fit together
+
+```mermaid
+flowchart LR
+  subgraph know["Know the project"]
+    ctx["rails-context<br/>code conventions<br/>per directory"]
+    ds["rails-design-system<br/>how the UI looks"]
+    cap["capture<br/>records new rules<br/>in the right file"]
+  end
+  subgraph build["Build to the standard"]
+    gen["rails-generators"]
+    hw["rails-hotwire"]
+    vc["rails-view-component"]
+    mt["rails-minitest"]
+  end
+  subgraph review["Review before commit"]
+    rr["rails-reviewer"]
+    dr["design-reviewer"]
+  end
+  know --> build --> review
+```
 
 The Rails plugins work alone, and each one knows about the others:
 

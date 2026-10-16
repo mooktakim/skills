@@ -18,6 +18,18 @@ Rails is MVC. This skill adds a fourth letter: **Context**. It sets up per-direc
 
 There is no separate audit command: re-running the skill is the audit (see below).
 
+How a directory's conventions reach the agent, whichever tool it uses:
+
+```mermaid
+flowchart LR
+  work["Agent works on<br/>app/services/charge.rb"] --> how{"Which tool?"}
+  how -->|"Read"| load["Claude Code loads<br/>app/services/CLAUDE.md"]
+  load -->|"@AGENTS.md import"| agents["app/services/AGENTS.md<br/>the directory's conventions"]
+  how -->|"Bash, Edit, Write, Grep"| hook["PostToolUse hook"]
+  hook -->|"hands it over"| agents
+  other["Codex, Cursor,<br/>other agents"] -->|"read it directly"| agents
+```
+
 ## Philosophy: intent, not inventory
 
 Context files describe the *shape* of a directory, never its *contents*. "Services are single-purpose command objects named `VerbNoun`, exposing `.call` and returning a `Result`" is allowed; "the main services are X, Y, Z" is forbidden. File lists go stale the moment anyone adds a file, and a stale context file is worse than none - the code is the inventory, and agents can glob and grep it. Context files answer what grep cannot: why the directory is structured this way, what a correct new addition looks like, what mistakes to avoid.

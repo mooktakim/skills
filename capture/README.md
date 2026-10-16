@@ -19,6 +19,18 @@ A correction you have to repeat is a gap in the project's context. Auto memory d
 4. **You approve the exact text.** Nothing is written until you approve the line and the target.
 5. **Enforced when possible.** If a grep can catch the rule, Claude proposes a check too: an `audit-rules` line in apps with a design system (enforced by `bin/audit_design` and its hooks), or a linter/CI step elsewhere.
 
+```mermaid
+flowchart TD
+  rule["A rule you state<br/>or a correction you make"] --> where{"Where does it apply?"}
+  where -->|"code in one directory"| dir["That directory's<br/>AGENTS.md"]
+  where -->|"UI in every section"| conv["docs/design-system/<br/>conventions.md"]
+  where -->|"one UI section<br/>or component"| sec["The section's design.md<br/>or the component spec"]
+  where -->|"the whole project"| root["Root AGENTS.md or<br/>a project-memory note"]
+  where -->|"you, in every project"| global["~/.claude/CLAUDE.md"]
+  dir & conv & sec & root & global --> grep{"Can a grep catch it?"}
+  grep -->|"yes"| check["Also an audit-rules line<br/>or a CI check"]
+```
+
 One-off taste ("I don't like this layout") and task instructions are not recorded. The same taste correction a second time is, as a design rule.
 
 ## Works in any project

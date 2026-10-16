@@ -42,6 +42,16 @@ Test work - running suites, writing tests, diagnosing failures - moved to the se
 
 **Delegation at fixed moments.** Agent descriptions alone rarely win against the built-in general-purpose agent, so the plugin ships a `SessionStart` hook that, in Rails projects only, tells the main session when to delegate without being asked: `rails-reviewer` after implementing a change and before committing or opening a PR (trivial changes skipped), `rails-security` when a change touches auth, money, uploads, or secrets and before a production deploy, and `rails-debugger` when a bug's root cause is not yet proven. Each review costs tokens (roughly 100-200k for a feature-sized diff); that is the deliberate trade for catching bugs before they merge. When several reviews apply to one change (including `rails-design-system:design-reviewer`), the hook asks for them in a single message so they run in parallel, and for each prompt to name the changed files and the intent, so the agents skip rediscovering the scope. The writing specialists stay on-demand.
 
+```mermaid
+flowchart LR
+  main["Main session"]
+  main -->|"after a change,<br/>before commit or PR"| rr["rails-reviewer"]
+  main -->|"auth, money,<br/>uploads, secrets"| rs["rails-security"]
+  main -->|"bug with no<br/>proven root cause"| rd["rails-debugger"]
+  main -.->|"when asked"| w["rails-model, rails-jobs,<br/>rails-performance,<br/>rails-deploy, rails-upgrade"]
+  rr & rs & rd --> report["Findings with evidence,<br/>back to the main session"]
+```
+
 **Reports, not transcripts.** Each agent ends with a structured report - what changed or what was found, the evidence, and the follow-ups for other specialists - never raw tool output.
 
 ## Usage
