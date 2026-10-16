@@ -1,6 +1,11 @@
 # Claude Code Skills
 
-A hand-authored collection of skills for [Claude Code](https://code.claude.com), packaged as a plugin marketplace. Each skill is its own plugin, so you install only the ones you want. Skills cover any domain — each skill's name and description tell you what it's for.
+[![Test](https://github.com/mooktakim/skills/actions/workflows/test.yml/badge.svg)](https://github.com/mooktakim/skills/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+A hand-authored collection of skills, agents, and hooks for [Claude Code](https://code.claude.com), packaged as a plugin marketplace. Each skill is its own plugin, so you install only the ones you want.
+
+The plugins share one aim: make Claude follow a project's real conventions, every session, without being told twice. They write those conventions into checked-in files, load them at the moment they matter, and back the most important rules with checks that run in hooks and CI.
 
 ## Install
 
@@ -10,27 +15,65 @@ Add the marketplace once:
 /plugin marketplace add mooktakim/skills
 ```
 
-Then install skills individually:
+Then install the plugins you want:
 
 ```
 /plugin install rails-context@mooktakim
 ```
 
-Browse everything interactively with `/plugin`.
+Run `/plugin` to browse and manage everything interactively, and `/plugin marketplace update mooktakim` to pick up new versions. Start a new session after installing, so the plugin's hooks and commands load.
 
-## Skills
+## Plugins
 
-| Skill | Domain | What it does |
-|-------|--------|--------------|
-| [`rails-context`](rails-context/) | Rails | Sets up per-directory `AGENTS.md` context files across a Rails app (MVC Context — Model, View, Controller, plus Context), each imported by a one-line `CLAUDE.md`, with drift-audit tooling and a migration from the old symlink layout. |
-| [`rails-design-system`](rails-design-system/) | Rails | Codifies a Rails app's UI into per-section design-system docs (role tokens, component specs, page patterns) on Tailwind v4, with drift auditing, edit-time enforcement, and a design-reviewer agent. |
-| [`rails-specialists`](rails-specialists/) | Rails | Ships a team of eight Rails specialist agents (models, jobs, debugging, review, security, performance, deploy, upgrades) that detect the project's stack and follow its conventions. |
-| [`rails-minitest`](rails-minitest/) | Rails | Sets one standard for Minitest suites in Rails apps - every kind of test, fixtures, shared helpers, shortcuts to a known state, speed, coverage, and flaky tests - with a suite audit and a `minitest-runner` agent that runs and writes tests. |
-| [`rails-view-component`](rails-view-component/) | Rails | Sets one standard for ViewComponent libraries in Rails apps - organising, writing, composing, and testing components, Turbo Streams, frames, morphing, self-broadcasting `TurboViewComponent`s, Stimulus beside components, forms with the app's own builder, previews, and the v4 upgrade - with a library audit and a `component-builder` agent that builds components to it. |
-| [`rails-hotwire`](rails-hotwire/) | Rails | Sets one standard for Hotwire in Rails apps - Turbo Drive, Frames, Streams, broadcasts, Turbo 8 morphing, and Stimulus - with form responses, secure streams, state through morphs, UI patterns, accessibility, testing, and upgrades from rails-ujs or Turbolinks, plus an app audit and a `hotwire-builder` agent that builds to it. |
-| [`rails-generators`](rails-generators/) | Rails | Makes Claude use Rails generators and commands instead of hand-writing their files - migrations above all (name patterns, field syntax, reversing, schema.rb conflicts, data changes, production safety), every other generator and installer, credentials, gems, and importmap pins - with a guard that refuses hand-written migrations and edits to schema dumps, encrypted credentials, and `Gemfile.lock`. |
-| [`capture`](capture/) | Any | Records a rule you state, or a correction you make, into the one checked-in context file where it belongs (a directory's `AGENTS.md`, the root, the design system, or your global file), so you never have to say it again. |
-| [`toolsmith`](toolsmith/) | Any | Scans your Claude Code history for shell patterns Claude repeats (inline edit scripts, hand-built log entries, CI polling) and replaces them with small single-purpose Rust commands, each with an LLM guide that the tests run, plus hooks that tell Claude about them and a log that shows whether they are used. |
-| [`project-memory`](project-memory/) | Any | Gives a project long-term memory in git - a protocol for typed notes with citations, a generated index read at task start, an inbox where unverified knowledge waits, lessons with usage counts, and an append-only log of finished work - with a fast `project-memory` command (lint for CI, index, stale), consolidation passes, and lossless migration from older history logs. |
+### Rails
 
-Each skill directory has its own README with full details.
+| Plugin | What it does |
+|--------|--------------|
+| [`rails-context`](rails-context/) | Per-directory `AGENTS.md` context files across a Rails app, so Claude inherits each directory's conventions, with a drift audit and hooks that keep them current. |
+| [`rails-design-system`](rails-design-system/) | Codifies the app's UI into a design system on Tailwind CSS v4 (role tokens, component specs, page patterns), enforced at edit time and in CI, with a design-reviewer agent. |
+| [`rails-hotwire`](rails-hotwire/) | One standard for Turbo Drive, Frames, Streams, broadcasts, morphing, and Stimulus, with an app audit and a `hotwire-builder` agent. |
+| [`rails-view-component`](rails-view-component/) | One standard for ViewComponent libraries: writing, composing, testing, and wiring components into Turbo and Stimulus, with a library audit and a `component-builder` agent. |
+| [`rails-minitest`](rails-minitest/) | One standard for Minitest suites: every kind of test, fixtures, helpers, speed, coverage, and flaky tests, with a suite audit and a `minitest-runner` agent. |
+| [`rails-generators`](rails-generators/) | Makes Claude use Rails generators and commands instead of hand-writing their files, with a guard against hand-written migrations and edits to generated files. |
+| [`rails-specialists`](rails-specialists/) | Eight specialist agents for models, jobs, debugging, review, security, performance, deployment, and upgrades, each following the project's own stack. |
+
+### Any project
+
+| Plugin | What it does |
+|--------|--------------|
+| [`project-memory`](project-memory/) | Long-term project memory in git: typed notes with citations, a generated index, an inbox for unverified knowledge, and an append-only work log, checked by a fast Rust command. |
+| [`capture`](capture/) | Records a rule you state, or a correction you make, in the one checked-in file where it belongs, so you never have to say it again. |
+| [`toolsmith`](toolsmith/) | Finds shell patterns Claude repeats in your Claude Code history and replaces them with small, tested, single-purpose Rust commands. |
+
+Each plugin's README covers what it ships, how to use it, and what it needs.
+
+## How the Rails plugins fit together
+
+The Rails plugins work alone, and each one knows about the others:
+
+- **`rails-context`** documents how the code is written, directory by directory. **`rails-design-system`** documents how the UI looks. **`capture`** routes any new rule you state into the right one of those files.
+- **`rails-hotwire`**, **`rails-view-component`**, and **`rails-minitest`** set the standard for how interactive UI, components, and tests are built. None of them sets visual rules: those come from the design system.
+- **`rails-generators`** keeps Claude on the framework's own commands for every file Rails can generate.
+- **`rails-specialists`** reviews, debugs, and audits the result. Its `rails-reviewer` runs in parallel with the design system's `design-reviewer` when both apply.
+
+## Requirements
+
+- [Claude Code](https://code.claude.com) CLI or desktop app.
+- Ruby for the hooks and audit scripts. Any Ruby from 2.6 works, including the macOS system Ruby.
+- [Rust](https://rustup.rs) (`cargo`) for `toolsmith` and `project-memory`, which build their commands on first use.
+
+## Development
+
+Every plugin is a directory at the repository root with a `.claude-plugin/plugin.json` manifest and a `SKILL.md`, an `agents/` directory, or both. [`AGENTS.md`](AGENTS.md) holds the full authoring conventions.
+
+```sh
+bin/test                          # Minitest suite: runs the real scripts and hooks in throwaway git repos
+TEST_RUBY=/usr/bin/ruby bin/test  # the same suite on the macOS system Ruby
+claude plugin validate .          # validate the marketplace manifest
+```
+
+CI runs the suite on Linux with current Rubies and Ruby 2.6, and on macOS with the system Ruby and bash 3.2.
+
+## License
+
+[MIT](LICENSE)

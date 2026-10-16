@@ -4,12 +4,18 @@ A team of eight Rails specialist agents for Claude Code. Each agent owns one sli
 
 The agents are stack-agnostic: every one starts by reading the Gemfile and config to learn what the project actually uses (Minitest or RSpec, Solid Queue or Sidekiq, Kamal or Heroku, ViewComponent or partials) and follows the project's own conventions rather than imposing defaults.
 
+## Install
+
+```
+/plugin marketplace add mooktakim/skills
+/plugin install rails-specialists@mooktakim
+```
+
 ## What it ships
 
 | Agent | Specialty | Writes code? |
 |---|---|---|
 | `rails-model` | ActiveRecord models, associations, validations, safe reversible migrations, schema design | yes |
-
 | `rails-jobs` | Background jobs, mailers, recurring work, Action Cable | yes |
 | `rails-debugger` | Reproduces bugs, digs logs and console state, returns a proven root cause | read-only |
 | `rails-reviewer` | Code review of a diff/branch: correctness, conventions, migration safety, layering | read-only |
@@ -17,6 +23,8 @@ The agents are stack-agnostic: every one starts by reading the Gemfile and confi
 | `rails-performance` | N+1s, indexes, query plans, memory, caching - with measurements as evidence | read-only |
 | `rails-deploy` | Deploy config, Dockerfiles, process topology, health checks, CI | yes |
 | `rails-upgrade` | Rails/Ruby/gem upgrades in small green steps, defaults-flag by defaults-flag | yes |
+
+### Moved to other plugins
 
 Hotwire front-end work moved to the separate [`rails-hotwire`](../rails-hotwire/) plugin in version 0.5.0: its `rails-hotwire:hotwire-builder` agent replaces the `rails-hotwire` agent that used to ship here, with the rails-hotwire skill preloaded. ViewComponent work goes to [`rails-view-component`](../rails-view-component/)'s `component-builder`.
 
@@ -36,14 +44,7 @@ Test work - running suites, writing tests, diagnosing failures - moved to the se
 
 **Reports, not transcripts.** Each agent ends with a structured report - what changed or what was found, the evidence, and the follow-ups for other specialists - never raw tool output.
 
-## Install
-
-```
-/plugin marketplace add mooktakim/skills
-/plugin install rails-specialists@mooktakim
-```
-
-## How to use it
+## Usage
 
 Mostly you don't invoke them - you just work. The agents' descriptions tell Claude when to delegate: ask for a code review before committing and `rails-reviewer` fires; report a bug and `rails-debugger` reproduces it.
 
@@ -56,3 +57,12 @@ To invoke one explicitly, @-mention it:
 ```
 
 The read-only agents (debugger, reviewer, security, performance) hand back findings; apply fixes yourself or dispatch the matching specialist with the findings as input.
+
+## Requirements
+
+- A Rails application.
+- Optional: Brakeman and bundler-audit, which `rails-security` runs when the app has them.
+
+---
+
+Part of [mooktakim/skills](../README.md), a plugin marketplace for Claude Code. MIT licensed.

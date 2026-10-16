@@ -4,6 +4,13 @@ Records a rule you state, or a correction you make, into the one checked-in cont
 
 A correction you have to repeat is a gap in the project's context. Auto memory doesn't close it: it lives on one machine and isn't in git. This skill writes the rule where every future session, teammate, and agent reads it.
 
+## Install
+
+```
+/plugin marketplace add mooktakim/skills
+/plugin install capture@mooktakim
+```
+
 ## How it works
 
 1. **Claude offers.** After you correct how it works ("no, don't use trailing slashes", "from now on run the tests first"), Claude handles the request, then offers in one line to record the rule - the rule as it would write it, and the file it would go to. A small `UserPromptSubmit` hook reminds it when a prompt reads like a correction; Claude still judges whether it is a lasting rule. You can also ask directly: "remember this", or `/capture:capture`.
@@ -14,11 +21,10 @@ A correction you have to repeat is a gap in the project's context. Auto memory d
 
 One-off taste ("I don't like this layout") and task instructions are not recorded. The same taste correction a second time is, as a design rule.
 
-Works in any project. In Rails apps set up with `rails-context` and `rails-design-system`, it routes into their files and follows their formats and size limits. In projects set up with `project-memory`, project-wide conventions, traps and procedures go to curated notes under `docs/` (your approval counts as the promotion the protocol asks for), and the root `AGENTS.md` keeps only the few hard rules every task needs.
+## Works in any project
 
-## Install
+In Rails apps set up with `rails-context` and `rails-design-system`, it routes into their files and follows their formats and size limits. In projects set up with `project-memory`, project-wide conventions, traps and procedures go to curated notes under `docs/` (your approval counts as the promotion the protocol asks for), and the root `AGENTS.md` keeps only the few hard rules every task needs.
 
-```
-/plugin marketplace add mooktakim/skills
-/plugin install capture@mooktakim
-```
+---
+
+Part of [mooktakim/skills](../README.md), a plugin marketplace for Claude Code. MIT licensed.

@@ -4,6 +4,13 @@ One standard for Hotwire in Rails apps: the server renders HTML, Turbo moves it 
 
 It sets no visual rules (that is the app's design system), and leaves ViewComponent-specific wiring to `rails-view-component`.
 
+## Install
+
+```
+/plugin marketplace add mooktakim/skills
+/plugin install rails-hotwire@mooktakim
+```
+
 ## What it ships
 
 - **The `rails-hotwire` skill** - 20 rules for every change, plus references loaded on demand:
@@ -23,13 +30,15 @@ It sets no visual rules (that is the app's design system), and leaves ViewCompon
 
 The Turbo and Stimulus handbooks and source (Turbo 8.0.23, turbo-rails 2.0.23, Stimulus 3.2.2, stimulus-rails 1.3.4, importmap-rails 2.2), 37signals' open-source Fizzy, Campfire, and Writebook (how the authors of Hotwire use it), the 37signals dev blog on morphing, thoughtbot's Hotwire examples and morphing write-ups, Better Stimulus, the Hotwire Native docs, and the conventions in the author's own apps.
 
-## Install
-
-```
-/plugin marketplace add mooktakim/skills
-/plugin install rails-hotwire@mooktakim
-```
-
-## How to use it
+## Usage
 
 Work as usual: when you ask for interactive UI in a Hotwire app, Claude hands it to the agent, or loads the skill for a small fix. For the whole app, ask in plain words - "audit our Hotwire setup", "move us off rails-ujs", "turn on morph refreshes" - or invoke the skill directly with `/rails-hotwire:rails-hotwire`.
+
+## Requirements
+
+- A Rails application that uses turbo-rails or stimulus-rails.
+- Ruby 2.6 or later for `scripts/audit_hotwire`. The macOS system Ruby is enough.
+
+---
+
+Part of [mooktakim/skills](../README.md), a plugin marketplace for Claude Code. MIT licensed.

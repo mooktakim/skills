@@ -1,0 +1,4 @@
+- Before making the repo public, the user had Claude scan all files and history: no secrets found. The user accepted the private app names in docs/, the author email, and the config_files references, so nothing was removed.
+- Root README rewritten: CI and license badges, plugins grouped into Rails and any-project tables with one-line rows, a section on how the Rails plugins fit together, requirements, development commands, license. Em dashes removed.
+- Every plugin README now has the same order: intro, Install, details, Usage, Requirements, footer link back to the root. Fixed a blank line that broke the rails-specialists agent table and a doubled dash in rails-context; moved the rails-minitest upgrade note out of Install; "tell the author" in rails-generators now links to the issues page.
+- project-memory 0.5.1: plugin.json description named the removed bin/memory script; it now names the project-memory command.

@@ -2,6 +2,15 @@
 
 Claude repeats the same shell patterns hundreds of times: a Python heredoc that opens a file, asserts some text is there, replaces it and writes it back; a `date`/`mkdir`/heredoc chain to add a history log entry; a loop of CI checks. This plugin finds those patterns in your Claude Code history and replaces them with small Rust commands that do one job each, have a guide written for an LLM, and are tested against that guide. It then measures whether Claude uses them and whether they help.
 
+## Install
+
+```
+/plugin marketplace add mooktakim/skills
+/plugin install toolsmith@mooktakim
+```
+
+Start a new session after installing or updating, so the new `bin/` is on PATH.
+
 ## Commands
 
 | Command | Job |
@@ -46,11 +55,6 @@ The session-start note says when a scan is more than a week old.
 - Ruby (the macOS system Ruby is enough) for the hooks and the analysis.
 - Claude Code CLI or desktop. claude.ai and Cowork do not install plugins that ship a `bin/` directory.
 
-## Install
+---
 
-```
-/plugin marketplace add mooktakim/skills
-/plugin install toolsmith@mooktakim
-```
-
-Start a new session after installing or updating, so the new `bin/` is on PATH.
+Part of [mooktakim/skills](../README.md), a plugin marketplace for Claude Code. MIT licensed.

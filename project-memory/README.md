@@ -4,6 +4,13 @@ Gives a project long-term memory that lives in git, so every session, teammate, 
 
 Agents follow what they retrieve closely, so a memory full of stale or unverified notes does more harm than none. This plugin sets up a protocol built around that: keep always-loaded context small, store only what cannot be cheaply re-derived from the code, cite the code behind every fact and check the citation before trusting it, and let nothing unverified become guidance.
 
+## Install
+
+```
+/plugin marketplace add mooktakim/skills
+/plugin install project-memory@mooktakim
+```
+
 ## What a project gets
 
 ```
@@ -56,9 +63,10 @@ The action builds the command from its own source once per version, caches it, a
 
 Ask in plain words ("set up project memory", "run a memory consolidation pass") or run `/project-memory:project-memory`. Setup and maintenance show a plan and wait for your approval before writing.
 
-## Install
+## Requirements
 
-```
-/plugin marketplace add mooktakim/skills
-/plugin install project-memory@mooktakim
-```
+- [Rust](https://rustup.rs) (`cargo`), to build the `project-memory` command the first time it runs.
+
+---
+
+Part of [mooktakim/skills](../README.md), a plugin marketplace for Claude Code. MIT licensed.

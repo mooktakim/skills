@@ -4,6 +4,13 @@ One standard for ViewComponent libraries in Rails apps: how to organise componen
 
 It sets no visual rules. How components look comes from the app's design system (`rails-design-system` when present) or the app's existing components.
 
+## Install
+
+```
+/plugin marketplace add mooktakim/skills
+/plugin install rails-view-component@mooktakim
+```
+
 ## What it ships
 
 - **The `rails-view-component` skill** - the rules for every component, plus references loaded on demand:
@@ -23,13 +30,15 @@ It sets no visual rules. How components look comes from the app's design system 
 
 The ViewComponent 4.x guide, API, and changelog (through 4.15), the turbo-rails and Stimulus source, the Turbo handbook and 37signals' writing on morphing, GitHub Primer's and GOV.UK's component libraries, Evil Martians' "ViewComponent in the wild" series, and the author's own `TurboViewComponent` base class, revised for `render_later` and plain-element targets.
 
-## Install
-
-```
-/plugin marketplace add mooktakim/skills
-/plugin install rails-view-component@mooktakim
-```
-
-## How to use it
+## Usage
 
 Work as usual: when you ask for UI that the app builds with components, Claude hands it to the agent, or loads the skill for a small fix. For the whole library, ask in plain words - "audit our components", "upgrade ViewComponent", "set up previews" - or invoke the skill directly with `/rails-view-component:rails-view-component`.
+
+## Requirements
+
+- A Rails application that uses the `view_component` gem.
+- Ruby 2.6 or later for `scripts/audit_components`. The macOS system Ruby is enough.
+
+---
+
+Part of [mooktakim/skills](../README.md), a plugin marketplace for Claude Code. MIT licensed.

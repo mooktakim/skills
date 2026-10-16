@@ -2,6 +2,13 @@
 
 Makes Claude use the Rails framework's own generators and commands instead of writing their files by hand. Left alone, Claude writes migrations directly - with hand-picked timestamps such as `20260930130000`, a typed `Migration[x.y]` tag, and no test or fixture beside a new model - and edits files the framework owns, like `db/schema.rb`. This plugin tells it the right command, and stops the worst cases before they happen.
 
+## Install
+
+```
+/plugin marketplace add mooktakim/skills
+/plugin install rails-generators@mooktakim
+```
+
 ## What it ships
 
 - **The `rails-generators` skill** - 13 rules, plus references loaded on demand:
@@ -15,15 +22,17 @@ Makes Claude use the Rails framework's own generators and commands instead of wr
 
 The Rails source and CHANGELOGs (8.0, 8.1.4, and `main`), the Active Record migrations, generators, and configuring guides, every generator run under `--pretend` on a fresh Rails 8.1.4 app, the strong_migrations README (2.8.0), and the importmap-rails, stimulus-rails, view_component, and Solid gems' source.
 
-## Install
-
-```
-/plugin marketplace add mooktakim/skills
-/plugin install rails-generators@mooktakim
-```
-
-## How to use it
+## Usage
 
 Nothing to do: in a Rails app, Claude gets the rules at session start and loads the skill when it changes the schema or creates a file a generator makes. The guard catches the rest. To ask directly - "which command adds a polymorphic reference?", "fix the schema.rb conflict" - invoke `/rails-generators:rails-generators`.
 
-If the guard ever blocks something it should not, disable the plugin for that session with `/plugin disable rails-generators@mooktakim` and tell the author.
+If the guard ever blocks something it should not, disable the plugin for that session with `/plugin disable rails-generators@mooktakim` and [open an issue](https://github.com/mooktakim/skills/issues).
+
+## Requirements
+
+- A Rails application (the guard acts only in directories with `bin/rails`).
+- Ruby 2.6 or later for the guard. The macOS system Ruby is enough.
+
+---
+
+Part of [mooktakim/skills](../README.md), a plugin marketplace for Claude Code. MIT licensed.

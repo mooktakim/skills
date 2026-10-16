@@ -2,7 +2,12 @@
 
 Codifies a Rails app's UI into a design system that every future view is built against - so the whole application stays visually consistent as it grows. It generates agent-facing specs under `docs/design-system/`, then keeps them maintained and enforced as the views change.
 
-Requires Tailwind CSS v4.
+## Install
+
+```
+/plugin marketplace add mooktakim/skills
+/plugin install rails-design-system@mooktakim
+```
 
 ## What it creates
 
@@ -47,14 +52,7 @@ Re-running later is how you maintain it: drift review, gap-fill for new sections
 - **Sweep mode:** maintenance runs dispatch it per section to find convention and frame drift across the whole app.
 - **Promote to the audit:** when a finding recurs and a regular expression can catch it (a forbidden gradient class, money formatted without the helper), the agent proposes a rule for `docs/design-system/audit-rules`, tested against the current code. `bin/audit_design` and its hooks enforce those rules from then on, at no token cost. The agent finds new kinds of drift; the script stops them for free.
 
-## Install
-
-```
-/plugin marketplace add mooktakim/skills
-/plugin install rails-design-system@mooktakim
-```
-
-## How to use it
+## Usage
 
 Open a Claude Code session inside your Rails app and ask in plain words - "set up a design system" / "audit design drift" - or invoke it directly: `/rails-design-system:rails-design-system`.
 
@@ -63,3 +61,13 @@ Afterwards, day to day:
 - The root `AGENTS.md` block makes agents read the standard before touching views, and update affected specs in the same commit as the change.
 - Re-run the skill periodically - or after a big UI push - to catch drift; `bin/audit_design` gives the same signal from the shell.
 - You don't have to remember: the plugin ships a `SessionStart` hook that runs `bin/audit_design` quietly when a session starts and, at most once a week per project, tells you when a maintenance run is due (audit findings, an audit script that differs from the installed skill, leftover audit hooks in `.claude/settings.json`, or no audit step in CI). It stays silent in projects without `bin/audit_design` and never starts a run on its own.
+
+## Requirements
+
+- A Rails application styled with Tailwind CSS v4.
+- Ruby 2.6 or later for `bin/audit_design` and the hooks. The macOS system Ruby is enough.
+- Optional: [`agent-browser`](https://github.com/vercel-labs/agent-browser), for the design reviewer's screenshot checks.
+
+---
+
+Part of [mooktakim/skills](../README.md), a plugin marketplace for Claude Code. MIT licensed.

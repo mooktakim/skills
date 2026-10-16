@@ -2,6 +2,13 @@
 
 Rails is MVC. This skill adds a fourth letter: **Context**. It sets up per-directory context files across a Rails application so that AI agents working in any part of the codebase automatically inherit that directory's local conventions.
 
+## Install
+
+```
+/plugin marketplace add mooktakim/skills
+/plugin install rails-context@mooktakim
+```
+
 ## What it creates
 
 - An `AGENTS.md` in each significant directory under `app/` and `lib/`, describing that directory's conventions: naming, base classes, call signatures, return shapes, what a correct new addition looks like, and gotchas.
@@ -30,14 +37,7 @@ The skill works in four phases, with you approving between them:
 
 Versions before 0.15.0 made `CLAUDE.md` the content file and `AGENTS.md` a symlink to it. Apps set up that way keep working: the audit and the hooks still read the old layout. `bin/audit_context` lists each old-layout directory with the command that converts it, and the next maintenance run (`/rails-context:rails-context`) converts them all in one approved step, moving the content unchanged (`git mv CLAUDE.md AGENTS.md`, then a `CLAUDE.md` holding `@AGENTS.md`). The root is converted only with your approval.
 
-## Install
-
-```
-/plugin marketplace add mooktakim/skills
-/plugin install rails-context@mooktakim
-```
-
-## How to use it
+## Usage
 
 Open a Claude Code session inside your Rails app and either ask in plain words - "set up MVC context" / "add per-directory context files" - or invoke the skill directly: `/rails-context:rails-context`.
 
@@ -54,6 +54,15 @@ Afterwards, day to day:
 - The maintenance rule in your root `AGENTS.md` makes agents update affected context files as part of normal work, in the same commit as the change.
 - Re-run the skill periodically - or after a big refactor - to catch drift; `bin/audit_context` gives the same signal from the shell.
 - You don't have to remember: the plugin ships a `SessionStart` hook that runs `bin/audit_context` quietly when a session starts and, at most once a week per project, tells you when a maintenance run is due (oversized files, 5 or more flagged files, or an audit script older than the installed skill). It stays silent in projects without `bin/audit_context` and never starts a run on its own.
-- **Shell work gets the context too.** Claude Code loads a directory's `CLAUDE.md` (and the `AGENTS.md` it imports) only when its Read tool reads a file there, and agents do much of their work through the shell. The plugin's `PostToolUse` hook watches Bash, Write, Edit, and Grep calls: when one touches code under `app/`, `lib/`, `test/`, or `spec/`, it hands Claude the context on that path (the root excluded) that has not reached it yet - what Claude Code would load, with the import expanded - - once per session, and again after a compaction. Silent in projects without `bin/audit_context`.
+- **Shell work gets the context too.** Claude Code loads a directory's `CLAUDE.md` (and the `AGENTS.md` it imports) only when its Read tool reads a file there, and agents do much of their work through the shell. The plugin's `PostToolUse` hook watches Bash, Write, Edit, and Grep calls: when one touches code under `app/`, `lib/`, `test/`, or `spec/`, it hands Claude the context on that path (the root excluded) that has not reached it yet - what Claude Code would load, with the import expanded - once per session, and again after a compaction. Silent in projects without `bin/audit_context`.
 - **Apps inside a larger repository work too.** When the Rails app is a directory of the repository you open (for example `studio/` or `hub/`), the hooks find it by its `bin/audit_context`, hand over the app's own root `CLAUDE.md` (Claude Code does not load it at session start), and `audit_context` and `context_report` list paths from the app.
 - **Do the files actually reach Claude?** The plugin's hooks keep a local log in `.git/claude-context-log.jsonl` (never committed): when a context file loads into Claude's context, Claude reads one, or the hook hands one over, and which files each session changed - by any tool, Bash included. `scripts/context_report` turns it into a table per context file: sessions that worked in the directory, sessions where its file reached Claude, and the gap between them. Maintenance runs use it to fix files that are not read where it matters, and to merge files that never are.
+
+## Requirements
+
+- A Rails application.
+- Ruby 2.6 or later for `bin/audit_context` and the hooks. The macOS system Ruby is enough.
+
+---
+
+Part of [mooktakim/skills](../README.md), a plugin marketplace for Claude Code. MIT licensed.

@@ -4,6 +4,13 @@ One standard for Minitest suites in Rails apps, and an agent that works to it. T
 
 Minitest only. RSpec apps are out of scope: the skill and the agent stop and say so.
 
+## Install
+
+```
+/plugin marketplace add mooktakim/skills
+/plugin install rails-minitest@mooktakim
+```
+
 ## What it ships
 
 - **The `rails-minitest` skill** - the rules for every test, plus references loaded on demand:
@@ -21,15 +28,19 @@ Minitest only. RSpec apps are out of scope: the skill and the agent stop and say
 
 The Rails testing guide and the Rails source, the test suite of 37signals' open-source Fizzy (fixtures only, helper modules in `test/test_helpers/`, 271 test files), the Rails 8.1 authentication generator's test helper, and the current documentation of SimpleCov, test-prof, and Minitest 6.
 
-## Install
-
-```
-/plugin marketplace add mooktakim/skills
-/plugin install rails-minitest@mooktakim
-```
+## Upgrading from rails-specialists
 
 This plugin replaces the `rails-tester` agent that `rails-specialists` shipped before version 0.4.0; the agent is now `rails-minitest:minitest-runner`.
 
-## How to use it
+## Usage
 
 Work as usual: when you ask for tests or a change that needs them, the skill loads, and test runs go to the agent. For the whole suite, ask in plain words - "audit our test suite", "make the tests faster", "set up coverage" - or invoke the skill directly with `/rails-minitest:rails-minitest`.
+
+## Requirements
+
+- A Rails application tested with Minitest.
+- Ruby 2.6 or later for `scripts/audit_tests`. The macOS system Ruby is enough.
+
+---
+
+Part of [mooktakim/skills](../README.md), a plugin marketplace for Claude Code. MIT licensed.
