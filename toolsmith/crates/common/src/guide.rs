@@ -109,16 +109,13 @@ fn example_text(name: &str, number: usize, e: &Value) -> String {
         command.push(' ');
         command.push_str(&shell_word(arg.as_str().unwrap_or("")));
     }
-    match e.get("stdin").and_then(Value::as_str) {
-        Some(stdin) => {
-            command.push_str(" <<'EOF'\n");
-            command.push_str(stdin);
-            if !stdin.ends_with('\n') {
-                command.push('\n');
-            }
-            command.push_str("EOF");
+    if let Some(stdin) = e.get("stdin").and_then(Value::as_str) {
+        command.push_str(" <<'EOF'\n");
+        command.push_str(stdin);
+        if !stdin.ends_with('\n') {
+            command.push('\n');
         }
-        None => {}
+        command.push_str("EOF");
     }
     out.push_str(&format!("\nCommand:\n```\n{}\n```\n", command));
     let exit = e.get("exit").and_then(Value::as_i64).unwrap_or(0);

@@ -1,0 +1,102 @@
+{
+  "name": "toolsmith-conflict-resolve",
+  "intent": "Resolve git merge-conflict blocks in files as one all-or-nothing change.",
+  "usage": "toolsmith-conflict-resolve --show [<path>...]  |  toolsmith-conflict-resolve [--stage] [--dry-run] <<'EOF' ... EOF",
+  "use_when": [
+    "A merge, rebase or cherry-pick stopped with conflicts, and you would otherwise write a Python or Ruby script that finds the '<<<<<<<' blocks and rewrites them.",
+    "A file has several conflict blocks and each needs its own answer: one side, both sides, or new text.",
+    "Several conflicted files must all be resolved before any of them changes."
+  ],
+  "not_for": [
+    "Taking one side for a whole file: `git checkout --ours <path>` or `--theirs` does that.",
+    "One small block you can fix with the Edit tool just as easily.",
+    "Text that is not inside a conflict block: use toolsmith-text-replace.",
+    "Continuing the merge or rebase: run `git rebase --continue` (or `git merge --continue`) yourself after this tool.",
+    "Binary files, files with CRLF line endings, or markers of a size other than 7."
+  ],
+  "input": "With --show, the paths to show; with no paths, every file git reports as conflicted (`git diff --name-only --diff-filter=U`), named relative to the current directory, so from a subdirectory a root file shows as '../app.yml'. It writes nothing.\n\nOtherwise a resolution spec on stdin. Each resolution is a header line:\n\n    @@ <path> <block> <choice>\n\n- <path> is relative to the current directory and has no spaces.\n- <block> is the block's number in the file, from 1 in file order (the numbers --show prints), or '*' for every block of that file not named by another header.\n- <choice> is 'ours' (the side after '<<<<<<<'), 'theirs' (the side after '======='), 'both' (ours, then theirs), or 'text'. A 'text' header is followed by '+' lines: the text after the '+' is taken exactly, spaces included, and replaces the whole block; a '+' alone is an empty line; no '+' lines removes the block.\n- A diff3 base section ('|||||||' to '=======') is shown by --show and dropped by every choice.\n- Every block of every named file must get exactly one resolution, or nothing is written. Empty lines may separate headers. --show prints each block under a header you can copy: replace its '(lines ...)' with a choice.",
+  "options": [
+    { "flag": "--show", "text": "Print the conflict blocks, numbered, under spec headers; write nothing." },
+    { "flag": "--stage", "text": "Run `git add` on each resolved file, marking it resolved for git." },
+    { "flag": "--dry-run", "text": "Check the spec and print what would change, but write nothing." }
+  ],
+  "output": "--show prints, per file, '<path>: N conflict blocks', then each block under a header '@@ <path> <block> (lines A-B)' followed by its lines exactly as in the file, markers included. Resolving prints one line per block, '<path> <block> (lines A-B): <choice>, N lines', in spec order of the files, then 'Done: N blocks resolved in M files.' (with ', staged with git add' before the full stop when --stage is given); --dry-run ends with 'Dry run: N blocks in M files would be resolved; nothing written.' instead. Files are written only after every block of every file has its resolution, each through a temporary file that is renamed over the original, keeping its permissions. On failure, nothing is written and stderr lists every problem with its file, block, lines and spec line, and how to fix it.",
+  "exit_codes": [
+    { "code": 0, "text": "Every block was resolved (or, with --dry-run, would be), or --show printed the blocks." },
+    { "code": 1, "text": "Nothing written: a block has no resolution or two, a block number does not exist, a file has no conflict blocks or broken markers, or a file could not be read." },
+    { "code": 2, "text": "Nothing written: the spec or the arguments are wrong." },
+    { "code": 3, "text": "A write or `git add` failed after other files were written; the message lists what was done." }
+  ],
+  "examples": [
+    {
+      "title": "Show the blocks of every conflicted file",
+      "situation": "A merge of the branch topic stopped with a conflict in app.yml.",
+      "git": true,
+      "setup": "git config user.name t && git config merge.conflictStyle merge && printf 'name: shop\\nport: 3000\\n' > app.yml && git add app.yml && git commit -qm base && git checkout -qb topic && printf 'name: shop\\nport: 4000\\n' > app.yml && git commit -qam topic && git checkout -q - && printf 'name: shop\\nport: 5000\\n' > app.yml && git commit -qam main && (git merge topic >/dev/null 2>&1 || true)",
+      "args": ["--show"],
+      "exit": 0,
+      "stdout": "app.yml: 1 conflict block\n@@ app.yml 1 (lines 2-6)\n<<<<<<< HEAD\nport: 5000\n=======\nport: 4000\n>>>>>>> topic\n"
+    },
+    {
+      "title": "From a subdirectory, paths are relative to it",
+      "situation": "A merge of the branch topic stopped with a conflict in app.yml at the repository root.",
+      "git": true,
+      "setup": "git config user.name t && git config merge.conflictStyle merge && printf 'name: shop\\nport: 3000\\n' > app.yml && git add app.yml && git commit -qm base && git checkout -qb topic && printf 'name: shop\\nport: 4000\\n' > app.yml && git commit -qam topic && git checkout -q - && printf 'name: shop\\nport: 5000\\n' > app.yml && git commit -qam main && (git merge topic >/dev/null 2>&1 || true)",
+      "files": { "lib/shop.rb": "module Shop; end\n" },
+      "cwd": "lib",
+      "args": ["--show"],
+      "exit": 0,
+      "stdout": "../app.yml: 1 conflict block\n@@ ../app.yml 1 (lines 2-6)\n<<<<<<< HEAD\nport: 5000\n=======\nport: 4000\n>>>>>>> topic\n"
+    },
+    {
+      "title": "Resolve each block its own way, in three files",
+      "files": {
+        "tools/check.sh": "#!/bin/bash\n<<<<<<< HEAD\n# Checks: lint, format, links.\n=======\n# Checks: lint, format, prose.\n>>>>>>> 310a753 (Add the prose check)\nall=(\n<<<<<<< HEAD\n  lint format links\n=======\n  lint format prose\n>>>>>>> 310a753 (Add the prose check)\n)\n",
+        ".github/workflows/ci.yml": "jobs:\n<<<<<<< HEAD\n  links:\n    run: tools/check.sh links\n=======\n  prose:\n    run: tools/check.sh prose\n>>>>>>> 310a753 (Add the prose check)\n",
+        "docs/INDEX.md": "# Index\n<<<<<<< HEAD\n- links.md\n=======\n- prose.md\n>>>>>>> 310a753 (Add the prose check)\n"
+      },
+      "args": [],
+      "stdin": "@@ tools/check.sh 1 text\n+# Checks: lint, format, links, prose.\n@@ tools/check.sh 2 text\n+  lint format links prose\n\n@@ .github/workflows/ci.yml * both\n@@ docs/INDEX.md 1 ours\n",
+      "exit": 0,
+      "stdout": "tools/check.sh 1 (lines 2-6): text, 1 line\ntools/check.sh 2 (lines 8-12): text, 1 line\n.github/workflows/ci.yml 1 (lines 2-8): both, 4 lines\ndocs/INDEX.md 1 (lines 2-6): ours, 1 line\nDone: 4 blocks resolved in 3 files.\n",
+      "files_after": {
+        "tools/check.sh": "#!/bin/bash\n# Checks: lint, format, links, prose.\nall=(\n  lint format links prose\n)\n",
+        ".github/workflows/ci.yml": "jobs:\n  links:\n    run: tools/check.sh links\n  prose:\n    run: tools/check.sh prose\n",
+        "docs/INDEX.md": "# Index\n- links.md\n"
+      }
+    },
+    {
+      "title": "Resolve and stage during a merge",
+      "situation": "A merge of the branch topic stopped with a conflict in app.yml.",
+      "git": true,
+      "setup": "git config user.name t && git config merge.conflictStyle merge && printf 'name: shop\\nport: 3000\\n' > app.yml && git add app.yml && git commit -qm base && git checkout -qb topic && printf 'name: shop\\nport: 4000\\n' > app.yml && git commit -qam topic && git checkout -q - && printf 'name: shop\\nport: 5000\\n' > app.yml && git commit -qam main && (git merge topic >/dev/null 2>&1 || true)",
+      "args": ["--stage"],
+      "stdin": "@@ app.yml 1 theirs\n",
+      "exit": 0,
+      "stdout": "app.yml 1 (lines 2-6): theirs, 1 line\nDone: 1 block resolved in 1 file, staged with git add.\n",
+      "files_after": { "app.yml": "name: shop\nport: 4000\n" },
+      "staged": ["app.yml"]
+    },
+    {
+      "title": "A block left without a resolution, so nothing is written",
+      "files": { "notes.md": "<<<<<<< HEAD\nA\n=======\nB\n>>>>>>> topic\nmiddle\n<<<<<<< HEAD\nC\n=======\nD\n>>>>>>> topic\n" },
+      "args": [],
+      "stdin": "@@ notes.md 1 ours\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "toolsmith-conflict-resolve: nothing written: 1 problem.\n\nnotes.md: block 2 (lines 7-11) has no resolution. Add '@@ notes.md 2 <choice>', or '@@ notes.md * <choice>' for every block not named.\n"
+    },
+    {
+      "title": "A block number that does not exist",
+      "files": { "app.yml": "name: shop\n<<<<<<< HEAD\nport: 5000\n=======\nport: 4000\n>>>>>>> topic\n" },
+      "args": [],
+      "stdin": "@@ app.yml 1 ours\n@@ app.yml 3 theirs\n",
+      "exit": 1,
+      "stdout": "",
+      "stderr": "toolsmith-conflict-resolve: nothing written: 1 problem.\n\napp.yml (spec line 2): block 3 does not exist; the file has 1 conflict block. Run 'toolsmith-conflict-resolve --show app.yml' to see it.\n"
+    }
+  ],
+  "family": "conflict-resolve",
+  "mode": "remind",
+  "added": "2026-10-16"
+}

@@ -21,6 +21,13 @@ name = "toolsmith-common"
 version = "0.1.0"
 
 [[package]]
+name = "toolsmith-conflict-resolve"
+version = "0.1.0"
+dependencies = [
+ "toolsmith-common",
+]
+
+[[package]]
 name = "toolsmith-file-lines"
 version = "0.1.0"
 dependencies = [

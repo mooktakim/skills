@@ -139,7 +139,7 @@ fn failure_blocks<'a>(lines: &[&'a str]) -> Vec<Vec<&'a str>> {
         if starts_block(line) {
             blocks.push(vec![line]);
             open = true;
-        } else if open && !line.trim().is_empty() && blocks.last().map_or(false, |b| b.len() < BLOCK_LINES) {
+        } else if open && !line.trim().is_empty() && blocks.last().is_some_and(|b| b.len() < BLOCK_LINES) {
             blocks.last_mut().unwrap().push(line);
         } else {
             open = false;
@@ -183,7 +183,7 @@ mod tests {
     #[test]
     fn long_blocks_are_cut() {
         let mut lines = vec!["Failure:"];
-        lines.extend(std::iter::repeat("detail").take(40));
+        lines.extend(std::iter::repeat_n("detail", 40));
         assert_eq!(failure_blocks(&lines)[0].len(), BLOCK_LINES);
     }
 }

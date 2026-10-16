@@ -99,7 +99,7 @@ pub fn parse(input: &str) -> Result<Vec<Block>, String> {
                 Some(l) if l.starts_with('-') => pending.is_empty() || !pending.new.is_empty(),
                 Some(_) => pending.is_empty(),
             };
-            if !between && !pending.old.is_empty() && pending.new.is_empty() && next.map_or(false, |l| l.starts_with('-')) {
+            if !between && !pending.old.is_empty() && pending.new.is_empty() && next.is_some_and(|l| l.starts_with('-')) {
                 return Err(format!(
                     "line {}: empty line after a deletion; to start the next edit, repeat the '@@ <path>' header; for an empty line of text, write '-' alone",
                     no

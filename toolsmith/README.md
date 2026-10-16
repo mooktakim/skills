@@ -23,6 +23,7 @@ Start a new session after installing or updating, so the new `bin/` is on PATH.
 | `toolsmith-json-set` | Set one value in a JSON file, keeping its existing layout. |
 | `toolsmith-ci-wait` | Wait for the CI runs of one commit to finish, printing only what failed. |
 | `toolsmith-pr-land` | Merge a pull request, then return the local clone to its updated base branch. |
+| `toolsmith-conflict-resolve` | Resolve git merge-conflict blocks in files as one all-or-nothing change. |
 
 Run any command with `--help` for a summary, or `--llm` for the full guide: when to use it, input format, exit codes and tested examples.
 
