@@ -244,7 +244,7 @@ class ProjectMemoryTest < Minitest::Test
     action = YAML.safe_load(File.read(File.join(PLUGIN, "action.yml")))
     steps = action.fetch("runs").fetch("steps")
     assert_equal "composite", action["runs"]["using"]
-    assert_equal ["actions/cache@v6"], steps.map { |step| step["uses"] }.compact
+    assert_equal ["actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9"], steps.map { |step| step["uses"] }.compact
     temp = File.join(@dir, ".runner")
     output = File.join(temp, "output")
     FileUtils.mkdir_p(temp)
