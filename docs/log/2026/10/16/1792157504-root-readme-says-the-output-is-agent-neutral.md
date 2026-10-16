@@ -1,0 +1,2 @@
+- User asked the root README to say the repo is no longer only for Claude Code, since the plugins default to AGENTS.md, and that everything is tested and used regularly in Claude Code.
+- Title is now "Agent Skills". A new "Not only Claude Code" section says what the plugins write (AGENTS.md imported by a one-line CLAUDE.md, docs/, audit scripts) works for any agent that reads AGENTS.md, while the plugins themselves install through Claude Code, are used daily there on real projects, and are covered by the test suite.

@@ -1,11 +1,17 @@
-# Claude Code Skills
+# Agent Skills
 
 [![Test](https://github.com/mooktakim/skills/actions/workflows/test.yml/badge.svg)](https://github.com/mooktakim/skills/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A hand-authored collection of skills, agents, and hooks for [Claude Code](https://code.claude.com), packaged as a plugin marketplace. Each skill is its own plugin, so you install only the ones you want.
+A hand-authored collection of skills, agents, and hooks for coding agents, packaged as a [Claude Code](https://code.claude.com) plugin marketplace. Each skill is its own plugin, so you install only the ones you want.
 
-The plugins share one aim: make Claude follow a project's real conventions, every session, without being told twice. They write those conventions into checked-in files, load them at the moment they matter, and back the most important rules with checks that run in hooks and CI.
+The plugins share one aim: make the agent follow a project's real conventions, every session, without being told twice. They write those conventions into checked-in files, load them at the moment they matter, and back the most important rules with checks that run in hooks and CI.
+
+## Not only Claude Code
+
+What the plugins write into a project is agent-neutral. Context and rules go to `AGENTS.md`, the open standard read by Codex, Cursor, Gemini CLI, and other coding agents, and Claude Code gets the same content through a one-line `CLAUDE.md` that imports it (`@AGENTS.md`). Project memory, the design system, and the audit scripts are plain markdown and Ruby in your repository, so they keep working for every agent and every teammate, with or without the plugins installed.
+
+The plugins themselves (skills, subagents, and hooks) install through Claude Code. Every one is used daily on real projects in Claude Code and covered by the test suite in this repository.
 
 ## Install
 
@@ -58,7 +64,7 @@ The Rails plugins work alone, and each one knows about the others:
 
 ## Requirements
 
-- [Claude Code](https://code.claude.com) CLI or desktop app.
+- [Claude Code](https://code.claude.com) CLI or desktop app, to install and run the plugins.
 - Ruby for the hooks and audit scripts. Any Ruby from 2.6 works, including the macOS system Ruby.
 - [Rust](https://rustup.rs) (`cargo`) for `toolsmith` and `project-memory`, which build their commands on first use.
 
