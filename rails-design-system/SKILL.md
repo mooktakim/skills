@@ -43,6 +43,24 @@ All sections compile into the app's single Tailwind entry CSS, so role names mus
 
 Everything you write - specs, recipes, proposed fixes - uses token-based Tailwind utilities only. Never a raw hex value, never a literal palette class (`bg-gray-100`, `text-indigo-600`), never an arbitrary `[...]` value. This is the rule the whole standard rests on: it makes drift mechanically detectable (`bin/audit_design` is three regular expressions), so breaking it once makes every audit a lie. A value not on the section's scale is drift, by definition. The one exception is a section on the External library model, whose specs use the library's own palette classes inside its recorded vendor paths.
 
+## Clickable means pointer
+
+Everything a user can click shows the pointer cursor on hover. Tailwind v4's preflight resets buttons to `cursor: default`, so the app's Tailwind entry CSS carries this one base rule, once for the whole app (not per section), beside the `@theme` blocks:
+
+```css
+@layer base {
+  a[href],
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  input:is([type="button"], [type="submit"], [type="reset"]):not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+}
+```
+
+Specs and recipes then never repeat `cursor-pointer` on buttons and links. An element the rule does not reach - a clickable `<label>` card, a row with a click action, a `<div>` a Stimulus controller makes clickable - carries `cursor-pointer` in its spec's canonical classes. Disabled controls never show the pointer.
+
 ## Specs, not code
 
 Canonical recipes are pure HTML plus Tailwind classes - view-layer neutral. Every component contract enumerates its axes (variant, size, tone - closed lists, never open-ended) and its states: default, hover, focus-visible, active, disabled, and loading where it submits. A component missing focus-visible is incomplete.
@@ -64,7 +82,7 @@ Delegate steps 1-4 to one read-only subagent when the environment provides subag
 
 Re-running on an app that already has `docs/design-system/` is maintenance, not a rewrite. The survey then also covers the existing docs, and the Phase 1 plan proposes six kinds of work:
 
-- **Gap-fill**: newly detected sections; components or patterns now in use but unspecced; missing or outdated enforcement wiring: `audit_design` entries an older version of this skill (or a workaround) wrote into `.claude/settings.json` - the app's, and the one at the top of the repository when the app is below it - get removed (the plugin ships the hooks now, so they would run twice), and a missing CI step gets added as in Phase 3.
+- **Gap-fill**: newly detected sections; components or patterns now in use but unspecced; a Tailwind entry CSS without the pointer base rule (see "Clickable means pointer"); missing or outdated enforcement wiring: `audit_design` entries an older version of this skill (or a workaround) wrote into `.claude/settings.json` - the app's, and the one at the top of the repository when the app is below it - get removed (the plugin ships the hooks now, so they would run twice), and a missing CI step gets added as in Phase 3.
 - **Drift review**: run `bin/audit_design` (if it is missing or differs from `scripts/audit_design` in this skill, copy it over first, then run the Phase 3 smoke test; an older copy that someone customised by hand gets its customisations moved into `vendor-paths` or `audit-rules`, and I approve that move). Each finding becomes a proposed fix - retokenise the view, or add a missing token to the section's `tokens.md` - never a silent skip.
 - **Promotion**: the same one-off markup repeated in a section's views becomes a proposed component spec in that section's library; a design-reviewer finding that recurs and that a regular expression catches reliably becomes a proposed `docs/design-system/audit-rules` line (the agent reports these under "Promote to the audit").
 - **Conventions and frames**: rules the views now follow consistently, or that I stated since the last run (look for repeated corrections in recent commits), but `conventions.md` lacks; views that break a recorded convention; page patterns that restate the frame instead of naming it. Find them with the `design-reviewer` agent this plugin ships: one agent per section in sweep mode, dispatched during the survey and counted in the plan's fan-out. Propose each fix across every section at once.
@@ -77,7 +95,7 @@ Never regenerate an existing doc: every change is a surgical edit, listed in the
 
 First write `docs/design-system/conventions.md` yourself, from the survey and my answers, and give its path to every section agent: section specs follow it. Under a shared foundation, then generate `shared/` (`tokens.md`, then any shared components), inline or with one agent, and give its path to every section agent. Sections then generate in parallel: dispatch one subagent per approved section (run inline when subagents are unavailable, or for a single small section). Before dispatching, resolve everything that needs my input - in particular the interview for sections with no views - so each agent's prompt already carries the answers; a generation agent never asks me anything. Each agent's prompt must scope it to its section only and include: the approved file list, the section's token prefix, the interview answers, the path to this skill's directory, and the instruction to follow this Phase's rules - reading the matching `references/` guide immediately before each file, and the `catalog/` map when speccing components. When every agent has returned, check the output against the doctrine (token purity, no reference the sharing model does not allow) before moving on.
 
-Each section, whether dispatched or inline, is generated in dependency order: `design.md` → `tokens.md` → `components/*.md` → `patterns/*.md` → `divergences.md`. After all sections, write the router `docs/design-system/README.md` yourself, recording the sharing model. It and `conventions.md` (plus `shared/` under a shared foundation) are the only cross-section files. For any External library section, also write `docs/design-system/vendor-paths`.
+Each section, whether dispatched or inline, is generated in dependency order: `design.md` → `tokens.md` → `components/*.md` → `patterns/*.md` → `divergences.md`. After all sections, write the router `docs/design-system/README.md` yourself, recording the sharing model, and add the pointer base rule to the Tailwind entry CSS if it is not there. It and `conventions.md` (plus `shared/` under a shared foundation) are the only cross-section files. For any External library section, also write `docs/design-system/vendor-paths`.
 
 Generation guides ship with this skill in `references/` next to this SKILL.md - they are part of the skill, NOT files in the target app, so resolve their paths from this skill's own directory. You MUST read the matching guide immediately before generating each file (per file, not once upfront):
 

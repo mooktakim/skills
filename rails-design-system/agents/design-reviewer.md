@@ -34,6 +34,7 @@ State which mode and scope you used.
 **3. Components:**
 - Markup rebuilt by hand where a specced component exists - name the component.
 - A component used with an axis value its contract does not list, or missing a mandatory state (focus-visible above all).
+- A clickable element that does not show the pointer: the Tailwind entry CSS lacks the base rule that gives `a[href]`, `button`, `[role="button"]`, and `summary` the pointer, or a clickable element that rule does not reach (a `<label>` card, a row or `<div>` with a click action) has no `cursor-pointer`.
 - Call sites passing raw class strings into a component whose contract has no axis for it.
 
 **4. Section rules** (`design.md` do and don't): gradients, hero blocks in a tool, the section's stated density and voice. Under islands, a reference to another section's components or tokens.

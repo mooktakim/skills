@@ -1,0 +1,3 @@
+- rails-design-system 0.19.0: everything clickable shows the pointer cursor. Tailwind v4's preflight resets buttons to `cursor: default`, so the skill now writes one `@layer base` rule into the app's Tailwind entry CSS (links, enabled buttons, `[role="button"]`, button inputs, `summary`), and maintenance runs add it where it is missing.
+- Elements the base rule does not reach (label cards, clickable rows or divs) carry `cursor-pointer` in their spec. The button catalog entry and the design-reviewer agent check this.
+- Requested by the user: clickable buttons and links must always show the hover cursor.

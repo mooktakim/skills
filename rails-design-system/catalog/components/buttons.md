@@ -17,6 +17,7 @@ The single action element for forms, toolbars, and page headings. Renders as `<b
 ### Contract
 - Axes: variant (primary | secondary | danger | text | icon); size (xs | sm | md | lg | xl); optional leading or trailing icon.
 - States: default, hover, focus-visible, active, disabled (`disabled:opacity-50 disabled:pointer-events-none`), loading where the button submits (disable it and swap the leading icon for a spinner; keep the label visible).
+- Cursor: the pointer on hover comes from the app's base rule (`button`, `a[href]`, `[role="button"]`), so the classes never repeat `cursor-pointer`; a disabled button shows no pointer.
 
 ### Canonical sample
 Primary, md size, leading icon:
