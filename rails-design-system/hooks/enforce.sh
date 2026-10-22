@@ -2,7 +2,7 @@
 # PostToolUse / Stop / SubagentStop hook: run this plugin's own audit_design
 # against each app with a design system, so every app gets the current checks the
 # moment the plugin updates - no per-app wiring, no maintenance run needed.
-# Silent in projects without docs/design-system/ (here or one level down).
+# Silent in projects without docs/design-system/ (here or in an app below).
 root=${CLAUDE_PROJECT_DIR:-}
 [ -n "$root" ] || exit 0
 . "$(dirname "$0")/app-roots.sh"

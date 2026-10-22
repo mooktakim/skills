@@ -4,7 +4,7 @@
 # Claude in the sessions that change code there. Local only: one JSONL file in
 # the repo's git directory (shared by worktrees, never committed). Silent, never
 # blocks, and only active in projects set up with rails-context (bin/audit_context
-# in the project directory or in an app directly below it). Paths are logged
+# in the project directory or in an app below it). Paths are logged
 # relative to the top of the git repository, so apps in one repository never mix.
 # Modes (one per hook event):
 #   start  SessionStart                 the HEAD the session started from

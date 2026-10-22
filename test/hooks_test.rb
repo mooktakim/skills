@@ -109,6 +109,46 @@ class HooksTest < Minitest::Test
     refute_includes message, "not run in CI", "CI at the repository top counts"
   end
 
+  # app-roots.sh in both plugins: the apps a session opened at the repository
+  # top serves, up to three levels down (apps/server in a monorepo).
+  def roots(plugin, function)
+    script = File.join(REPO, plugin, "hooks/app-roots.sh")
+    run_bash("-c", %(. "$1" && #{function} "$2"), "_", script, @dir).out.split("\n").map { |dir| dir.delete_prefix("#{@dir}/") }
+  end
+
+  def test_app_roots_find_apps_up_to_three_levels_down_in_both_plugins
+    { ["rails-context", "app_roots"] => ->(app) { install "rails-context", "audit_context", app },
+      ["rails-design-system", "design_roots"] => ->(app) { write "#{app}docs/design-system/README.md", "# Design system\n" } }.each do |(plugin, function), mark|
+      FileUtils.rm_rf(Dir.glob(path("*")))
+      %w[web/ apps/server/ packages/x/y/ a/b/c/d/ web/engines/inner/ node_modules/pkg/ vendor/x/ apps/tmp/ .hidden/app/].each(&mark)
+      File.symlink(path("apps"), path("linked"))
+      File.symlink(path(".hidden/app"), path("studio"))
+      File.symlink(path(".hidden/app"), path("apps/linked"))
+      assert_equal %w[apps/server packages/x/y studio web], roots(plugin, function),
+                   "#{plugin}: one, two, and three levels down, and a symlinked app one level down; not deeper, inside an app, in ignored or hidden directories, inside a symlink, or through a deeper symlink"
+      mark.call("")
+      assert_equal [@dir], roots(plugin, function), "#{plugin}: an app at the project directory is the only one"
+    end
+  end
+
+  def test_design_and_context_hooks_work_for_an_app_two_levels_down
+    write "apps/server/docs/design-system/README.md", "# Design system\n"
+    write "apps/server/app/views/x/a.html.erb", %(<p class="bg-surface">ok</p>\n)
+    install "rails-context", "audit_context", "apps/server/"
+    write "apps/server/app/models/CLAUDE.md", "# models\n"
+    write "apps/server/app/models/user.rb", "class User; end\n"
+    commit "init"
+
+    append "apps/server/app/views/x/a.html.erb", %(<p class="bg-red-600">new</p>\n)
+    stop = hook("rails-design-system", "enforce.sh", "--stop", stdin: "{}")
+    assert_equal 2, stop.code
+    assert_includes stop.err, "app/views/x/a.html.erb:2:"
+    refute_nil hook("rails-design-system", "reviewer-context.sh").out[/design-reviewer/]
+
+    context = injected(tool_call("Bash", { "command" => "cat apps/server/app/models/user.rb" }))
+    assert_includes context, "Contents of #{@dir}/apps/server/app/models/CLAUDE.md:\n\n# models"
+  end
+
   def test_enforce_is_silent_outside_design_system_projects
     write "app/views/x/a.html.erb", %(<p class="bg-red-600">x</p>\n)
     commit

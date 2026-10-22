@@ -3,11 +3,12 @@
 # files for the code a tool call touched, when the Read tool's automatic loading
 # was bypassed. The logic lives in scripts/inject_context. Silent, never blocks,
 # and only active in projects set up with rails-context (bin/audit_context in the
-# project directory or in an app directly below it).
+# project directory or in an app below it).
 root=${CLAUDE_PROJECT_DIR:-}
 [ -n "$root" ] || exit 0
 . "$(dirname "$0")/app-roots.sh"
-[ -n "$(app_roots "$root")" ] || exit 0
+apps=$(app_roots "$root")
+[ -n "$apps" ] || exit 0
 plugin=${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}
 
 # Version-manager shims (asdf, rbenv) cost ~150 ms per call, on every tool call.
@@ -20,5 +21,5 @@ if [ ! -x "$ruby" ]; then
   ruby=$(cd "$root" && ruby -e 'print RbConfig.ruby' 2>/dev/null) || exit 0
   mkdir -p "$data" 2>/dev/null && printf '%s' "$ruby" > "$cache"
 fi
-"$ruby" --disable-gems "$plugin/scripts/inject_context" 2>/dev/null
+APP_ROOTS="$apps" "$ruby" --disable-gems "$plugin/scripts/inject_context" 2>/dev/null
 exit 0

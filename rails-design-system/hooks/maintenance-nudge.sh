@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SessionStart hook: tell the user when this project's design system is due a
 # maintenance run, at most once a week per project. Checks every app with
-# bin/audit_design (the project directory, or apps directly below it). Silent in
+# bin/audit_design (the project directory, or apps below it). Silent in
 # projects without one, and whenever nothing needs attention.
 set -uo pipefail
 root=${CLAUDE_PROJECT_DIR:-$PWD}
