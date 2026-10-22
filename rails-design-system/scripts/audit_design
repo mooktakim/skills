@@ -9,7 +9,8 @@
 # copy against the project this way). The app may sit inside a larger repository.
 # Findings are drift signals to review, not proof of defects.
 # Mark a deliberate exception by putting "design-ok" on the same line.
-# Mailer templates are exempt: email clients require inline styles.
+# Mailer templates are exempt: email clients require inline styles. The token
+# checks skip CSS @theme blocks: the compiled tokens are where raw values belong.
 #
 # Modes:
 #   bin/audit_design                    scan the app and report; always exits 0
@@ -58,7 +59,8 @@ HEX = /(^|[^0-9a-zA-Z_.&-])#([0-9a-fA-F]{6}|[0-9a-fA-F]{8}|[0-9a-fA-F]{3,4})([^0
 ARB = %r{[a-z][a-z0-9:-]*-(\[[^\]]+\]|\(--[^)]+\))([^:/]|/[0-9]|$)}.freeze
 PAL = /(bg|text|border|ring|divide|outline|fill|stroke|from|via|to|accent|decoration|placeholder|caret|shadow)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-[0-9]{2,3}/.freeze
 
-VIEW_DIRS = %w[app/views app/components app/frontend app/javascript app/assets/stylesheets].freeze
+# app/assets/tailwind/ holds the entry CSS and component classes under tailwindcss-rails 4.
+VIEW_DIRS = %w[app/views app/components app/frontend app/javascript app/assets/stylesheets app/assets/tailwind].freeze
 EXTENSIONS = %w[.erb .haml .slim .html .rb .css .js].freeze
 
 def data_lines(name)
@@ -115,6 +117,33 @@ def in_scope?(path)
   EXTENSIONS.include?(File.extname(path))
 end
 
+# The numbers of the lines inside a CSS file's @theme blocks.
+def theme_lines(path)
+  return [] unless File.extname(path) == ".css"
+
+  inside = false
+  depth = 0
+  text_lines(File.binread(path)).each_with_index.select do |text, _|
+    inside ||= text.match?(/(^|\s)@theme\b/)
+    next false unless inside
+
+    depth += text.count("{") - text.count("}")
+    if depth <= 0 && text.include?("}")
+      inside = false
+      depth = 0
+    end
+    true
+  end.map { |_, index| index + 1 }
+end
+
+# The lines the token checks apply to: a checked view file's, outside @theme blocks.
+def token_lines(path, lines)
+  return [] unless in_scope?(path)
+
+  themed = theme_lines(path)
+  lines.reject { |number, _| themed.include?(number) }
+end
+
 def git(*args)
   IO.popen(["git", *args], err: File::NULL, &:read)
 end
@@ -168,7 +197,7 @@ end
 def findings_for(path, base)
   token_check = vendor?(path) ? Regexp.union(HEX, ARB) : Regexp.union(HEX, ARB, PAL)
   lines = added_lines(path, base)
-  token_hits = in_scope?(path) ? lines.select { |_, text| text.match?(token_check) }.map { |number, text| "  #{path.b}:#{number}: #{text}" } : []
+  token_hits = token_lines(path, lines).select { |_, text| text.match?(token_check) }.map { |number, text| "  #{path.b}:#{number}: #{text}" }
   rule_hits = RULES.flat_map do |label, pattern, prefixes|
     next [] unless rule_reaches?(prefixes, path)
 
@@ -286,19 +315,20 @@ def full_scan(strict:)
     next if content.include?("\0")
 
     lines = text_lines(content).each_with_index.map { |text, index| [index + 1, text] }
-    [path, lines.reject { |_, text| text.include?("design-ok") }]
+    lines = lines.reject { |_, text| text.include?("design-ok") }
+    [path, lines, token_lines(path, lines)]
   end.compact
 
   views = ->(path) { in_scope?(path) }
-  checks = [["raw hex colours", HEX, views], ["arbitrary values", ARB, views],
-            ["literal palette classes", PAL, ->(path) { in_scope?(path) && !vendor?(path) }]]
-  checks += RULES.map { |label, pattern, prefixes| ["rule: #{label}", pattern, ->(path) { rule_reaches?(prefixes, path) }] }
+  checks = [["raw hex colours", HEX, views, true], ["arbitrary values", ARB, views, true],
+            ["literal palette classes", PAL, ->(path) { in_scope?(path) && !vendor?(path) }, true]]
+  checks += RULES.map { |label, pattern, prefixes| ["rule: #{label}", pattern, ->(path) { rule_reaches?(prefixes, path) }, false] }
   total = 0
-  checks.each do |label, pattern, applies|
-    hits = files.flat_map do |path, lines|
+  checks.each do |label, pattern, applies, token|
+    hits = files.flat_map do |path, lines, tokened|
       next [] unless applies.call(path)
 
-      lines.select { |_, text| text.match?(pattern) }.map { |number, text| "   #{path.b}:#{number}:#{text}" }
+      (token ? tokened : lines).select { |_, text| text.match?(pattern) }.map { |number, text| "   #{path.b}:#{number}:#{text}" }
     end
     total += hits.size
     puts "== #{label}: #{hits.size}", *hits, ""

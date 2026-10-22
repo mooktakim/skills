@@ -215,6 +215,34 @@ class AuditDesignTest < Minitest::Test
     assert_equal 2, hook(path("app/views/x/a.html.erb")).code
   end
 
+  # tailwindcss-rails 4 keeps the entry CSS and component classes in
+  # app/assets/tailwind/; its @theme block is where the token values live.
+  def test_tailwind_css_is_checked_outside_its_theme_blocks
+    write "app/assets/tailwind/application.css", <<~CSS
+      @import "tailwindcss";
+      @theme {
+        --color-primary: #1d4ed8;
+      }
+      @theme inline { --color-on-primary: #fff; }
+      .btn { @apply bg-primary; }
+    CSS
+    commit "tailwind"
+    assert_equal 0, run_script("audit_design", "--strict").code, "token values in @theme blocks"
+
+    css = path("app/assets/tailwind/application.css")
+    File.write(css, File.read(css).sub("  --color-primary: #1d4ed8;\n", "  --color-primary: #1d4ed8;\n  --color-danger: #b91c1c;\n"))
+    assert_equal 0, hook(css).code, "a new token in a @theme block"
+
+    append "app/assets/tailwind/application.css", ".badge { color: #ff0000; }\n"
+    result = hook(css)
+    assert_equal 2, result.code
+    assert_includes result.err, "app/assets/tailwind/application.css:8: .badge"
+    refute_includes result.err, "--color-danger"
+    assert_equal 2, stop.code
+    full = run_script("audit_design")
+    assert_includes full.out, "== raw hex colours: 1\n   app/assets/tailwind/application.css:8:.badge"
+  end
+
   # -- full scan, strict, changed -----------------------------------------
 
   def test_full_scan_format_and_exit_codes
