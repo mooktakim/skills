@@ -124,7 +124,7 @@ def theme_lines(path)
   inside = false
   depth = 0
   text_lines(File.binread(path)).each_with_index.select do |text, _|
-    inside ||= text.match?(/(^|\s)@theme\b/)
+    inside ||= text.match?(/\A\s*@theme\b/)
     next false unless inside
 
     depth += text.count("{") - text.count("}")

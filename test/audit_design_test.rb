@@ -243,6 +243,16 @@ class AuditDesignTest < Minitest::Test
     assert_includes full.out, "== raw hex colours: 1\n   app/assets/tailwind/application.css:8:.badge"
   end
 
+  def test_a_comment_naming_theme_does_not_start_a_theme_block
+    write "app/assets/tailwind/application.css", <<~CSS
+      /* Role tokens live in the @theme block below */
+      .badge { color: #ff0000; }
+    CSS
+    result = hook(path("app/assets/tailwind/application.css"))
+    assert_equal 2, result.code
+    assert_includes result.err, "app/assets/tailwind/application.css:2: .badge"
+  end
+
   # -- full scan, strict, changed -----------------------------------------
 
   def test_full_scan_format_and_exit_codes

@@ -122,8 +122,10 @@ class HooksTest < Minitest::Test
       FileUtils.rm_rf(Dir.glob(path("*")))
       %w[web/ apps/server/ packages/x/y/ a/b/c/d/ web/engines/inner/ node_modules/pkg/ vendor/x/ apps/tmp/ .hidden/app/].each(&mark)
       File.symlink(path("apps"), path("linked"))
-      assert_equal %w[apps/server packages/x/y web], roots(plugin, function),
-                   "#{plugin}: one, two, and three levels down; not deeper, inside an app, in ignored or hidden directories, or through a symlink"
+      File.symlink(path(".hidden/app"), path("studio"))
+      File.symlink(path(".hidden/app"), path("apps/linked"))
+      assert_equal %w[apps/server packages/x/y studio web], roots(plugin, function),
+                   "#{plugin}: one, two, and three levels down, and a symlinked app one level down; not deeper, inside an app, in ignored or hidden directories, inside a symlink, or through a deeper symlink"
       mark.call("")
       assert_equal [@dir], roots(plugin, function), "#{plugin}: an app at the project directory is the only one"
     end
