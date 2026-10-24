@@ -361,8 +361,10 @@ class ToolsmithTest < Minitest::Test
     root
   end
 
+  # The reminder tests run every tool in remind mode; the real modes are checked
+  # in test_text_replace_and_file_lines_block_their_patterns.
   def hook(script, stdin: "", env: {})
-    env = { "TOOLSMITH_ROOT" => fake_root }.merge(env) unless env.key?("TOOLSMITH_ROOT")
+    env = { "TOOLSMITH_ROOT" => fake_root(mode: "remind") }.merge(env) unless env.key?("TOOLSMITH_ROOT")
     run_bash File.join(PLUGIN, "hooks", script), stdin: stdin, env: { "TOOLSMITH_LOG" => @log }.merge(env)
   end
 
@@ -461,6 +463,21 @@ class ToolsmithTest < Minitest::Test
     output = JSON.parse(result.out).fetch("hookSpecificOutput")
     assert_equal "deny", output["permissionDecision"]
     assert_includes output["permissionDecisionReason"], "toolsmith-text-replace"
+    assert_includes output["permissionDecisionReason"], "own Edit or Read tool", "the refusal names the built-in tools too"
+  end
+
+  # The two tools whose reminders were followed least (usage review 2026-10-24)
+  # block their pattern; the user approved it.
+  def test_text_replace_and_file_lines_block_their_patterns
+    modes = manifests.to_h { |m| [m["name"], m["mode"]] }
+    assert_equal "block", modes.fetch("toolsmith-text-replace")
+    assert_equal "block", modes.fetch("toolsmith-file-lines")
+    real = ->(command) { JSON.parse(hook("pre-bash.sh", stdin: bash_event(command), env: { "TOOLSMITH_ROOT" => fake_root }).out).fetch("hookSpecificOutput") }
+    assert_equal "deny", real.call("sed -i '' 's/a/b/' x.rb")["permissionDecision"]
+    assert_equal "deny", real.call("sed -n 1,5p a.rb; sed -n 9,12p b.rb")["permissionDecision"]
+    jq = real.call("jq '.x = 1' a.json > t.json && mv t.json a.json")
+    assert_nil jq["permissionDecision"], "the other tools still only remind"
+    assert_includes jq["additionalContext"], "toolsmith-json-set"
   end
 
   # -- the history analysis -------------------------------------------------

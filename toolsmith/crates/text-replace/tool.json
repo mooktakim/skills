@@ -77,6 +77,6 @@
     }
   ],
   "family": "literal-replace",
-  "mode": "remind",
+  "mode": "block",
   "added": "2026-10-07"
 }

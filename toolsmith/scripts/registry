@@ -135,7 +135,8 @@ def check
     "this command looks like #{all_families[tool['family']]['title']}; `#{tool['name']}` exists for that: #{tool['intent']}"
   end.join(" Also, ") + " Run `<command> --llm` for how to use one."
   output = if blocking
-             { "permissionDecision" => "deny", "permissionDecisionReason" => "#{message} Use it instead of this command." }
+             { "permissionDecision" => "deny",
+               "permissionDecisionReason" => "#{message} Use it instead of this command, or Claude Code's own Edit or Read tool when that fits better." }
            else
              { "additionalContext" => "#{message} Use it next time unless it does not fit. This reminder shows once per session." }
            end
