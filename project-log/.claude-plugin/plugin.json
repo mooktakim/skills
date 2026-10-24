@@ -1,0 +1,10 @@
+{
+  "name": "project-log",
+  "version": "0.1.0",
+  "description": "An append-only work log in git: one immutable entry file per finished unit of work, committed with the work, checked by a fast project-log command, with lossless migration from older history logs",
+  "author": { "name": "Mooktakim Ahmed", "email": "mooktakim@fluxter.co.uk" },
+  "homepage": "https://github.com/mooktakim/skills",
+  "repository": "https://github.com/mooktakim/skills",
+  "keywords": ["log", "history", "changelog", "documentation", "context"],
+  "license": "MIT"
+}

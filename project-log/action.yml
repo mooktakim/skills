@@ -1,0 +1,34 @@
+name: project-log lint
+description: Check a project's docs/log work log with the project-log command, built once from this action's own source and cached.
+inputs:
+  directory:
+    description: The project's directory (the one that holds docs/LOG.md), relative to the repository root.
+    default: "."
+runs:
+  using: composite
+  steps:
+    # GitHub has already downloaded this action at the pinned commit, so the
+    # command builds from that source; the key is a hash of it, so a new pin
+    # rebuilds only when the code changed.
+    - name: Cache key
+      id: key
+      shell: bash
+      run: |
+        cd "$GITHUB_ACTION_PATH"
+        if command -v sha256sum >/dev/null 2>&1; then hash="sha256sum"; else hash="shasum -a 256"; fi
+        sum=$(cat Cargo.toml Cargo.lock src/*.rs | $hash | cut -c1-16)
+        echo "key=project-log-$RUNNER_OS-$RUNNER_ARCH-$sum" >> "$GITHUB_OUTPUT"
+    - name: Restore the project-log command
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      with:
+        path: ${{ runner.temp }}/project-log
+        key: ${{ steps.key.outputs.key }}
+    - name: Build the project-log command
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: cargo install --locked --quiet --path "$GITHUB_ACTION_PATH" --root "$RUNNER_TEMP/project-log"
+    - name: project-log lint
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: '"$RUNNER_TEMP/project-log/bin/project-log" lint'

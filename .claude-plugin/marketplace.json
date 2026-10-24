@@ -52,6 +52,11 @@
       "description": "Small single-purpose Rust commands that replace shell patterns Claude repeats, found by scanning your Claude Code history, with usage tracking"
     },
     {
+      "name": "project-log",
+      "source": "./project-log",
+      "description": "An append-only work log in git: one immutable entry file per finished unit of work, committed with the work, with lossless migration from older history logs"
+    },
+    {
       "name": "project-memory",
       "source": "./project-memory",
       "description": "Long-term project memory in git: typed notes with citations, a generated index, an inbox, lessons, and an append-only log, with lossless migration from older history logs"
