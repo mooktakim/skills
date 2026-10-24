@@ -540,7 +540,9 @@ class HooksTest < Minitest::Test
     "you keep adding a dot to the status badge",
     "update CLAUDE.md so you stop doing this",
     "stop using inline styles",
-    "no, never push without asking"
+    "no, never push without asking",
+    "We don't want any licensed fonts, use free versions only",
+    "we should always redirect /subscribe/{code} to /subscribe/{code}?afmc={code}"
   ].freeze
 
   NOT_CORRECTIONS = [
@@ -555,7 +557,8 @@ class HooksTest < Minitest::Test
     "no thats fine",
     "nope, leave it",
     "dont deploy yet",
-    "don't merge it yet, I want to check"
+    "don't merge it yet, I want to check",
+    "stop the server"
   ].freeze
 
   def test_correction_hint_fires_on_corrections_and_rules
@@ -564,6 +567,8 @@ class HooksTest < Minitest::Test
 
   def test_correction_hint_stays_quiet_otherwise
     NOT_CORRECTIONS.each { |prompt| assert_nil prompt_hint(prompt), prompt }
+    unattended = hook("capture", "correction-hint.sh", stdin: JSON.generate("prompt" => "never commit to main"), env: { "CLAUDE_CODE_SESSION_ATTENDED" => "0" })
+    assert_equal "", unattended.out, "no one to offer to in a headless or SDK run"
     assert_equal "", hook("capture", "correction-hint.sh", stdin: "not json").out
   end
 
