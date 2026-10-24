@@ -13,7 +13,12 @@ done)
 
 data=${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}}
 mkdir -p "$data" 2>/dev/null || exit 0
-stamp="$data/nudge-$(printf '%s' "$root" | shasum | cut -c1-16)"
+# Every worktree and clone of one repository shares the weekly stamp: it is keyed
+# by the repository (its origin, or its shared git directory) and the project's
+# folder in it, not by the checkout's path.
+repo=$(git -C "$root" remote get-url origin 2>/dev/null) \
+  || repo=$(cd "$root" 2>/dev/null && cd "$(git rev-parse --git-common-dir 2>/dev/null || echo .)" && pwd -P) || repo=$root
+stamp="$data/nudge-$(printf '%s %s' "$repo" "$(git -C "$root" rev-parse --show-prefix 2>/dev/null)" | shasum | cut -c1-16)"
 [ -n "$(find "$stamp" -mtime -7 2>/dev/null)" ] && exit 0
 
 plugin="${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}"

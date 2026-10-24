@@ -236,11 +236,25 @@ class HooksTest < Minitest::Test
     design_app
     install "rails-design-system", "audit_design"
     commit "audit"
+    git "remote", "add", "origin", "https://example.com/app.git"
     first = hook("rails-design-system", "maintenance-nudge.sh")
     message = system_message(first)
     assert_includes message, "bin/audit_design is not run in CI"
     refute_includes message, "differs"
     assert_equal "", hook("rails-design-system", "maintenance-nudge.sh").out, "at most once a week"
+    assert_equal "", in_other_checkouts { |checkout| hook("rails-design-system", "maintenance-nudge.sh", env: { "CLAUDE_PROJECT_DIR" => checkout }).out },
+                 "once a week for the repository, not for each worktree or clone"
+  end
+
+  # The output of the block for a git worktree of the test repo and for a clone
+  # with the same origin, joined.
+  def in_other_checkouts
+    worktree = File.join(@data, "worktree")
+    clone = File.join(@data, "clone")
+    git "worktree", "add", "-q", worktree
+    git "clone", "-q", @dir, clone
+    Open3.capture3("git", "remote", "set-url", "origin", "https://example.com/app.git", chdir: clone)
+    [worktree, clone].map { |checkout| yield File.realpath(checkout) }.join
   end
 
   def test_design_nudge_flags_outdated_scripts_leftover_hooks_and_findings
@@ -277,10 +291,13 @@ class HooksTest < Minitest::Test
     File.symlink("CLAUDE.md", path("app/models/AGENTS.md"))
     6.times { |i| write "app/helpers/h#{i}.rb", "module H#{i}; end\n" }
     commit "context"
+    git "remote", "add", "origin", "https://example.com/app.git"
     message = system_message(hook("rails-context", "maintenance-nudge.sh"))
     assert_includes message, "1 context file(s) over the size limit"
     assert_includes message, "1 director(ies) may need a context file"
     refute_includes message, "differs"
+    assert_equal "", in_other_checkouts { |checkout| hook("rails-context", "maintenance-nudge.sh", env: { "CLAUDE_PROJECT_DIR" => checkout }).out },
+                 "once a week for the repository, not for each worktree or clone"
   end
 
   # -- rails-context: the context reach log and report -----------------------

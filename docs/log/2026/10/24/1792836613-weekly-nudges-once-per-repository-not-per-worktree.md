@@ -1,0 +1,4 @@
+# 2026-10-24 Weekly nudges once per repository, not per worktree
+- Goal: usage review 2026-10-24 found the "maintenance is due" SessionStart nudges of rails-context and rails-design-system firing in every worktree: oasis-kids got 11 in 2 days across its treehouse worktrees, because the weekly stamp was keyed by the checkout path.
+- Changed: both maintenance-nudge.sh key the stamp by the repository - the origin URL, else the shared git directory (git rev-parse --git-common-dir) - plus the project's folder in it (--show-prefix). Treehouse worktrees share one git dir; no-mistakes worktrees use their own bare repo but the same origin, so the origin comes first. rails-context 0.17.1, rails-design-system 0.21.1.
+- Verified: new test assertions (a git worktree and a clone with the same origin stay silent after the first nudge) fail on the old hooks and pass on the new ones; bin/test passes.

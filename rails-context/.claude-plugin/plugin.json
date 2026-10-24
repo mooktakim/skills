@@ -1,6 +1,6 @@
 {
   "name": "rails-context",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "description": "Per-directory AGENTS.md context files for Rails apps (MVC Context), each imported by a one-line CLAUDE.md: survey, generate, migrate the old symlink layout; re-runs audit drift and fill gaps",
   "author": {
     "name": "Mooktakim Ahmed",
