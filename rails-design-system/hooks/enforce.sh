@@ -2,11 +2,13 @@
 # PostToolUse / Stop / SubagentStop hook: run this plugin's own audit_design
 # against each app with a design system, so every app gets the current checks the
 # moment the plugin updates - no per-app wiring, no maintenance run needed.
-# Silent in projects without docs/design-system/ (here or in an app below).
+# Only for the project's Rails apps with a design system
+# (docs/design-system/README.md), from the list hooks/rails-apps.sh keeps.
 root=${CLAUDE_PROJECT_DIR:-}
 [ -n "$root" ] || exit 0
-. "$(dirname "$0")/app-roots.sh"
-apps=$(design_roots "$root")
+input=$(cat)
+. "$(dirname "$0")/rails-apps.sh"
+apps=$(rails_apps "$root" "$input" | while IFS= read -r app; do [ -f "$app/docs/design-system/README.md" ] && printf '%s\n' "$app"; done)
 [ -n "$apps" ] || exit 0
 plugin=${CLAUDE_PLUGIN_ROOT:-$(dirname "$0")/..}
 
@@ -22,7 +24,6 @@ if [ ! -x "$ruby" ]; then
 fi
 
 # The worst exit status of the apps' runs: 2 sends the findings back to Claude.
-input=$(cat)
 status=0
 while IFS= read -r app; do
   printf '%s' "$input" | AUDIT_ROOT="$app" "$ruby" --disable-gems "$plugin/scripts/audit_design" "$@"

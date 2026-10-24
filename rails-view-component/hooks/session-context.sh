@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
-# SessionStart hook: in a Rails app that uses ViewComponent (at the project root
-# or one level down), tell the main session when to load the rails-view-component
-# skill and when to delegate to its component-builder agent. Silent everywhere else.
+# SessionStart hook: when one of the project's Rails apps (hooks/rails-apps.sh)
+# uses ViewComponent, tell the main session when to load the rails-view-component
+# skill and when to delegate to its component-builder agent. Silent everywhere
+# else. It also searches for the apps again, for every hook.
 set -uo pipefail
 root=${CLAUDE_PROJECT_DIR:-$PWD}
+. "$(dirname "$0")/rails-apps.sh"
 found=0
-for app in "$root" "$root"/*; do
-  [ -f "$app/config/application.rb" ] || continue
-  grep -q 'Rails::Application' "$app/config/application.rb" 2>/dev/null || continue
+while IFS= read -r app; do
+  [ -n "$app" ] || continue
   grep -qs '^ *view_component (' "$app/Gemfile.lock" || grep -qsE "^[[:space:]]*gem[[:space:]]+[\"']view_component[\"']" "$app/Gemfile" || continue
   found=1
   break
-done
+done <<EOF
+$(rails_apps "$root" fresh)
+EOF
 [ "$found" -eq 1 ] || exit 0
 
 cat <<'JSON'

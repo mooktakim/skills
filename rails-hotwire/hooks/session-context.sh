@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
-# SessionStart hook: in a Rails app that uses turbo-rails or stimulus-rails (at
-# the project root or one level down), tell the main session when to load the
+# SessionStart hook: when one of the project's Rails apps (hooks/rails-apps.sh)
+# uses turbo-rails or stimulus-rails, tell the main session when to load the
 # rails-hotwire skill and when to delegate to its hotwire-builder agent. Silent
-# everywhere else.
+# everywhere else. It also searches for the apps again, for every hook.
 set -uo pipefail
 root=${CLAUDE_PROJECT_DIR:-$PWD}
+. "$(dirname "$0")/rails-apps.sh"
 found=0
-for app in "$root" "$root"/*; do
-  [ -f "$app/config/application.rb" ] || continue
-  grep -q 'Rails::Application' "$app/config/application.rb" 2>/dev/null || continue
+while IFS= read -r app; do
+  [ -n "$app" ] || continue
   grep -qsE '^ *(turbo-rails|stimulus-rails) \(' "$app/Gemfile.lock" || grep -qsE "^[[:space:]]*gem[[:space:]]+[\"'](turbo-rails|stimulus-rails)[\"']" "$app/Gemfile" || continue
   found=1
   break
-done
+done <<EOF
+$(rails_apps "$root" fresh)
+EOF
 [ "$found" -eq 1 ] || exit 0
 
 cat <<'JSON'

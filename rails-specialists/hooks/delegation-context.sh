@@ -2,14 +2,12 @@
 # SessionStart hook: in a Rails project, tell the main session the moments at
 # which to delegate to the specialists. Agent descriptions alone rarely won
 # against the built-in general-purpose agent, so the workflow moments are
-# stated up front. Silent outside Rails projects.
+# stated up front. Silent in projects without a Rails app (hooks/rails-apps.sh).
+# It also searches for the apps again, for every hook.
 set -uo pipefail
 root=${CLAUDE_PROJECT_DIR:-$PWD}
-rails=0
-for app in "$root/config/application.rb" "$root"/*/config/application.rb; do
-  [ -f "$app" ] && grep -q 'Rails::Application' "$app" 2>/dev/null && { rails=1; break; }
-done
-[ "$rails" -eq 1 ] || exit 0
+. "$(dirname "$0")/rails-apps.sh"
+[ -n "$(rails_apps "$root" fresh)" ] || exit 0
 
 cat <<'EOF'
 {

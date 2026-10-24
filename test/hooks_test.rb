@@ -19,7 +19,8 @@ class HooksTest < Minitest::Test
   end
 
   def plugin_env(plugin)
-    { "CLAUDE_PROJECT_DIR" => @dir, "CLAUDE_PLUGIN_ROOT" => File.join(REPO, plugin), "CLAUDE_PLUGIN_DATA" => @data }
+    # TMPDIR holds the plugins' shared list of Rails apps (hooks/rails-apps.sh).
+    { "CLAUDE_PROJECT_DIR" => @dir, "CLAUDE_PLUGIN_ROOT" => File.join(REPO, plugin), "CLAUDE_PLUGIN_DATA" => @data, "TMPDIR" => @data }
   end
 
   def hook(plugin, script, *args, stdin: "", cwd: @dir, env: {})
@@ -30,7 +31,20 @@ class HooksTest < Minitest::Test
     JSON.parse(result.out)["systemMessage"]
   end
 
+  # The hooks act only for Rails apps (hooks/rails-apps.sh): a directory whose
+  # config/application.rb defines a Rails::Application.
+  def rails_config(app = "")
+    write "#{app}config/application.rb", "module App\n  class Application < Rails::Application\n  end\nend\n"
+  end
+
+  # Every app a test copies a plugin script into is a Rails app.
+  def install(plugin, script, app = "")
+    super
+    rails_config(app)
+  end
+
   def design_app
+    rails_config
     write "docs/design-system/README.md", "# Design system\n"
     write "app/views/x/a.html.erb", %(<p class="bg-surface">ok</p>\n)
     FileUtils.mkdir_p(path("docs/sub"))
@@ -109,25 +123,85 @@ class HooksTest < Minitest::Test
     refute_includes message, "not run in CI", "CI at the repository top counts"
   end
 
-  # app-roots.sh in both plugins: the apps a session opened at the repository
-  # top serves, up to three levels down (apps/server in a monorepo).
-  def roots(plugin, function)
-    script = File.join(REPO, plugin, "hooks/app-roots.sh")
-    run_bash("-c", %(. "$1" && #{function} "$2"), "_", script, @dir).out.split("\n").map { |dir| dir.delete_prefix("#{@dir}/") }
+  # hooks/rails-apps.sh, the list of Rails apps every Rails plugin shares.
+  RAILS_PLUGINS = %w[rails-context rails-design-system rails-generators rails-hotwire rails-minitest rails-specialists rails-view-component].freeze
+
+  def rails_apps(*args, dir: @dir)
+    script = File.join(REPO, "rails-context/hooks/rails-apps.sh")
+    out = run_bash("-c", %(. "$1" && shift && rails_apps "$@"), "_", script, dir, *args, env: { "TMPDIR" => @data }).out
+    out.split("\n").map { |app| app == dir ? "." : app.delete_prefix("#{dir}/") }
   end
 
-  def test_app_roots_find_apps_up_to_three_levels_down_in_both_plugins
-    { ["rails-context", "app_roots"] => ->(app) { install "rails-context", "audit_context", app },
-      ["rails-design-system", "design_roots"] => ->(app) { write "#{app}docs/design-system/README.md", "# Design system\n" } }.each do |(plugin, function), mark|
-      FileUtils.rm_rf(Dir.glob(path("*")))
-      %w[web/ apps/server/ packages/x/y/ a/b/c/d/ web/engines/inner/ node_modules/pkg/ vendor/x/ apps/tmp/ .hidden/app/].each(&mark)
-      File.symlink(path("apps"), path("linked"))
-      File.symlink(path(".hidden/app"), path("studio"))
-      File.symlink(path(".hidden/app"), path("apps/linked"))
-      assert_equal %w[apps/server packages/x/y studio web], roots(plugin, function),
-                   "#{plugin}: one, two, and three levels down, and a symlinked app one level down; not deeper, inside an app, in ignored or hidden directories, inside a symlink, or through a deeper symlink"
-      mark.call("")
-      assert_equal [@dir], roots(plugin, function), "#{plugin}: an app at the project directory is the only one"
+  def rails_app_of(input)
+    script = File.join(REPO, "rails-context/hooks/rails-apps.sh")
+    out = run_bash("-c", %(. "$1" && rails_app_of "$2" "$(rails_apps "$3")"), "_", script, JSON.generate(input), @dir,
+                   env: { "TMPDIR" => @data, "CLAUDE_PROJECT_DIR" => @dir }).out.chomp
+    out.empty? ? nil : out.delete_prefix("#{@dir}/")
+  end
+
+  def test_rails_apps_copies_are_identical_in_every_rails_plugin
+    copy = File.read(File.join(REPO, "rails-context/hooks/rails-apps.sh"))
+    RAILS_PLUGINS.each do |plugin|
+      assert_equal copy, File.read(File.join(REPO, plugin, "hooks/rails-apps.sh")), "#{plugin}/hooks/rails-apps.sh differs from rails-context's: change all of them together"
+    end
+  end
+
+  def rails_layout
+    ["web/", "apps/server/", "a/b/c/d/e/", "web/engines/inner/", "gem/test/dummy/", "node_modules/pkg/", ".hidden/app/", "ignored/app/",
+     "sp ace/app/"].each { |app| rails_config(app) }
+    write "notrails/config/application.rb", "# not a Rails app\n"
+    write ".gitignore", "ignored/\n"
+    File.symlink(path(".hidden/app"), path("studio"))
+    File.symlink(path(".hidden/app"), path("apps/linked"))
+  end
+
+  def test_rails_apps_finds_every_app_git_sees_at_any_depth
+    rails_layout
+    assert_equal ["a/b/c/d/e", "apps/server", "sp ace/app", "studio", "web"], rails_apps("fresh"),
+                 "any depth and a symlinked app one level down; not inside an app, an engine's dummy app, node_modules, hidden or ignored, " \
+                 "without Rails::Application, or through a deeper symlink"
+    rails_config
+    assert_equal ["."], rails_apps("fresh"), "an app at the project directory holds the others"
+  end
+
+  def test_rails_apps_without_git_skips_dependency_and_hidden_directories
+    outside = File.realpath(Dir.mktmpdir("no-git"))
+    %w[web/ node_modules/pkg/ .hidden/app/ apps/server/ apps/server/test/dummy/].each do |app|
+      FileUtils.mkdir_p(File.join(outside, app, "config"))
+      File.write(File.join(outside, app, "config/application.rb"), "class A < Rails::Application; end\n")
+    end
+    assert_equal %w[apps/server web], rails_apps("fresh", dir: outside)
+  ensure
+    FileUtils.rm_rf(outside)
+  end
+
+  def test_rails_apps_keeps_one_list_until_an_app_may_have_changed
+    rails_config "web/"
+    assert_equal ["web"], rails_apps("fresh")
+    assert_equal 1, Dir.glob(File.join(@data, "claude-rails-apps/*")).size, "one shared list for the project"
+    rails_config "api/"
+    assert_equal ["web"], rails_apps, "other hooks use the list"
+    assert_equal ["web"], rails_apps(JSON.generate("tool_input" => { "command" => "git status" }))
+    assert_equal %w[api web], rails_apps(JSON.generate("tool_input" => { "command" => "rails new api" })),
+                 "a call that may create an app searches again"
+    assert_empty Dir.glob(File.join(@data, "claude-rails-apps/*")), "and drops the list, so the next hook searches after it ran"
+    assert_equal %w[api web], rails_apps
+    FileUtils.rm_rf(path("web"))
+    assert_equal ["api"], rails_apps, "an app that is gone is left out"
+    assert_equal %w[api], rails_apps(JSON.generate("tool_input" => { "file_path" => path("x/config/application.rb") }))
+  end
+
+  def test_rails_app_of_names_the_app_a_tool_call_works_in
+    rails_layout
+    rails_apps "fresh"
+    assert_equal "apps/server", rails_app_of("tool_input" => { "file_path" => path("apps/server/app/models/user.rb") })
+    assert_equal "web", rails_app_of("cwd" => path("web"), "tool_input" => { "file_path" => "app/models/user.rb" }), "relative to the cwd"
+    assert_nil rails_app_of("tool_input" => { "file_path" => path("lib/x.rb") }), "a file outside every app"
+    assert_equal "web", rails_app_of("cwd" => path("web/app"), "tool_input" => { "command" => "ls" }), "a command run in an app"
+    { "cd web && bin/rails generate model Post" => "web", "cat web/app/x.rb" => "web", "ls ./apps/server/db" => "apps/server",
+      "cat #{path('a/b/c/d/e/Gemfile')}" => "a/b/c/d/e", "ls myweb/x" => nil, "git status" => nil }.each do |command, app|
+      result = rails_app_of("cwd" => @dir, "tool_input" => { "command" => command })
+      app ? assert_equal(app, result, command) : assert_nil(result, command)
     end
   end
 
@@ -554,11 +628,12 @@ class HooksTest < Minitest::Test
 
   # -- the first-touch notes ------------------------------------------------
 
+  # Each call works in the app at web/; file paths are relative to the cwd.
   FIRST_TOUCH = {
-    "rails-view-component" => ["Write", { "file_path" => "/app/app/components/card_component.rb" }],
-    "rails-hotwire" => ["Bash", { "command" => "cat > app/javascript/controllers/tabs_controller.js <<'JS'\nJS" }],
-    "rails-minitest" => ["Edit", { "file_path" => "/app/test/models/user_test.rb" }],
-    "rails-generators" => ["Bash", { "command" => "bin/rails generate migration AddSlugToPosts slug:string" }]
+    "rails-view-component" => ["Write", { "file_path" => "web/app/components/card_component.rb" }],
+    "rails-hotwire" => ["Bash", { "command" => "cat > web/app/javascript/controllers/tabs_controller.js <<'JS'\nJS" }],
+    "rails-minitest" => ["Edit", { "file_path" => "web/test/models/user_test.rb" }],
+    "rails-generators" => ["Bash", { "command" => "cd web && bin/rails generate migration AddSlugToPosts slug:string" }]
   }.freeze
 
   def test_first_touch_notes_once_per_session_and_never_in_subagents
@@ -566,8 +641,12 @@ class HooksTest < Minitest::Test
       assert_equal "", hook(plugin, "first-touch.sh", stdin: JSON.generate("session_id" => "#{plugin}-none", "tool_name" => tool, "tool_input" => tool_input)).out,
                    "#{plugin}: silent outside a Rails app"
     end
-    write "web/config/application.rb", "class App < Rails::Application\nend\n"
+    rails_config "web/"
     FIRST_TOUCH.each do |plugin, (tool, tool_input)|
+      hook(plugin, "session-context.sh") # a new session searches for the apps again
+      outside = tool_input.transform_values { |text| text.gsub("web", "lib") }
+      assert_equal "", hook(plugin, "first-touch.sh", stdin: JSON.generate("session_id" => "#{plugin}-out", "tool_name" => tool, "tool_input" => outside)).out,
+                   "#{plugin}: silent for a path outside every Rails app"
       note = lambda do |session, extra = {}|
         # Each plugin has its own data directory in Claude Code; here they share one.
         out = hook(plugin, "first-touch.sh", stdin: JSON.generate({ "session_id" => "#{plugin}-#{session}", "tool_name" => tool, "tool_input" => tool_input }.merge(extra))).out
@@ -690,11 +769,12 @@ class HooksTest < Minitest::Test
     ].each { |command| assert_nil refused("Bash", "command" => command), command }
   end
 
-  def test_guard_finds_an_app_one_level_down_and_is_silent_outside_rails
+  def test_guard_finds_an_app_below_the_project_and_is_silent_outside_rails
     write "db/migrate/20261009120000_x.rb.keep", ""
-    assert_equal({}, guard("Write", "file_path" => path("db/migrate/20261009120000_create_posts.rb")), "no bin/rails")
+    assert_equal({}, guard("Write", "file_path" => path("db/migrate/20261009120000_create_posts.rb")), "no Rails app")
     assert_equal({}, guard("Edit", "file_path" => path("Gemfile.lock")))
     rails_app("api/")
+    guard("Write", "file_path" => path("api/config/application.rb")) # the call that made the app drops the list
     reason = refused("Bash", "command" => "echo x > api/db/migrate/20261009120000_create_posts.rb")
     assert_includes reason, "(run it in #{path('api')})"
     assert_equal "", hook("rails-generators", "guard.sh", stdin: JSON.generate("tool_name" => "Read", "tool_input" => { "file_path" => path("app/models/user.rb") })).out

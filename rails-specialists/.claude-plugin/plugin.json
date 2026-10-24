@@ -1,6 +1,6 @@
 {
   "name": "rails-specialists",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "A team of Rails specialist agents: models, jobs, debugging, review, security, performance, deploy, and upgrades",
   "author": { "name": "Mooktakim Ahmed", "email": "mooktakim@fluxter.co.uk" },
   "homepage": "https://github.com/mooktakim/skills",

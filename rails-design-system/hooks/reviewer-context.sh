@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# SessionStart hook: in an app with a design system, tell the main session when
-# to delegate to the design-reviewer agent. Silent everywhere else.
+# SessionStart hook: when one of the project's Rails apps has a design system,
+# tell the main session when to delegate to the design-reviewer agent. Silent
+# everywhere else. It also searches for the apps again, for every hook.
 set -uo pipefail
 root=${CLAUDE_PROJECT_DIR:-$PWD}
-. "$(dirname "$0")/app-roots.sh"
-[ -n "$(design_roots "$root")" ] || exit 0
+. "$(dirname "$0")/rails-apps.sh"
+apps=$(rails_apps "$root" fresh | while IFS= read -r app; do [ -f "$app/docs/design-system/README.md" ] && printf '%s\n' "$app"; done)
+[ -n "$apps" ] || exit 0
 
 cat <<'EOF'
 {

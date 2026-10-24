@@ -1,6 +1,6 @@
 {
   "name": "rails-view-component",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "ViewComponent for Rails apps: a skill with the standard for organising, writing, composing, and testing components, Turbo Streams, frames, broadcasts and morphing, Stimulus beside components, forms with the app's own builder, previews, the v4 upgrade, and a library audit, plus a component-builder agent that builds components to it",
   "author": { "name": "Mooktakim Ahmed", "email": "mooktakim@fluxter.co.uk" },
   "homepage": "https://github.com/mooktakim/skills",

@@ -1,18 +1,12 @@
 #!/usr/bin/env bash
-# SessionStart hook: in a Rails app (at the project root or one level down), tell
+# SessionStart hook: in a project with a Rails app (hooks/rails-apps.sh), tell
 # the main session to use the framework's generators and commands instead of
 # writing the files they write, and when to load the rails-generators skill.
-# Silent everywhere else.
+# Silent everywhere else. It also searches for the apps again, for every hook.
 set -uo pipefail
 root=${CLAUDE_PROJECT_DIR:-$PWD}
-found=0
-for app in "$root" "$root"/*; do
-  [ -f "$app/config/application.rb" ] || continue
-  grep -q 'Rails::Application' "$app/config/application.rb" 2>/dev/null || continue
-  found=1
-  break
-done
-[ "$found" -eq 1 ] || exit 0
+. "$(dirname "$0")/rails-apps.sh"
+[ -n "$(rails_apps "$root" fresh)" ] || exit 0
 
 cat <<'JSON'
 {

@@ -3,8 +3,8 @@
 # scripts/context_report can measure whether a directory's CLAUDE.md reaches
 # Claude in the sessions that change code there. Local only: one JSONL file in
 # the repo's git directory (shared by worktrees, never committed). Silent, never
-# blocks, and only active in projects set up with rails-context (bin/audit_context
-# in the project directory or in an app below it). Paths are logged
+# blocks, and only active in projects with a Rails app set up with rails-context
+# (bin/audit_context), from the list hooks/rails-apps.sh keeps. Paths are logged
 # relative to the top of the git repository, so apps in one repository never mix.
 # Modes (one per hook event):
 #   start  SessionStart                 the HEAD the session started from
@@ -15,14 +15,17 @@
 #                                       by any tool - Bash edits included
 root=${CLAUDE_PROJECT_DIR:-}
 [ -n "$root" ] || exit 0
-. "$(dirname "$0")/app-roots.sh"
-[ -n "$(app_roots "$root")" ] || exit 0
+input=$(cat)
+. "$(dirname "$0")/rails-apps.sh"
+# A session start searches for the apps again; the other events use the list.
+case "${1:-}" in start|compact) list=fresh ;; *) list=$input ;; esac
+apps=$(rails_apps "$root" "$list" | while IFS= read -r app; do [ -x "$app/bin/audit_context" ] && printf '%s\n' "$app"; done)
+[ -n "$apps" ] || exit 0
 top=$(git -C "$root" rev-parse --show-toplevel 2>/dev/null) || exit 0
 prefix=$(git -C "$root" rev-parse --show-prefix 2>/dev/null)
 gitdir=$(git -C "$root" rev-parse --git-common-dir 2>/dev/null) || exit 0
 case "$gitdir" in /*) ;; *) gitdir="$root/$gitdir" ;; esac
 log="$gitdir/claude-context-log.jsonl"
-input=$(cat)
 
 field() { # field <name>: the first string value of "name" in the hook input
   printf '%s' "$input" | grep -o "\"$1\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" | head -1 \

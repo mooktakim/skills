@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # SessionStart hook: tell the user when this project's design system is due a
 # maintenance run, at most once a week per project. Checks every app with
-# bin/audit_design (the project directory, or apps below it). Silent in
+# a design system and bin/audit_design, among the project's Rails apps. Silent in
 # projects without one, and whenever nothing needs attention.
 set -uo pipefail
 root=${CLAUDE_PROJECT_DIR:-$PWD}
-. "$(dirname "$0")/app-roots.sh"
-apps=$(design_roots "$root" | while IFS= read -r app; do [ -x "$app/bin/audit_design" ] && printf '%s\n' "$app"; done)
+. "$(dirname "$0")/rails-apps.sh"
+apps=$(rails_apps "$root" fresh | while IFS= read -r app; do
+  [ -f "$app/docs/design-system/README.md" ] && [ -x "$app/bin/audit_design" ] && printf '%s\n' "$app"
+done)
 [ -n "$apps" ] || exit 0
 
 data=${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}}

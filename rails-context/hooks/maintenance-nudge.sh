@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # SessionStart hook: tell the user when this project's context files are due a
-# maintenance run, at most once a week per project. Checks every app set up with
-# rails-context (the project directory, or apps below it). Silent in
-# projects without bin/audit_context, and whenever nothing needs attention.
+# maintenance run, at most once a week per project. Checks every Rails app in the
+# project set up with rails-context (bin/audit_context). Silent in projects
+# without one, and whenever nothing needs attention.
 set -uo pipefail
 root=${CLAUDE_PROJECT_DIR:-$PWD}
-. "$(dirname "$0")/app-roots.sh"
-apps=$(app_roots "$root")
+. "$(dirname "$0")/rails-apps.sh"
+apps=$(rails_apps "$root" fresh | while IFS= read -r app; do [ -x "$app/bin/audit_context" ] && printf '%s\n' "$app"; done)
 [ -n "$apps" ] || exit 0
 
 data=${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}}

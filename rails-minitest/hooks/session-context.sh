@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
-# SessionStart hook: in a Rails app tested with Minitest (at the project root or
-# one level down), tell the main session when to load the rails-minitest skill
-# and when to delegate to its minitest-runner agent. Silent everywhere else,
-# including RSpec apps.
+# SessionStart hook: when one of the project's Rails apps (hooks/rails-apps.sh)
+# is tested with Minitest, tell the main session when to load the rails-minitest
+# skill and when to delegate to its minitest-runner agent. Silent everywhere
+# else, including RSpec apps. It also searches for the apps again, for every hook.
 set -uo pipefail
 root=${CLAUDE_PROJECT_DIR:-$PWD}
+. "$(dirname "$0")/rails-apps.sh"
 minitest=0
-for app in "$root" "$root"/*; do
-  [ -f "$app/config/application.rb" ] && [ -f "$app/test/test_helper.rb" ] || continue
-  grep -q 'Rails::Application' "$app/config/application.rb" 2>/dev/null || continue
+while IFS= read -r app; do
+  [ -n "$app" ] && [ -f "$app/test/test_helper.rb" ] || continue
   grep -qs 'rspec-rails' "$app/Gemfile" && continue
   minitest=1
   break
-done
+done <<EOF
+$(rails_apps "$root" fresh)
+EOF
 [ "$minitest" -eq 1 ] || exit 0
 
 cat <<'JSON'

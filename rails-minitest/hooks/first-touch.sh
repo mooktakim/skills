@@ -5,15 +5,14 @@
 # app appears later (built in the session) or started before the plugin was
 # installed. Once per session; silent in subagents. Never blocks.
 input=$(cat)
+# A call that may create or remove a Rails app drops the shared list first.
+root=${CLAUDE_PROJECT_DIR:-$PWD}
+. "$(dirname "$0")/rails-apps.sh"
+rails_apps_forget "$root" "$input"
 case "$input" in *test/*_test.rb*|*test/fixtures/*|*test/test_helper*|*test/test_helpers/*) ;; *) exit 0 ;; esac
 case "$input" in *'"agent_id"'*) exit 0 ;; esac
-# Only in a Rails app: the project directory, or an app directly below it.
-root=${CLAUDE_PROJECT_DIR:-$PWD}
-for app in "$root" "$root"/*; do
-  [ -f "$app/config/application.rb" ] && break
-  app=""
-done
-[ -n "$app" ] || exit 0
+# Only for a tool call in one of the project's Rails apps (hooks/rails-apps.sh).
+[ -n "$(rails_app_of "$input" "$(rails_apps "$root" "$input")")" ] || exit 0
 session=$(printf '%s' "$input" | grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"\([^"]*\)"$/\1/')
 [ -n "$session" ] || exit 0
 dir="${CLAUDE_PLUGIN_DATA:-${TMPDIR:-/tmp}}/first-touch"

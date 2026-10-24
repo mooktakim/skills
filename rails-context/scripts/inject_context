@@ -16,7 +16,7 @@
 # so that one is handed over too. Logged paths are relative to the repository top.
 #
 # Run by hooks/inject-context.sh with the hook input on stdin and the apps it
-# found (hooks/app-roots.sh) in APP_ROOTS, one per line. Plain Ruby,
+# serves (from hooks/rails-apps.sh) in APP_ROOTS, one per line. Plain Ruby,
 # standard library only (Ruby 2.6+). What reached Claude comes from the local log
 # that hooks/log-context.sh keeps (.git/claude-context-log.jsonl); each file this
 # hook hands over is logged there too ("inject"), so it is given once per session,
@@ -47,7 +47,7 @@ def context_text(dir)
 end
 
 project = File.realpath(ENV.fetch("CLAUDE_PROJECT_DIR", "")) rescue exit(0)
-# The apps set up with rails-context, as hooks/app-roots.sh found them.
+# The apps set up with rails-context, as hooks/rails-apps.sh listed them.
 apps = ENV.fetch("APP_ROOTS", "").split("\n").map { |dir| File.realpath(dir) rescue nil }.compact
 exit 0 if apps.empty?
 top = IO.popen(["git", "-C", project, "rev-parse", "--show-toplevel"], err: File::NULL, &:read).strip
