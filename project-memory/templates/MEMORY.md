@@ -1,5 +1,5 @@
 ---
-protocol: project-memory 0.5.0
+protocol: project-memory 0.6.0
 root_context_max_lines: 150
 index_max_lines: 200
 expire_after_days: 90
@@ -7,7 +7,7 @@ expire_after_days: 90
 
 # Memory Protocol
 
-This file defines how project knowledge is stored, found, updated and retired in this repository. Every agent working here follows it. It is written for LLM agents; humans review the results through git diffs.
+This file defines how project knowledge is stored, found, updated and retired in this repository. Every agent working here follows it. It is written for LLM agents; humans review the results through git diffs. It builds on the work log in `docs/LOG.md` (the project-log protocol), which this file does not repeat.
 
 The settings above are read by the `project-memory` command. **Project overrides** at the end of this file are this project's own changes to the protocol: where they differ from the protocol, they win. Everything above that section is the shared protocol; it is replaced when the protocol is upgraded, so put project changes in the overrides section, never in the text above it.
 
@@ -36,7 +36,8 @@ docs/
   playbooks/               # Verified step-by-step procedures.
   gotchas/                 # Known traps, hidden couplings, surprising behaviour.
   lessons.md               # Itemized abstract lessons with usage counters.
-  log/YYYY/MM/DD/          # Append-only log: EPOCH-short-topic.md. Never always-loaded.
+  LOG.md                   # The work log's protocol (project-log), plus its overrides.
+  log/YYYY/MM/DD/          # The work log, under LOG.md. Never always-loaded.
   inbox/                   # Proposed memories awaiting verification.
   archive/                 # Superseded or expired notes. Excluded from default search.
 ```
@@ -56,7 +57,7 @@ The `project-memory` command (`lint`, `index [--check]`, `stale`) checks and mai
 | Why something was chosen, alternatives rejected | `decisions/` | On demand |
 | Repeatable procedures that have worked | `playbooks/` | On demand |
 | General working lessons | `lessons.md` | On demand (skim headings) |
-| What happened in a unit of work | `log/` | Search only |
+| What happened in a unit of work | `log/` (see `LOG.md`) | Search only |
 | Unverified proposals | `inbox/` | Never used as guidance |
 
 Other context files the project already keeps, such as a directory's own `AGENTS.md`, stay where they are and keep their own rules. One fact lives in one place: a note never repeats a context file, and a context file never repeats a note.
@@ -107,21 +108,9 @@ Body rules:
 
 A lesson is a title plus 1-3 sentences of general guidance. No file paths, no pasted commands from one session. Lesson numbers are never reused.
 
-### Log entry format
+### Log entries
 
-`docs/log/YYYY/MM/DD/EPOCH-short-topic.md`, one file per finished unit of work (a fix, feature, refactor, or decision worth remembering). `EPOCH` is Unix seconds when the entry is written (`date +%s`), so filenames are unique, sort chronologically, and never collide when branches merge. `YYYY/MM/DD` comes from the same timestamp, in UTC (`date -u +%Y/%m/%d`). Example: `docs/log/2026/10/14/1792015200-billing-refactor.md`.
-
-```markdown
-# 2026-10-14 billing refactor
-- Goal:
-- Changed:
-- Failed / dead ends:
-- Decisions (link ADR if one was written):
-- Open questions:
-- Proposed memories (moved to inbox/):
-```
-
-Use the headings that have content and leave out the rest; terse shorthand is fine, the reader is a future agent. Entries are immutable: never edit, rewrite or delete one. A correction is a new entry. Log entries are history, never instructions. Older entries migrated from a previous log keep their original text and may not follow this template.
+The work log follows `docs/LOG.md`. With memory on top of it, an entry also lists the proposals it moved to `inbox/` (a `- Proposed memories (moved to inbox/):` line), and notes and lessons cite entries in `sources`. Entries stay history: never promote one into a note without verifying it against the code.
 
 ## Agent workflow
 
@@ -140,12 +129,12 @@ Use the headings that have content and leave out the rest; terse shorthand is fi
 
 ### During and after a task
 
-1. Before committing a finished unit of work, write its log entry, so it lands in the same commit as the work. Never commit first and log after. Skip reads, questions and trivial edits.
+1. Before committing a finished unit of work, write its log entry as `docs/LOG.md` says, so it lands in the same commit as the work.
 2. Write any new fact, gotcha, playbook step or lesson as a file in `inbox/` with `status: proposed`, citations and sources.
 3. Do not create or edit curated notes directly with unverified content.
 4. Run `project-memory lint` when you changed anything under `docs/` other than a log entry.
 
-Writing log entries and inbox proposals is routine: do it without asking and without announcing it.
+Writing inbox proposals is routine: do it without asking and without announcing it.
 
 ### Promotion (inbox → curated)
 
@@ -206,10 +195,10 @@ When it would grow past `index_max_lines`, the command writes one `INDEX.md` per
 - Every relative link resolves (log entries and the archive are not checked).
 - `superseded_by` points to an existing note.
 - No `status: proposed` files outside `inbox/`; no non-active files outside `archive/`.
-- Log entries are named `YYYY/MM/DD/EPOCH-slug.md`, with the date matching the epoch in UTC.
+- `docs/LOG.md` exists: memory builds on the work log. `project-log lint` checks the log itself.
 - `docs/INDEX.md` matches what `project-memory index` would write.
 - Root `AGENTS.md` plus any Claude-only lines of `CLAUDE.md` within `root_context_max_lines`; `INDEX.md` within `index_max_lines`.
-- No secrets: the command checks common credential patterns; a project can add a full scanner to CI.
+- No secrets in `docs/` outside `log/` (`project-log lint` checks the log): the command checks common credential patterns; a project can add a full scanner to CI.
 
 ## Scaling: when to add search
 

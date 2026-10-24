@@ -5,7 +5,8 @@
 Read this at the start of a task and open only the notes that matter to it. Protocol: MEMORY.md.
 
 ## Architecture
-- architecture/project-memory.md - project-memory plugin (0.4.0, 2026-10-15) - replaced the global project history log; user decisions on migration, Rust command, opt-in CI (verified 2026-10-15)
+- architecture/project-log.md - project-log plugin (0.1.0, 2026-10-24) - the work log split out of project-memory as its base layer; user decisions on the split (verified 2026-10-24)
+- architecture/project-memory.md - project-memory plugin (0.4.0, 2026-10-15) - replaced the global project history log; user decisions on migration, Rust command, opt-in CI (verified 2026-10-24)
 - architecture/rails-design-system.md - rails-design-system - standing constraints and user decisions to respect in every edit (as of 2026-10-01) (verified 2026-10-15)
 - architecture/rails-generators.md - rails-generators plugin - why it exists (hand-written migrations), PreToolUse guard design, no agent/no audit decision, open items (verified 2026-10-15)
 - architecture/rails-hotwire.md - rails-hotwire skill plugin (2026-10-09) - scope, user conventions it encodes, and the open agent and old-skill questions (verified 2026-10-15)

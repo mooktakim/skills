@@ -44,7 +44,7 @@ Run `/plugin` to browse and manage everything interactively, and `/plugin market
 | Plugin | What it does |
 |--------|--------------|
 | [`project-log`](project-log/) | An append-only work log in git: one immutable entry per finished unit of work, committed with the work, checked by a fast Rust command. |
-| [`project-memory`](project-memory/) | Long-term project memory in git: typed notes with citations, a generated index, an inbox for unverified knowledge, and an append-only work log, checked by a fast Rust command. |
+| [`project-memory`](project-memory/) | Long-term project memory in git, on top of `project-log`: typed notes with citations, a generated index, an inbox for unverified knowledge, and lessons, checked by a fast Rust command. |
 | [`capture`](capture/) | Records a rule you state, or a correction you make, in the one checked-in file where it belongs, so you never have to say it again. |
 | [`toolsmith`](toolsmith/) | Finds shell patterns Claude repeats in your Claude Code history and replaces them with small, tested, single-purpose Rust commands. |
 

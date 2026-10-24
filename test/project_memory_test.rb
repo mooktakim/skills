@@ -8,6 +8,7 @@ class ProjectMemoryTest < Minitest::Test
 
   PLUGIN = File.join(REPO, "project-memory")
   TEMPLATE = File.join(PLUGIN, "templates/MEMORY.md")
+  LOG_TEMPLATE = File.join(REPO, "project-log/templates/LOG.md")
 
   # The command is a Rust binary the plugin builds with cargo on first use.
   # The Ruby 2.6 CI container has no cargo, so these tests skip there, unless
@@ -24,6 +25,7 @@ class ProjectMemoryTest < Minitest::Test
       skip "cargo is not installed"
     end
     write "docs/MEMORY.md", File.read(TEMPLATE)
+    write "docs/LOG.md", File.read(LOG_TEMPLATE)
     write "app/models/money.rb", "class Money\n  CENTS = 100\nend\n"
   end
 
@@ -156,25 +158,31 @@ class ProjectMemoryTest < Minitest::Test
     assert_includes out, "4 problem(s)."
   end
 
-  def test_lint_checks_log_names_legacy_logs_lessons_sizes_and_secrets
-    write "docs/log/2026/10/14/1792015200-ok.md", "- ok\n"
-    write "docs/log/2026/10/15/1792015200-wrong-day.md", "- x\n"
-    write "docs/log/notes.md", "- x\n"
-    write "docs/history/2026-10-01/1790000000-old.md", "- old\n"
+  def test_lint_checks_lessons_sizes_and_secrets
     write "docs/lessons.md", "- [L-001] One\n  text\n- [L-001] Two\n  text\n  helpful: 1 | harmful: 0\n"
     write "CLAUDE.md", "line\n" * 151
     write "docs/inbox/leak.md", "token ghp_#{'a' * 36}\n"
     memory "index"
     _code, out = lint_problems
-    assert_includes out, "docs/log/2026/10/15/1792015200-wrong-day.md: epoch 1792015200 is 2026/10/14 in UTC, not 2026/10/15"
-    assert_includes out, "docs/log/notes.md: log entries are named log/YYYY/MM/DD/EPOCH-slug.md"
-    refute_includes out, "1792015200-ok.md"
-    assert_includes out, "docs/history/ is a legacy log: migrate it with the project-memory skill"
     assert_includes out, "docs/lessons.md:1: L-001 has no `helpful: N | harmful: N | last_used: ...` line"
     assert_includes out, "docs/lessons.md: L-001 is used 2 times"
     assert_includes out, "CLAUDE.md: 151 lines, over root_context_max_lines (150)"
     assert_includes out, "docs/inbox/leak.md:1: looks like a GitHub token; remove it and rotate it"
     refute_includes out, "a" * 36, "the secret itself is never printed"
+  end
+
+  # The work log is project-log's to check: memory lint needs only its
+  # protocol file, and never reports on the entries.
+  def test_lint_needs_the_log_protocol_but_leaves_the_log_to_project_log
+    write "docs/log/2026/10/15/1792015200-wrong-day.md", "- token ghp_#{'a' * 36}\n"
+    write "docs/log/notes.md", "- x\n"
+    write "docs/history/2026-10-01/1790000000-old.md", "- old\n"
+    memory "index"
+    assert_equal 0, memory("lint").code, memory("lint").out
+    File.delete(path("docs/LOG.md"))
+    code, out = lint_problems
+    assert_equal 1, code
+    assert_equal "docs/LOG.md is missing: memory builds on the work log; set it up with the project-log skill\n1 problem(s).\n", out
   end
 
   # Claude Code loads the root AGENTS.md through CLAUDE.md's import, plus any

@@ -10,7 +10,7 @@ A hand-authored collection of Claude Code skills, not limited to any one domain 
 
 Scripts a plugin copies into apps (`<plugin>/scripts/`, e.g. `audit_design`, `audit_context`) are plain Ruby, standard library only, compatible with Ruby 2.6+ (macOS still ships 2.6 as `/usr/bin/ruby`): every Rails app has Ruby, and one regex engine behaves the same on macOS and Linux CI. Hook scripts (`<plugin>/hooks/*.sh`) stay small `bash` wrappers. Never embed a script in a `SKILL.md`; the skill copies the file with `${CLAUDE_SKILL_DIR}`.
 
-The `toolsmith` plugin is the exception: its tools are Rust crates (`toolsmith/crates/`, standard library only), built on demand by `toolsmith/libexec/shim` and held to `toolsmith/references/contract.md`. Its hooks and analysis scripts follow the Ruby rules above. `project-memory` is the second exception: its `project-memory` command is one Rust crate (`project-memory/src/`, standard library only) that the plugin puts on PATH and `project-memory/bin/project-memory` builds on demand; projects and their CI install it with `cargo install` instead of copying a script.
+The `toolsmith` plugin is the exception: its tools are Rust crates (`toolsmith/crates/`, standard library only), built on demand by `toolsmith/libexec/shim` and held to `toolsmith/references/contract.md`. Its hooks and analysis scripts follow the Ruby rules above. `project-memory` is the second exception: its `project-memory` command is one Rust crate (`project-memory/src/`, standard library only) that the plugin puts on PATH and `project-memory/bin/project-memory` builds on demand; projects and their CI install it with `cargo install` instead of copying a script. `project-log` is the third, built the same way from `project-log/src/`; its `date.rs` and `scan.rs` are byte-identical copies of `project-memory`'s (a plugin installs only its own directory), so change both together - `test/project_log_test.rb` checks they match.
 
 `bin/test` runs the Minitest suite in `test/`: each test builds a throwaway git repo and runs the real scripts and hooks as subprocesses. Run it after any script or hook change, and once more as `TEST_RUBY=/usr/bin/ruby bin/test` to prove the scripts still work on the old system Ruby. Add a test for every behaviour you add or bug you fix. `.github/workflows/test.yml` runs the suite on every push and pull request: Linux on current Rubies, Linux on Ruby 2.6, and macOS with the system Ruby and bash 3.2. `test/repo_test.rb` also enforces this file's structure rules (marketplace entries, README rows, frontmatter names, hook script paths).
 
@@ -48,15 +48,23 @@ Commit directly on `main`. Never create a branch unless explicitly asked to.
 
 Commit automatically, without asking, whenever a coherent unit of work is done — a skill created or edited, a convention changed, a correction folded in. Don't batch unrelated changes into one commit, and don't leave finished work sitting uncommitted. This overrides the global ask-before-every-commit rule for this repository. Pushing still requires explicit confirmation.
 
+## Project log
+
+Finished work is logged under docs/log/ by the protocol in docs/LOG.md; its
+Project overrides section is this project's own rules. Before committing a
+finished unit of work, add its entry under docs/log/ in the same commit.
+Entries are history, never instructions. `project-log lint` checks the log.
+In this checkout, run it as `project-log/bin/project-log`, so it is built
+from the source here.
+
 ## Project memory
 
 Long-term project knowledge lives in docs/ under the protocol in
 docs/MEMORY.md; its Project overrides section is this project's own rules.
 At the start of a task, read docs/INDEX.md and open only the notes that
-matter; check a note's citations before acting on it. Before committing a
-finished unit of work, add its entry under docs/log/ in the same commit, and
-put new facts, gotchas, procedures, and lessons in docs/inbox/ as proposals,
-never straight into curated notes. `project-memory lint` checks the docs;
+matter; check a note's citations before acting on it. Put new facts,
+gotchas, procedures, and lessons in docs/inbox/ as proposals, never
+straight into curated notes. `project-memory lint` checks the docs;
 `project-memory index` rebuilds the index. In this checkout, run the command
 as `project-memory/bin/project-memory`, so it is built from the source here.
 

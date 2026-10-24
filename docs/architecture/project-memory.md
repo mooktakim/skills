@@ -3,9 +3,9 @@ id: project-memory
 type: architecture
 status: active
 summary: project-memory plugin (0.4.0, 2026-10-15) - replaced the global project history log; user decisions on migration, Rust command, opt-in CI
-aliases: [project memory, docs/log, inbox, MEMORY.md, history log]
+aliases: [project memory, inbox, MEMORY.md]
 created: 2026-10-14
-verified_at: 2026-10-15
+verified_at: 2026-10-24
 citations: [project-memory/src/main.rs, project-memory/action.yml, project-memory/SKILL.md]
 sources: [auto memory project-memory-status.md]
 ---
@@ -18,6 +18,8 @@ User decisions:
 - No migration script: the user wants Claude to read each project's old log and decide the mapping (projects logged differently); no-loss is enforced by checks in SKILL.md.
 - The `project-memory` command is Rust (user wanted speed: 0.09 s vs Ruby 0.32 s on a big project), on PATH through the plugin; not a toolsmith command (one job per tool rule).
 - CI is opt-in per project, through the composite action `mooktakim/skills/project-memory@<sha>` (cached build). Committed binaries and a cross-platform binary were rejected.
+
+The work log and the legacy history migration moved to the `project-log` plugin on 2026-10-24 (project-memory 0.6.0); see [project-log](project-log.md).
 
 The skills repo is private (2026-10-15); its project-type auto memories were copied into docs/inbox/ as proposals. config_files itself still has a legacy docs/history log.
 

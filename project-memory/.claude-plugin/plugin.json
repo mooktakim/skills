@@ -1,10 +1,11 @@
 {
   "name": "project-memory",
-  "version": "0.5.2",
-  "description": "Long-term project memory in git: a protocol for typed notes with citations, a generated index, an inbox for unverified knowledge, lessons, and an append-only log, checked by a fast project-memory command, with lossless migration from older history logs",
+  "version": "0.6.0",
+  "description": "Long-term project memory in git, on top of the project-log work log: a protocol for typed notes with citations, a generated index, an inbox for unverified knowledge, and lessons, checked by a fast project-memory command",
   "author": { "name": "Mooktakim Ahmed", "email": "mooktakim@fluxter.co.uk" },
   "homepage": "https://github.com/mooktakim/skills",
   "repository": "https://github.com/mooktakim/skills",
   "keywords": ["memory", "documentation", "history", "adr", "context", "claude-md"],
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": ["project-log"]
 }

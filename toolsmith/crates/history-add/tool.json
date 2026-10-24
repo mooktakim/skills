@@ -3,20 +3,20 @@
   "intent": "Add one new entry file to the project's docs/log history.",
   "usage": "toolsmith-history-add [--no-stage] \"<title>\" <<'EOF' ... EOF",
   "use_when": [
-    "You finished a unit of work and the project's docs/MEMORY.md says to log it before committing.",
+    "You finished a unit of work and the project's docs/LOG.md says to log it before committing.",
     "You would otherwise build the docs/log/<YYYY>/<MM>/<DD>/<epoch>-<slug>.md path with date, mkdir and a heredoc."
   ],
   "not_for": [
     "Reading or searching the log: use find, cat or grep on docs/log.",
     "Changing an existing entry: entries are immutable.",
-    "Inbox proposals or curated notes: write those as docs/MEMORY.md describes.",
-    "Migrating a legacy docs/history or docs/HISTORY.md log: the project-memory skill does that."
+    "Inbox proposals or curated notes: write those as docs/MEMORY.md describes, when the project has one.",
+    "Migrating a legacy docs/history or docs/HISTORY.md log: the project-log skill does that."
   ],
   "input": "The title as the first argument: a short headline for the entry, made into the file's slug (lowercase letters, digits and single hyphens, at most 60 characters). The entry text on stdin: standalone markdown, written exactly as given, with a final newline added when missing. Empty text is refused.",
   "options": [
     { "flag": "--no-stage", "text": "Write the file but do not run `git add` on it." }
   ],
-  "output": "Stdout is the new file's path, relative to the current directory. The file goes in the docs/log of the nearest directory at or above the current one, up to the git repository root, that has docs/MEMORY.md or docs/log. Its name is docs/log/<YYYY>/<MM>/<DD>/<unix-time>-<slug>.md, with the UTC date of that time. An existing file is never overwritten. Inside a git repository the file is staged with `git add`, so it lands in the next commit with the work it describes.",
+  "output": "Stdout is the new file's path, relative to the current directory. The file goes in the docs/log of the nearest directory at or above the current one, up to the git repository root, that has docs/LOG.md or docs/log. Its name is docs/log/<YYYY>/<MM>/<DD>/<unix-time>-<slug>.md, with the UTC date of that time. An existing file is never overwritten. Inside a git repository the file is staged with `git add`, so it lands in the next commit with the work it describes.",
   "exit_codes": [
     { "code": 0, "text": "The entry was written (and staged, inside a git repository)." },
     { "code": 1, "text": "No entry, or an unstaged one: no project memory found, a legacy docs/history log not yet migrated, the file exists, or a write or `git add` failed." },
@@ -26,14 +26,14 @@
     {
       "title": "Add an entry at the repository root",
       "git": true,
-      "files": { "docs/MEMORY.md": "# Memory Protocol\n" },
+      "files": { "docs/LOG.md": "# Log Protocol\n" },
       "args": ["SEO review of staging"],
       "stdin": "- Crawled staging: 557 URLs, 3 broken internal links fixed.\n",
       "exit": 0,
       "stdout_regex": "\\Adocs/log/\\d{4}/\\d{2}/\\d{2}/\\d+-seo-review-of-staging\\.md\\n\\z",
       "stdout_sample": "docs/log/2026/10/15/1792019400-seo-review-of-staging.md\n",
       "files_after": {
-        "docs/MEMORY.md": "# Memory Protocol\n",
+        "docs/LOG.md": "# Log Protocol\n",
         "docs/log/*/*/*/*-seo-review-of-staging.md": "- Crawled staging: 557 URLs, 3 broken internal links fixed.\n"
       },
       "staged": ["docs/log/*/*/*/*-seo-review-of-staging.md"]
@@ -66,16 +66,16 @@
       "stdin": "- Something.\n",
       "exit": 1,
       "stdout": "",
-      "stderr": "toolsmith-history-add: . still has the legacy docs/history log; migrate it to docs/log with the project-memory skill first\n"
+      "stderr": "toolsmith-history-add: . still has the legacy docs/history log; migrate it to docs/log with the project-log skill first\n"
     },
     {
-      "title": "A project without project memory",
+      "title": "A project without a work log",
       "git": true,
       "args": ["Notes"],
       "stdin": "- Something.\n",
       "exit": 1,
       "stdout": "",
-      "stderr": "toolsmith-history-add: no docs/MEMORY.md or docs/log above here; set up project memory with the project-memory skill first\n"
+      "stderr": "toolsmith-history-add: no docs/LOG.md or docs/log above here; set up the project log with the project-log skill first\n"
     },
     {
       "title": "Empty entry text is refused",

@@ -1,9 +1,10 @@
 //! project-memory: checks and maintains the project memory under docs/, as
 //! the project's docs/MEMORY.md describes. Rust standard library only.
 //!
-//!   project-memory lint            check notes, links, citations, log names,
-//!                                  the index, size budgets and secrets; exit 1
-//!                                  on any problem
+//!   project-memory lint            check notes, links, citations, the index,
+//!                                  size budgets and secrets, and that the work
+//!                                  log's docs/LOG.md exists; exit 1 on any
+//!                                  problem
 //!   project-memory index [--check] write docs/INDEX.md from the notes'
 //!                                  frontmatter; --check only reports whether it
 //!                                  is current
@@ -11,10 +12,15 @@
 //!
 //! The project is the nearest directory at or above the current one, up to the
 //! git repository root, that has docs/MEMORY.md, or $MEMORY_ROOT when set.
-//! Settings come from docs/MEMORY.md's frontmatter.
+//! Settings come from docs/MEMORY.md's frontmatter. The work log under
+//! docs/log/ is project-log's to check.
 
+// date.rs and scan.rs are byte-identical copies in project-log, so not every
+// function in them is used here.
+#[allow(dead_code)]
 mod date;
 mod frontmatter;
+#[allow(dead_code)]
 mod scan;
 
 use std::cell::RefCell;
@@ -323,26 +329,11 @@ impl Memory {
         Vec::new()
     }
 
-    fn log_problems(&self) -> Vec<String> {
-        let mut problems = Vec::new();
-        for file in files_under(&self.docs.join("log"), true) {
-            let name = relative(&file, &self.docs);
-            match parse_log_name(&name) {
-                None => problems.push(format!("{}: log entries are named log/YYYY/MM/DD/EPOCH-slug.md", self.rel(&file))),
-                Some((day, epoch)) => {
-                    let actual = date::utc_path(epoch);
-                    if actual != day {
-                        problems.push(format!("{}: epoch {} is {} in UTC, not {}", self.rel(&file), epoch, actual, day));
-                    }
-                }
-            }
-        }
-        problems
-    }
-
+    /// Secrets anywhere in docs/ except the log, which project-log checks.
     fn secret_problems(&self) -> Vec<String> {
         let mut problems = Vec::new();
-        for file in files_under(&self.docs, true) {
+        let log = self.docs.join("log");
+        for file in files_under(&self.docs, true).into_iter().filter(|f| !f.starts_with(&log)) {
             let bytes = fs::read(&file).unwrap_or_default();
             for (index, line) in bytes.split(|&c| c == b'\n').enumerate() {
                 for name in scan::secrets(line) {
@@ -395,11 +386,8 @@ impl Memory {
 
     fn lint(&self) {
         let mut problems = Vec::new();
-        if self.docs.join("history").is_dir() {
-            problems.push("docs/history/ is a legacy log: migrate it with the project-memory skill".to_string());
-        }
-        if self.docs.join("HISTORY.md").is_file() {
-            problems.push("docs/HISTORY.md is a legacy log: migrate it with the project-memory skill".to_string());
+        if !self.docs.join("LOG.md").is_file() {
+            problems.push("docs/LOG.md is missing: memory builds on the work log; set it up with the project-log skill".to_string());
         }
         let mut ids: BTreeMap<String, Vec<&Note>> = BTreeMap::new();
         let mut order: Vec<String> = Vec::new();
@@ -428,7 +416,6 @@ impl Memory {
         if lessons.is_file() {
             problems.extend(link_problems(&lessons, &read(&lessons)).into_iter().map(|p| format!("docs/lessons.md: {}", p)));
         }
-        problems.extend(self.log_problems());
         for file in self.index_differences() {
             problems.push(format!("{} is out of date: run project-memory index", self.rel(&file)));
         }
@@ -641,21 +628,6 @@ fn split_citation(citation: &str) -> (&str, Option<(usize, usize)>) {
     (citation, None)
 }
 
-/// The YYYY/MM/DD folder and epoch of a log/YYYY/MM/DD/EPOCH-slug.md path.
-fn parse_log_name(name: &str) -> Option<(String, i64)> {
-    let parts: Vec<&str> = name.split('/').collect();
-    let digits = |s: &str, n: usize| s.len() == n && s.bytes().all(|c| c.is_ascii_digit());
-    if parts.len() != 5 || parts[0] != "log" || !digits(parts[1], 4) || !digits(parts[2], 2) || !digits(parts[3], 2) {
-        return None;
-    }
-    let stem = parts[4].strip_suffix(".md")?;
-    let (epoch, slug) = stem.split_once('-')?;
-    if epoch.is_empty() || slug.is_empty() || !epoch.bytes().all(|c| c.is_ascii_digit()) {
-        return None;
-    }
-    Some((format!("{}/{}/{}", parts[1], parts[2], parts[3]), epoch.parse().ok()?))
-}
-
 fn link_problems(file: &Path, text: &str) -> Vec<String> {
     let dir = file.parent().unwrap_or(Path::new("."));
     scan::relative_links(text)
@@ -730,14 +702,6 @@ mod tests {
         assert_eq!(split_citation("app/a.rb:3-9"), ("app/a.rb", Some((3, 9))));
         assert_eq!(split_citation("app/a.rb"), ("app/a.rb", None));
         assert_eq!(split_citation("c:/x:tag"), ("c:/x:tag", None));
-    }
-
-    #[test]
-    fn log_names() {
-        assert_eq!(parse_log_name("log/2026/10/14/1792015200-billing.md"), Some(("2026/10/14".to_string(), 1_792_015_200)));
-        assert_eq!(parse_log_name("log/2026/10/14/notes.md"), None);
-        assert_eq!(parse_log_name("log/2026/10/1792015200-x.md"), None);
-        assert_eq!(parse_log_name("log/2026/10/14/1792015200-.md"), None);
     }
 
     #[test]

@@ -59,7 +59,7 @@
     {
       "name": "project-memory",
       "source": "./project-memory",
-      "description": "Long-term project memory in git: typed notes with citations, a generated index, an inbox, lessons, and an append-only log, with lossless migration from older history logs"
+      "description": "Long-term project memory in git, on top of the project-log work log: typed notes with citations, a generated index, an inbox, and lessons"
     }
   ]
 }

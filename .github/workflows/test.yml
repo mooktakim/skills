@@ -48,6 +48,8 @@ jobs:
           ruby-version: "4.0"
       - name: Tests (scripts on the current Ruby)
         run: bin/test
+      - name: Project log (through the plugin's own action)
+        uses: ./project-log
       - name: Project memory docs (through the plugin's own action)
         uses: ./project-memory
       - name: Scripts on the system Ruby, hooks on bash 3.2

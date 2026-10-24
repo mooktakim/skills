@@ -1,5 +1,5 @@
 //! toolsmith-history-add: adds one new entry file to the project's
-//! docs/log history, as the project-memory protocol (docs/MEMORY.md)
+//! docs/log history, as the project-log protocol (docs/LOG.md)
 //! describes: `docs/log/<YYYY>/<MM>/<DD>/<epoch>-<slug>.md` with the UTC date
 //! of the epoch, never overwriting an entry, staged so it lands in the same
 //! commit as the work. See tool.json for the guide that `--llm` prints.
@@ -51,13 +51,13 @@ fn main() {
     let cwd = std::env::current_dir().unwrap_or_else(|e| tool.fail(&format!("cannot read the current directory: {}", e)));
     let in_git = cwd.ancestors().any(|d| d.join(".git").exists());
     let base = match find_base(&cwd) {
-        Base::Memory(base) => base,
+        Base::Log(base) => base,
         Base::Legacy(base) => tool.fail(&format!(
-            "{} still has the legacy docs/history log; migrate it to docs/log with the project-memory skill first",
+            "{} still has the legacy docs/history log; migrate it to docs/log with the project-log skill first",
             shown_path(&base, &cwd)
         )),
         Base::None => tool.fail(
-            "no docs/MEMORY.md or docs/log above here; set up project memory with the project-memory skill first",
+            "no docs/LOG.md or docs/log above here; set up the project log with the project-log skill first",
         ),
     };
     let (day, epoch) = now().unwrap_or_else(|e| tool.fail(&e));
@@ -118,20 +118,20 @@ fn slugify(title: &str) -> String {
 
 #[derive(Debug, PartialEq)]
 enum Base {
-    /// A project with project memory: docs/MEMORY.md or docs/log.
-    Memory(PathBuf),
+    /// A project with a work log: docs/LOG.md or docs/log.
+    Log(PathBuf),
     /// A project that still has the old docs/history or docs/HISTORY.md log.
     Legacy(PathBuf),
     None,
 }
 
-/// The nearest directory at or above `cwd` that has project memory, looking
+/// The nearest directory at or above `cwd` that has a work log, looking
 /// no higher than the git repository root.
 fn find_base(cwd: &Path) -> Base {
     for dir in cwd.ancestors() {
         let docs = dir.join("docs");
-        if docs.join("MEMORY.md").is_file() || docs.join("log").is_dir() {
-            return Base::Memory(dir.to_path_buf());
+        if docs.join("LOG.md").is_file() || docs.join("log").is_dir() {
+            return Base::Log(dir.to_path_buf());
         }
         if docs.join("history").is_dir() || docs.join("HISTORY.md").is_file() {
             return Base::Legacy(dir.to_path_buf());
@@ -208,7 +208,7 @@ mod tests {
     }
 
     #[test]
-    fn the_nearest_project_memory_wins_up_to_the_git_root() {
+    fn the_nearest_project_log_wins_up_to_the_git_root() {
         let outer = std::env::temp_dir().join(format!("toolsmith-history-{}", std::process::id()));
         let root = outer.join("repo");
         let sub = root.join("apps/web/app");
@@ -217,12 +217,12 @@ mod tests {
         fs::create_dir_all(outer.join("docs/log")).unwrap();
         assert_eq!(find_base(&sub), Base::None, "never above the git root");
         fs::create_dir_all(root.join("docs")).unwrap();
-        fs::write(root.join("docs/MEMORY.md"), "x").unwrap();
-        assert_eq!(find_base(&sub), Base::Memory(root.clone()));
+        fs::write(root.join("docs/LOG.md"), "x").unwrap();
+        assert_eq!(find_base(&sub), Base::Log(root.clone()));
         fs::create_dir_all(root.join("apps/web/docs/history")).unwrap();
         assert_eq!(find_base(&sub), Base::Legacy(root.join("apps/web")));
         fs::create_dir_all(root.join("apps/web/docs/log")).unwrap();
-        assert_eq!(find_base(&sub), Base::Memory(root.join("apps/web")));
+        assert_eq!(find_base(&sub), Base::Log(root.join("apps/web")));
         fs::remove_dir_all(&outer).unwrap();
     }
 }
