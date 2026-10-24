@@ -3,12 +3,12 @@
   "families": [
     {
       "id": "literal-replace",
-      "title": "a script that finds text in a file and replaces it",
+      "title": "a script that replaces literal text in a file",
       "rules": [
-        ["\\bpython3?\\b", "open\\([^)]*,\\s*['\"][wa]|write_text|\\.write\\(", "\\.replace\\(|re\\.sub"],
-        ["\\bruby\\b", "File\\.write|IO\\.write|File\\.open\\([^)]*['\"]w", "\\.sub!?[ (]|gsub!?[ (]"],
-        ["\\bsed\\s+(-[a-zA-Z]*\\s+)*-i"],
-        ["\\bperl\\s+-\\w*i\\b"]
+        ["\\bpython3?\\b", "open\\([^)]*,\\s*['\"][wa]|write_text|\\.write\\(", "\\.replace\\("],
+        ["\\bruby\\b", "File\\.write|IO\\.write|File\\.open\\([^)]*['\"]w", "\\.g?sub!?\\(\\s*['\"]"],
+        ["\\bsed\\b[^\\n|;&]*\\s-i\\b", "(?:['\"]|-e\\s+)s([/|#,@])(?:\\\\[./]|(?!\\1)[^\\\\.*^$\\[\\]\\n])+\\1"],
+        ["\\bperl\\s+-\\w*i", "(?:['\"]|-e\\s+)s([/|#,@{])(?:\\\\[./]|(?!\\1)[^\\\\.*^$\\[\\]()+?|\\n])+\\1"]
       ]
     },
     {
@@ -27,9 +27,12 @@
     },
     {
       "id": "ci-wait",
-      "title": "polling a pull request's CI checks",
+      "title": "waiting for CI or reading its failures",
       "rules": [
-        ["\\A(?!(?:.|\\n)*--log)(?:.|\\n)*gh (pr checks|run (watch|view|list))"]
+        ["\\bgh run watch\\b"],
+        ["\\bgh pr checks\\b[^\\n|;&]*--watch"],
+        ["\\b(sleep|until|while)\\b", "\\bgh (pr checks|run (list|view))\\b"],
+        ["\\bgh run view\\b[^\\n|;&]*--log-failed"]
       ]
     },
     {
