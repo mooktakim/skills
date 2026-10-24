@@ -44,6 +44,43 @@ class ToolsmithTest < Minitest::Test
     system("command -v cargo >/dev/null 2>&1")
   end
 
+  def family_matches?(id, command)
+    family = JSON.parse(File.read(File.join(PLUGIN, "families.json"))).fetch("families").find { |f| f["id"] == id }
+    family.fetch("rules").any? { |rule| rule.all? { |re| Regexp.new(re).match?(command) } }
+  end
+
+  # A family counts, and reminds of its tool for, only the job the tool does.
+  FAMILY_CASES = {
+    "ci-wait" => {
+      "gh run watch 123 --exit-status" => true,
+      "gh pr checks 228 --watch --fail-fast" => true,
+      "until gh pr checks 5 | grep -qv pending; do sleep 20; done" => true,
+      "gh run view 400 --log-failed | tail -50" => true,
+      "gh run view 40063031171 --repo x --json status,conclusion,jobs --jq ." => false,
+      "gh pr checks 228 -R mooktakim/oasis-kids | head -3" => false,
+      "gh run view 40 --log | grep error" => false
+    },
+    "literal-replace" => {
+      "sed -i '' 's/ok/fine/' app/a.html.erb" => true,
+      "sed -i '' 's/\\.nvmrc/.tool-versions/g' $files" => true,
+      "perl -pi -e 's/foo/bar/g' x.rb" => true,
+      "python3 - <<'PY'\np='a'; s=open(p).read(); open(p,'w').write(s.replace('a','b'))\nPY" => true,
+      "ruby -e 'File.write(f, File.read(f).sub(\"a\", \"b\"))'" => true,
+      "sed -i '' 's/^nodejs 24.2.0$/nodejs 24.22.0/' ~/.tool-versions" => false,
+      "sed -i '' 's/reads .tool-versions (nvm)/x/' f" => false,
+      "perl -0pi -e 's/end\\n(\\s+)def/x/' a.rb" => false,
+      "python3 -c \"import re; open('a','w').write(re.sub(r'x+','y',s))\"" => false,
+      "ruby -e 'File.write(f, File.read(f).gsub(/a+/, \"b\"))'" => false,
+      "sed -n 5,9p x.rb" => false
+    }
+  }.freeze
+
+  def test_families_match_only_the_job_their_tool_does
+    FAMILY_CASES.each do |id, cases|
+      cases.each { |command, want| assert_equal want, family_matches?(id, command), "#{id}: #{command}" }
+    end
+  end
+
   def need_cargo
     return if cargo?
     flunk "cargo is required: REQUIRE_CARGO is set" if ENV["REQUIRE_CARGO"]
