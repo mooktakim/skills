@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # PreToolUse hook (Bash): remind Claude of a toolsmith command when the Bash command matches a pattern one replaces.
 # Prefers the system Ruby, which starts fastest. Never fails the hook.
+# Skipped in a Bridge agent session (BRIDGE_SESSION_TOKEN is set): Bridge runs
+# Claude Code headless as a worker or lead, where a refused command only costs
+# a turn, and Bridge's own guard decides what it may run.
+[ -n "${BRIDGE_SESSION_TOKEN:-}" ] && exit 0
 ruby=/usr/bin/ruby
 [ -x "$ruby" ] || ruby=$(command -v ruby) || exit 0
 # --disable-gems: the registry needs only the standard library, and loading

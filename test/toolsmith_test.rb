@@ -466,6 +466,14 @@ class ToolsmithTest < Minitest::Test
     assert_includes output["permissionDecisionReason"], "own Edit or Read tool", "the refusal names the built-in tools too"
   end
 
+  def test_pre_bash_stays_out_of_a_bridge_agent_session
+    env = { "TOOLSMITH_ROOT" => fake_root(mode: "block") }
+    refute_empty hook("pre-bash.sh", stdin: bash_event("sed -i '' 's/a/b/' x.rb"), env: env).out
+    result = hook("pre-bash.sh", stdin: bash_event("sed -i '' 's/a/b/' x.rb"), env: env.merge("BRIDGE_SESSION_TOKEN" => "bss_test"))
+    assert_equal 0, result.code
+    assert_empty result.out
+  end
+
   # The two tools whose reminders were followed least (usage review 2026-10-24)
   # block their pattern; the user approved it.
   def test_text_replace_and_file_lines_block_their_patterns
