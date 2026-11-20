@@ -527,6 +527,14 @@ class ToolsmithTest < Minitest::Test
     Result.new(out, err, status)
   end
 
+  def test_scan_skips_a_transcript_that_vanishes_before_it_is_read
+    dir = projects
+    File.symlink(File.join(dir, "gone.jsonl"), File.join(dir, "-proj-b/vanished.jsonl"))
+    result = analyse("scan", "--projects", dir, "--metrics", File.join(@state, "weekly.json"))
+    assert_equal 0, result.code, result.err
+    assert_includes result.out, "5 Bash calls in 2 sessions, 2 projects"
+  end
+
   def test_scan_counts_families_and_keeps_weekly_metrics_after_transcripts_go
     dir = projects
     metrics = File.join(@state, "weekly.json")

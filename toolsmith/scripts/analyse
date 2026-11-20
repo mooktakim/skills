@@ -65,12 +65,20 @@ end
 
 # Every Bash call in the transcripts, with whether its result was an error.
 # Lines are only parsed when they can hold a Bash call or an error result.
+def each_line(file, &block)
+  File.foreach(file, encoding: "UTF-8", &block)
+rescue Errno::ENOENT
+  nil
+end
+
 def load_calls(dir)
   calls = {}
   errors = {}
   Dir.glob(File.join(dir, "**", "*.jsonl")).sort.each do |file|
     project = file.sub("#{dir}/", "").split("/").first
-    File.foreach(file, encoding: "UTF-8") do |line|
+    # A transcript can vanish between the glob and the read (a finished
+    # worktree's project folder is removed): skip it.
+    each_line(file) do |line|
       line = line.scrub
       if line.include?('"tool_use"') && line.include?('"Bash"')
         record = parse(line)
