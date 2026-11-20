@@ -10,8 +10,9 @@
 #   analyse examples  (--family ID | --match REGEX) [--limit N]
 #                                                    recent commands, for design work
 #   analyse adoption  [--metrics FILE] [--log FILE]  per tool and week: tool calls
-#                                                    vs old-pattern calls, plus the
-#                                                    usage log
+#                                                    vs old-pattern calls, the share
+#                                                    in interactive sessions alone,
+#                                                    plus the usage log
 #
 # Every command takes --projects DIR (default ~/.claude/projects). --metrics
 # FILE keeps weekly counts, never command text, merged by taking the larger
@@ -28,7 +29,10 @@ ROOT = ENV.fetch("TOOLSMITH_ROOT", File.expand_path("..", __dir__))
 SHELL_WORDS = %w[done fi esac for case in function].freeze
 TOOL_NAME = /(?:\A|[\s;&|(`])(toolsmith-[a-z0-9]+(?:-[a-z0-9]+)*)/.freeze
 
-Call = Struct.new(:id, :command, :time, :session, :project, :error) do
+# interactive: the call is from a session the user drives (entrypoint "cli"),
+# not a headless one (entrypoint "sdk-cli": Bridge and no-mistakes workers,
+# evals), where the toolsmith hooks may be off by design.
+Call = Struct.new(:id, :command, :time, :session, :project, :error, :interactive) do
   def week
     time.strftime("%G-W%V")
   end
@@ -88,7 +92,8 @@ def load_calls(dir)
           command = block["input"].is_a?(Hash) ? block["input"]["command"] : nil
           next unless command.is_a?(String) && record["timestamp"]
 
-          calls[block["id"]] ||= Call.new(block["id"], command, Time.parse(record["timestamp"]).utc, record["sessionId"], project, false)
+          calls[block["id"]] ||= Call.new(block["id"], command, Time.parse(record["timestamp"]).utc, record["sessionId"], project, false,
+                                          record["entrypoint"] == "cli")
         end
       end
       next unless line.include?('"is_error":true')
@@ -105,27 +110,37 @@ def bump(hash, key, field, by = 1)
   hash[key][field] += by
 end
 
+def empty_counts
+  { "bash_calls" => 0, "families" => {}, "tools" => {} }
+end
+
+def count(counts, call, all_families)
+  counts["bash_calls"] += 1
+  used = call.tools
+  used.each do |tool|
+    bump(counts["tools"], tool, "calls")
+    bump(counts["tools"], tool, "errors") if call.error
+  end
+  return unless used.empty?
+
+  all_families.each do |family|
+    next unless matches?(family, call.command)
+
+    bump(counts["families"], family["id"], "calls")
+    bump(counts["families"], family["id"], "errors") if call.error
+    bump(counts["families"], family["id"], "chars", call.command.length)
+  end
+end
+
 # Weekly counts: Bash calls; per family, calls that match it and use no tool;
-# per tool, calls that use it.
+# per tool, calls that use it. The same counts again under "interactive" for
+# the calls from interactive sessions alone.
 def weekly(calls, all_families)
   weeks = {}
   calls.each do |call|
-    week = (weeks[call.week] ||= { "bash_calls" => 0, "families" => {}, "tools" => {} })
-    week["bash_calls"] += 1
-    used = call.tools
-    used.each do |tool|
-      bump(week["tools"], tool, "calls")
-      bump(week["tools"], tool, "errors") if call.error
-    end
-    next unless used.empty?
-
-    all_families.each do |family|
-      next unless matches?(family, call.command)
-
-      bump(week["families"], family["id"], "calls")
-      bump(week["families"], family["id"], "errors") if call.error
-      bump(week["families"], family["id"], "chars", call.command.length)
-    end
+    week = (weeks[call.week] ||= empty_counts.merge("interactive" => empty_counts))
+    count(week, call, all_families)
+    count(week["interactive"], call, all_families) if call.interactive
   end
   weeks
 end
@@ -223,6 +238,13 @@ def examples(options)
   end
 end
 
+# The tool's calls as a share of its calls plus its old-pattern calls.
+def share(counts, name, family)
+  calls = (counts.dig("tools", name) || {})["calls"].to_i
+  old = (counts.dig("families", family) || {})["calls"].to_i
+  calls + old > 0 ? "#{(100.0 * calls / (calls + old)).round}%" : "-"
+end
+
 def usage_log(file)
   return [] unless file && File.exist?(file)
 
@@ -236,13 +258,13 @@ def adoption(options)
   tools.each do |tool|
     name = tool["name"]
     puts "#{name} (replaces #{tool['family']}, added #{tool['added']}, mode #{tool['mode']})"
-    rows = [["week", "tool calls", "tool errors", "old-pattern calls", "share"]]
+    rows = [["week", "tool calls", "tool errors", "old-pattern calls", "share", "interactive share"]]
     weeks.keys.sort.each do |week|
       used = weeks[week].dig("tools", name) || {}
       old = (weeks[week].dig("families", tool["family"]) || {})["calls"].to_i
       calls = used["calls"].to_i
-      share = calls + old > 0 ? "#{(100.0 * calls / (calls + old)).round}%" : "-"
-      rows << [week, calls, used["errors"].to_i, old, share]
+      rows << [week, calls, used["errors"].to_i, old, share(weeks[week], name, tool["family"]),
+               weeks[week].key?("interactive") ? share(weeks[week]["interactive"], name, tool["family"]) : "n/a"]
     end
     table(rows).each { |line| puts "  #{line}" }
     runs = events.select { |e| e["event"] == "run" && e["tool"] == name }

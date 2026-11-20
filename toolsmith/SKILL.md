@@ -37,7 +37,7 @@ To change an existing tool, follow the same steps from 1, starting from its `too
 
 ## 3. Review adoption
 
-1. Run `ruby $T/scripts/analyse adoption --metrics $T/metrics/weekly.json`. For each tool and week it shows tool calls, tool errors, old-pattern calls and the tool's share, then the usage log: runs, failed runs, guide reads, reminders, and reminders followed by a run within 10 minutes.
+1. Run `ruby $T/scripts/analyse adoption --metrics $T/metrics/weekly.json`. For each tool and week it shows tool calls, tool errors, old-pattern calls, the tool's share, and its share in interactive sessions alone (headless sessions such as Bridge and no-mistakes workers may run with the hooks off), then the usage log: runs, failed runs, guide reads, reminders, and reminders followed by a run within 10 minutes.
 2. Read the numbers against the tool's `added` date. A useful tool's share rises week by week and its failures stay rare.
 3. Propose actions, each with its evidence, and wait for approval:
    - **Share low, reminders not followed:** read recent old-pattern commands (`analyse examples --family <id>`) to see why the tool did not fit. Then improve the guide (`use_when`, `not_for`, examples) or the tool.

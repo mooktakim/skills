@@ -450,6 +450,38 @@
           "calls": 134,
           "errors": 5
         }
+      },
+      "interactive": {
+        "bash_calls": 86,
+        "families": {
+          "literal-replace": {
+            "calls": 6,
+            "chars": 15784,
+            "errors": 1
+          },
+          "history-write": {
+            "calls": 2,
+            "chars": 3722
+          },
+          "commit-chain": {
+            "calls": 3,
+            "chars": 2479
+          }
+        },
+        "tools": {
+          "toolsmith-history-add": {
+            "calls": 3
+          },
+          "toolsmith-text-replace": {
+            "calls": 4
+          },
+          "toolsmith-pr-land": {
+            "calls": 2
+          },
+          "toolsmith-ci-wait": {
+            "calls": 2
+          }
+        }
       }
     },
     "2026-W42": {
@@ -549,6 +581,95 @@
         },
         "toolsmith-conflict-resolve": {
           "calls": 5
+        }
+      },
+      "interactive": {
+        "bash_calls": 7214,
+        "families": {
+          "literal-replace": {
+            "calls": 1128,
+            "chars": 2691515,
+            "errors": 12
+          },
+          "multi-file-heredoc": {
+            "calls": 140,
+            "chars": 526613,
+            "errors": 1
+          },
+          "test-output-trim": {
+            "calls": 397,
+            "chars": 560698,
+            "errors": 1
+          },
+          "yaml-edit": {
+            "calls": 63,
+            "chars": 214954
+          },
+          "line-range-read": {
+            "calls": 297,
+            "chars": 67017,
+            "errors": 6
+          },
+          "image-prep": {
+            "calls": 13,
+            "chars": 6152
+          },
+          "commit-chain": {
+            "calls": 53,
+            "chars": 38609,
+            "errors": 1
+          },
+          "ci-wait": {
+            "calls": 24,
+            "chars": 47905
+          },
+          "pr-land": {
+            "calls": 22,
+            "chars": 39755
+          },
+          "conflict-resolve": {
+            "calls": 22,
+            "chars": 25991
+          },
+          "history-write": {
+            "calls": 1,
+            "chars": 2514
+          },
+          "json-edit": {
+            "calls": 1,
+            "chars": 969
+          }
+        },
+        "tools": {
+          "toolsmith-check-run": {
+            "calls": 224,
+            "errors": 5
+          },
+          "toolsmith-text-replace": {
+            "calls": 48,
+            "errors": 1
+          },
+          "toolsmith-history-add": {
+            "calls": 104
+          },
+          "toolsmith-ci-wait": {
+            "calls": 80,
+            "errors": 1
+          },
+          "toolsmith-files-write": {
+            "calls": 22,
+            "errors": 1
+          },
+          "toolsmith-pr-land": {
+            "calls": 63,
+            "errors": 2
+          },
+          "toolsmith-file-lines": {
+            "calls": 1
+          },
+          "toolsmith-json-set": {
+            "calls": 2
+          }
         }
       }
     },
@@ -651,6 +772,104 @@
         "toolsmith-conflict-resolve": {
           "calls": 54
         }
+      },
+      "interactive": {
+        "bash_calls": 22260,
+        "families": {
+          "literal-replace": {
+            "calls": 1253,
+            "chars": 2937683,
+            "errors": 41
+          },
+          "yaml-edit": {
+            "calls": 71,
+            "chars": 249084,
+            "errors": 5
+          },
+          "ci-wait": {
+            "calls": 96,
+            "chars": 31586,
+            "errors": 2
+          },
+          "multi-file-heredoc": {
+            "calls": 72,
+            "chars": 321395,
+            "errors": 2
+          },
+          "line-range-read": {
+            "calls": 447,
+            "chars": 114107,
+            "errors": 48
+          },
+          "image-prep": {
+            "calls": 292,
+            "chars": 281661,
+            "errors": 12
+          },
+          "commit-chain": {
+            "calls": 199,
+            "chars": 183323,
+            "errors": 1
+          },
+          "history-write": {
+            "calls": 9,
+            "chars": 35355,
+            "errors": 1
+          },
+          "json-edit": {
+            "calls": 2,
+            "chars": 830,
+            "errors": 1
+          },
+          "pr-land": {
+            "calls": 6,
+            "chars": 3150,
+            "errors": 1
+          },
+          "test-output-trim": {
+            "calls": 163,
+            "chars": 228708,
+            "errors": 6
+          },
+          "conflict-resolve": {
+            "calls": 4,
+            "chars": 4362
+          }
+        },
+        "tools": {
+          "toolsmith-file-lines": {
+            "calls": 318,
+            "errors": 5
+          },
+          "toolsmith-ci-wait": {
+            "calls": 73,
+            "errors": 2
+          },
+          "toolsmith-text-replace": {
+            "calls": 699,
+            "errors": 31
+          },
+          "toolsmith-history-add": {
+            "calls": 33
+          },
+          "toolsmith-check-run": {
+            "calls": 692,
+            "errors": 86
+          },
+          "toolsmith-files-write": {
+            "calls": 18
+          },
+          "toolsmith-json-set": {
+            "calls": 15,
+            "errors": 1
+          },
+          "toolsmith-pr-land": {
+            "calls": 2
+          },
+          "toolsmith-conflict-resolve": {
+            "calls": 19
+          }
+        }
       }
     },
     "2026-W44": {
@@ -743,6 +962,94 @@
         },
         "toolsmith-json-set": {
           "calls": 2
+        }
+      },
+      "interactive": {
+        "bash_calls": 5150,
+        "families": {
+          "literal-replace": {
+            "calls": 38,
+            "errors": 38,
+            "chars": 114656
+          },
+          "yaml-edit": {
+            "calls": 8,
+            "errors": 7,
+            "chars": 37640
+          },
+          "commit-chain": {
+            "calls": 54,
+            "chars": 62958
+          },
+          "ci-wait": {
+            "calls": 23,
+            "chars": 12856
+          },
+          "line-range-read": {
+            "calls": 64,
+            "errors": 64,
+            "chars": 37709
+          },
+          "image-prep": {
+            "calls": 34,
+            "chars": 21422,
+            "errors": 1
+          },
+          "multi-file-heredoc": {
+            "calls": 5,
+            "errors": 2,
+            "chars": 22889
+          },
+          "pr-land": {
+            "calls": 1,
+            "chars": 396
+          },
+          "test-output-trim": {
+            "calls": 14,
+            "chars": 16458
+          },
+          "history-write": {
+            "calls": 4,
+            "errors": 2,
+            "chars": 12672
+          },
+          "json-edit": {
+            "calls": 5,
+            "chars": 6646
+          }
+        },
+        "tools": {
+          "toolsmith-check-run": {
+            "calls": 205,
+            "errors": 11
+          },
+          "toolsmith-ci-wait": {
+            "calls": 72,
+            "errors": 1
+          },
+          "toolsmith-text-replace": {
+            "calls": 289,
+            "errors": 7
+          },
+          "toolsmith-file-lines": {
+            "calls": 255,
+            "errors": 1
+          },
+          "toolsmith-history-add": {
+            "calls": 51
+          },
+          "toolsmith-pr-land": {
+            "calls": 20
+          },
+          "toolsmith-files-write": {
+            "calls": 7
+          },
+          "toolsmith-json-set": {
+            "calls": 2
+          },
+          "toolsmith-conflict-resolve": {
+            "calls": 8
+          }
         }
       }
     },
@@ -838,6 +1145,96 @@
         "toolsmith-files-write": {
           "calls": 35,
           "errors": 3
+        }
+      },
+      "interactive": {
+        "bash_calls": 9286,
+        "families": {
+          "json-edit": {
+            "calls": 6,
+            "chars": 6568
+          },
+          "test-output-trim": {
+            "calls": 89,
+            "chars": 127457,
+            "errors": 6
+          },
+          "line-range-read": {
+            "calls": 92,
+            "errors": 91,
+            "chars": 33040
+          },
+          "commit-chain": {
+            "calls": 62,
+            "chars": 77636,
+            "errors": 2
+          },
+          "ci-wait": {
+            "calls": 32,
+            "chars": 34676
+          },
+          "multi-file-heredoc": {
+            "calls": 41,
+            "chars": 253554,
+            "errors": 5
+          },
+          "literal-replace": {
+            "calls": 101,
+            "errors": 101,
+            "chars": 399810
+          },
+          "yaml-edit": {
+            "calls": 9,
+            "errors": 4,
+            "chars": 52128
+          },
+          "image-prep": {
+            "calls": 62,
+            "errors": 3,
+            "chars": 22641
+          },
+          "history-write": {
+            "calls": 2,
+            "chars": 3371
+          },
+          "pr-land": {
+            "calls": 6,
+            "chars": 34249
+          }
+        },
+        "tools": {
+          "toolsmith-file-lines": {
+            "calls": 466,
+            "errors": 9
+          },
+          "toolsmith-conflict-resolve": {
+            "calls": 13
+          },
+          "toolsmith-check-run": {
+            "calls": 361,
+            "errors": 23
+          },
+          "toolsmith-text-replace": {
+            "calls": 928,
+            "errors": 25
+          },
+          "toolsmith-ci-wait": {
+            "calls": 63,
+            "errors": 3
+          },
+          "toolsmith-history-add": {
+            "calls": 25
+          },
+          "toolsmith-pr-land": {
+            "calls": 14
+          },
+          "toolsmith-json-set": {
+            "calls": 1
+          },
+          "toolsmith-files-write": {
+            "calls": 35,
+            "errors": 3
+          }
         }
       }
     },
@@ -938,15 +1335,105 @@
         "toolsmith-conflict-resolve": {
           "calls": 41
         }
+      },
+      "interactive": {
+        "bash_calls": 16540,
+        "families": {
+          "line-range-read": {
+            "calls": 179,
+            "errors": 178,
+            "chars": 41442
+          },
+          "test-output-trim": {
+            "calls": 297,
+            "chars": 132921,
+            "errors": 11
+          },
+          "literal-replace": {
+            "calls": 118,
+            "errors": 118,
+            "chars": 184192
+          },
+          "commit-chain": {
+            "calls": 104,
+            "chars": 87677,
+            "errors": 2
+          },
+          "multi-file-heredoc": {
+            "calls": 73,
+            "chars": 331172,
+            "errors": 7
+          },
+          "yaml-edit": {
+            "calls": 10,
+            "chars": 59259,
+            "errors": 7
+          },
+          "history-write": {
+            "calls": 4,
+            "errors": 2,
+            "chars": 4066
+          },
+          "ci-wait": {
+            "calls": 68,
+            "chars": 30013,
+            "errors": 2
+          },
+          "image-prep": {
+            "calls": 44,
+            "chars": 19670,
+            "errors": 2
+          },
+          "json-edit": {
+            "calls": 10,
+            "chars": 8573
+          }
+        },
+        "tools": {
+          "toolsmith-file-lines": {
+            "calls": 1263,
+            "errors": 7
+          },
+          "toolsmith-text-replace": {
+            "calls": 1919,
+            "errors": 121
+          },
+          "toolsmith-check-run": {
+            "calls": 573,
+            "errors": 55
+          },
+          "toolsmith-history-add": {
+            "calls": 156,
+            "errors": 1
+          },
+          "toolsmith-ci-wait": {
+            "calls": 213,
+            "errors": 21
+          },
+          "toolsmith-pr-land": {
+            "calls": 112,
+            "errors": 5
+          },
+          "toolsmith-files-write": {
+            "calls": 59,
+            "errors": 2
+          },
+          "toolsmith-json-set": {
+            "calls": 11
+          },
+          "toolsmith-conflict-resolve": {
+            "calls": 13
+          }
+        }
       }
     },
     "2026-W47": {
-      "bash_calls": 22121,
+      "bash_calls": 22184,
       "families": {
         "line-range-read": {
-          "calls": 411,
-          "errors": 410,
-          "chars": 99687
+          "calls": 412,
+          "errors": 411,
+          "chars": 99809
         },
         "ci-wait": {
           "calls": 16,
@@ -1003,19 +1490,19 @@
       },
       "tools": {
         "toolsmith-check-run": {
-          "calls": 1198,
+          "calls": 1204,
           "errors": 156
         },
         "toolsmith-text-replace": {
-          "calls": 1827,
+          "calls": 1834,
           "errors": 142
         },
         "toolsmith-history-add": {
-          "calls": 233,
+          "calls": 237,
           "errors": 6
         },
         "toolsmith-file-lines": {
-          "calls": 1209,
+          "calls": 1214,
           "errors": 14
         },
         "toolsmith-ci-wait": {
@@ -1033,7 +1520,89 @@
           "calls": 44
         },
         "toolsmith-json-set": {
-          "calls": 7
+          "calls": 10
+        }
+      },
+      "interactive": {
+        "bash_calls": 3586,
+        "families": {
+          "line-range-read": {
+            "calls": 44,
+            "errors": 43,
+            "chars": 9257
+          },
+          "ci-wait": {
+            "calls": 15,
+            "chars": 3976
+          },
+          "literal-replace": {
+            "calls": 22,
+            "errors": 22,
+            "chars": 43529
+          },
+          "multi-file-heredoc": {
+            "calls": 6,
+            "errors": 1,
+            "chars": 16940
+          },
+          "test-output-trim": {
+            "calls": 52,
+            "chars": 25149,
+            "errors": 2
+          },
+          "commit-chain": {
+            "calls": 21,
+            "chars": 19343,
+            "errors": 1
+          },
+          "image-prep": {
+            "calls": 73,
+            "chars": 42744,
+            "errors": 1
+          },
+          "yaml-edit": {
+            "calls": 1,
+            "errors": 1,
+            "chars": 5784
+          },
+          "history-write": {
+            "calls": 1,
+            "chars": 348
+          }
+        },
+        "tools": {
+          "toolsmith-check-run": {
+            "calls": 93,
+            "errors": 8
+          },
+          "toolsmith-history-add": {
+            "calls": 51,
+            "errors": 1
+          },
+          "toolsmith-text-replace": {
+            "calls": 317,
+            "errors": 18
+          },
+          "toolsmith-file-lines": {
+            "calls": 190,
+            "errors": 1
+          },
+          "toolsmith-ci-wait": {
+            "calls": 48,
+            "errors": 3
+          },
+          "toolsmith-pr-land": {
+            "calls": 37
+          },
+          "toolsmith-json-set": {
+            "calls": 10
+          },
+          "toolsmith-conflict-resolve": {
+            "calls": 2
+          },
+          "toolsmith-files-write": {
+            "calls": 7
+          }
         }
       }
     }

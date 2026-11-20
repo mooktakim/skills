@@ -518,8 +518,8 @@ class ToolsmithTest < Minitest::Test
     File.write(file, records.map { |r| JSON.generate(r) + "\n" }.join)
   end
 
-  def bash_use(id, command, time, session = "s1")
-    { "type" => "assistant", "timestamp" => time, "sessionId" => session,
+  def bash_use(id, command, time, session = "s1", entrypoint: nil)
+    { "type" => "assistant", "timestamp" => time, "sessionId" => session, "entrypoint" => entrypoint,
       "message" => { "content" => [{ "type" => "tool_use", "id" => id, "name" => "Bash", "input" => { "command" => command } }] } }
   end
 
@@ -604,8 +604,31 @@ class ToolsmithTest < Minitest::Test
     assert_equal 0, result.code, result.err
     section = result.out[/toolsmith-text-replace .*?\n\n/m]
     assert_includes section, "(replaces literal-replace, added "
-    assert_match(/^  2026-W41 +1 +1 +1 +50%$/, section)
-    assert_match(/^  2026-W40 +0 +0 +0 +-$/, section)
+    assert_match(/^  2026-W41 +1 +1 +1 +50% +-$/, section)
+    assert_match(/^  2026-W40 +0 +0 +0 +- +-$/, section)
     assert_includes section, "Usage log: 2 runs, 1 failed, 1 guide reads, 1 reminders, 1 reminders followed by a run within 10 minutes."
+  end
+
+  # Headless sessions (Bridge and no-mistakes workers) run with the hooks off,
+  # so their old-pattern calls must not hide how interactive sessions do.
+  def test_adoption_shows_the_share_in_interactive_sessions_alone
+    dir = File.join(@state, "split")
+    transcript(File.join(dir, "-you/one.jsonl"), [
+      bash_use("i1", "toolsmith-text-replace <<'EOF'\n@@ x.rb\n-a\n+b\nEOF", "2026-10-06T10:00:00Z", "you", entrypoint: "cli")
+    ])
+    transcript(File.join(dir, "-worker/two.jsonl"), %w[w1 w2 w3].map { |id| bash_use(id, "sed -i '' 's/a/b/' x.rb", "2026-10-06T11:00:00Z", "worker", entrypoint: "sdk-cli") })
+    metrics = File.join(@state, "split.json")
+    File.write(metrics, JSON.generate("weeks" => { "2026-W30" => { "bash_calls" => 2, "families" => { "literal-replace" => { "calls" => 2 } }, "tools" => {} } }))
+    result = analyse("adoption", "--projects", dir, "--metrics", metrics, "--log", @log)
+    assert_equal 0, result.code, result.err
+    section = result.out[/toolsmith-text-replace .*?\n\n/m]
+    assert_match(/^  week +tool calls +tool errors +old-pattern calls +share +interactive share$/, section)
+    assert_match(/^  2026-W41 +1 +0 +3 +25% +100%$/, section)
+    assert_match(/^  2026-W30 +0 +0 +2 +0% +n\/a$/, section, "a week saved before the split has no interactive counts")
+    analyse("scan", "--projects", dir, "--metrics", metrics)
+    saved = JSON.parse(File.read(metrics))["weeks"]["2026-W41"]["interactive"]
+    assert_equal 1, saved["bash_calls"]
+    assert_equal 1, saved["tools"]["toolsmith-text-replace"]["calls"]
+    assert_empty saved["families"]
   end
 end

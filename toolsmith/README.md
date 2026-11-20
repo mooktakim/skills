@@ -54,7 +54,7 @@ flowchart LR
 Two records feed the numbers:
 
 - **The usage log** at `~/.local/state/toolsmith/usage.jsonl` (or `$XDG_STATE_HOME/toolsmith/`, or `$TOOLSMITH_LOG`): one line per run and per reminder, with the time, tool, exit code and duration. It never holds arguments or input. Set `TOOLSMITH_LOG=` (empty) to turn it off.
-- **Weekly snapshots** in `metrics/weekly.json`: counts only, committed with each scan. Claude Code deletes transcripts after `cleanupPeriodDays` (30 by default), and the snapshot keeps the trend after that.
+- **Weekly snapshots** in `metrics/weekly.json`: counts only, committed with each scan, with a second set for interactive sessions alone (headless Bridge and no-mistakes workers run with the hooks off). Claude Code deletes transcripts after `cleanupPeriodDays` (30 by default), and the snapshot keeps the trend after that.
 
 In a checkout of this repository, the session-start note says when a scan is more than a week old. Other projects never see it: scans run here, when you choose.
 
