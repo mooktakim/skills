@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# SessionStart hook: list the toolsmith commands for Claude, and say when a history scan is due.
+# SessionStart hook: list the toolsmith commands for Claude and, in a checkout of
+# the toolsmith source, say when a history scan is due.
 # Prefers the system Ruby, which starts fastest. Never fails the hook.
 ruby=/usr/bin/ruby
 [ -x "$ruby" ] || ruby=$(command -v ruby) || exit 0

@@ -4,7 +4,9 @@
 # The toolsmith plugin's hook logic, run by the bash wrappers in hooks/.
 #
 #   registry context   SessionStart: print the tool list for Claude, leaving out
-#                      any tool whose name another command on PATH already has
+#                      any tool whose name another command on PATH already has.
+#                      Only in a checkout of the toolsmith source, also say when
+#                      a history scan is due
 #   registry check     PreToolUse (Bash): read the hook event on stdin; when the
 #                      command matches a family a tool replaces, remind Claude of
 #                      the tool (mode "remind") or deny the command (mode "block").
@@ -83,8 +85,34 @@ rescue StandardError
   names
 end
 
+# The toolsmith directory of the source checkout the session works in: the
+# nearest directory at or above the session's cwd that holds toolsmith/ with
+# its crates and families.json. Scans run there and save their date there.
+def checkout(cwd)
+  dir = File.expand_path(cwd)
+  loop do
+    candidate = File.join(dir, "toolsmith")
+    return candidate if File.directory?(File.join(candidate, "crates")) && File.file?(File.join(candidate, "families.json"))
+    parent = File.dirname(dir)
+    return nil if parent == dir
+    dir = parent
+  end
+end
+
+def session_cwd
+  input = $stdin.tty? ? "" : $stdin.read
+  cwd = input.strip.empty? ? nil : JSON.parse(input)["cwd"]
+  cwd.is_a?(String) && !cwd.empty? ? cwd : Dir.pwd
+rescue StandardError
+  Dir.pwd
+end
+
+# Only where scans are done, so other projects never see it.
 def scan_note
-  file = File.join(ROOT, "metrics/weekly.json")
+  source = checkout(session_cwd)
+  return unless source
+
+  file = File.join(source, "metrics/weekly.json")
   last = File.exist?(file) ? JSON.parse(File.read(file))["last_scan"] : nil
   days = last ? ((Time.now - Time.parse(last)) / 86_400).floor : nil
   return if days && days < SCAN_DUE_DAYS

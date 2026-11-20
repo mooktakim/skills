@@ -377,16 +377,39 @@ class ToolsmithTest < Minitest::Test
     out.empty? ? nil : JSON.parse(out).dig("hookSpecificOutput", "additionalContext")
   end
 
-  def test_session_start_lists_every_tool_and_a_due_scan
+  # A checkout of the toolsmith source: a repository that holds toolsmith/ with
+  # its crates, families.json and the scan date in metrics/weekly.json.
+  def source_checkout(last_scan)
+    repo = Dir.mktmpdir("checkout", @state)
+    FileUtils.mkdir_p(File.join(repo, "docs"))
+    File.symlink(fake_root(last_scan: last_scan), File.join(repo, "toolsmith"))
+    FileUtils.rm_f(File.join(repo, "toolsmith/metrics/weekly.json")) unless last_scan
+    repo
+  end
+
+  def session_start(cwd)
+    hook("session-start.sh", stdin: JSON.generate("hook_event_name" => "SessionStart", "cwd" => cwd))
+  end
+
+  def test_session_start_lists_every_tool
     result = hook("session-start.sh")
     assert_equal 0, result.code
     manifests.each { |m| assert_includes result.out, "- #{m['name']}: #{m['intent']}" }
     assert_includes result.out, "run `<command> --llm` once in a session"
-    refute_includes result.out, "scan"
-    stale = hook("session-start.sh", env: { "TOOLSMITH_ROOT" => fake_root(last_scan: (Time.now - 10 * 86_400).strftime("%Y-%m-%d")) })
-    assert_includes stale.out, "was 10 days ago"
-    never = hook("session-start.sh", env: { "TOOLSMITH_ROOT" => fake_root(last_scan: nil).tap { |r| FileUtils.rm_f(File.join(r, "metrics/weekly.json")) } })
-    assert_includes never.out, "has not been scanned for new tool ideas yet"
+  end
+
+  def test_session_start_says_a_scan_is_due_only_in_a_toolsmith_checkout
+    days_ago = ->(n) { (Time.now - n * 86_400).strftime("%Y-%m-%d") }
+    stale = source_checkout(days_ago.call(10))
+    assert_includes session_start(stale).out, "was 10 days ago"
+    assert_includes session_start(File.join(stale, "docs")).out, "was 10 days ago", "a subdirectory of the checkout counts"
+    refute_includes session_start(source_checkout(days_ago.call(2))).out, "scan"
+    assert_includes session_start(source_checkout(nil)).out, "has not been scanned for new tool ideas yet"
+    stale_root = { "TOOLSMITH_ROOT" => fake_root(last_scan: days_ago.call(30)) }
+    other = hook("session-start.sh", stdin: JSON.generate("cwd" => @dir), env: stale_root)
+    assert_includes other.out, "toolsmith-text-replace"
+    refute_includes other.out, "scan", "other projects never see the scan hint"
+    refute_includes hook("session-start.sh", env: stale_root).out, "scan", "no hook input: the hook's own cwd decides"
   end
 
   def test_session_start_leaves_out_a_tool_another_command_shadows
