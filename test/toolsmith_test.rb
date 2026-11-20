@@ -452,16 +452,44 @@ class ToolsmithTest < Minitest::Test
     assert_equal %w[toolsmith-json-set toolsmith-text-replace], log_events.map { |e| e["tool"] }
   end
 
-  def test_pre_bash_reminds_once_per_session_and_never_in_a_subagent
+  def test_pre_bash_reminds_once_per_session_and_once_per_subagent
     sed = "sed -i '' 's/a/b/' x.rb"
     assert_includes reminded(sed, session_id: "s1").to_s, "toolsmith-text-replace"
     assert_nil reminded(sed, session_id: "s1"), "a second reminder in the same session"
     assert_includes reminded("sed -n 1,5p a.rb; sed -n 9,12p b.rb", session_id: "s1").to_s, "toolsmith-file-lines", "another tool is still new"
     assert_includes reminded(sed, session_id: "s2").to_s, "toolsmith-text-replace", "a new session"
-    assert_nil reminded(sed, session_id: "s3", agent_id: "a1", agent_type: "Explore"), "a subagent"
-    assert_includes reminded(sed, session_id: "s3").to_s, "toolsmith-text-replace", "the subagent did not use up the session's reminder"
+    assert_includes reminded(sed, session_id: "s3", agent_id: "a1", agent_type: "Explore").to_s, "toolsmith-text-replace", "a subagent has its own context"
+    assert_nil reminded(sed, session_id: "s3", agent_id: "a1", agent_type: "Explore"), "a second reminder in the same subagent"
+    assert_includes reminded(sed, session_id: "s3", agent_id: "a2").to_s, "toolsmith-text-replace", "another subagent"
+    assert_includes reminded(sed, session_id: "s3").to_s, "toolsmith-text-replace", "the subagents did not use up the session's reminder"
     refute_includes reminded(sed).to_s, "say why"
-    assert_equal 5, log_events.size, "only reminders shown are logged"
+    assert_equal 7, log_events.size, "only reminders shown are logged"
+  end
+
+  def test_pre_bash_checks_what_a_command_runs_besides_toolsmith_commands
+    edit = "toolsmith-text-replace <<'EOF'\n@@ a.rb\n-sed -n 1,5p a.rb; sed -n 9,12p b.rb\n+bin/rails test x | tail -3\nEOF"
+    assert_includes reminded("#{edit}\nbin/rails test test/a_test.rb 2>&1 | tail -30", session_id: "c1").to_s, "toolsmith-check-run",
+                    "a test run after an edit is still checked"
+    on_line = "cd app; toolsmith-text-replace <<'EOF' && bin/rubocop a.rb | tail -1\n@@ a.rb\n-sed -n 1,5p a.rb\n+b\nEOF"
+    assert_includes reminded(on_line, session_id: "c2").to_s, "toolsmith-check-run",
+                    "after a heredoc whose command line goes on"
+    [edit, "#{edit}\ngit diff --stat",
+     "toolsmith-check-run -- sh -c 'bin/rails test x && sed -n 1,4p y | grep z'",
+     "toolsmith-check-run -- bin/rails test x; toolsmith-file-lines a.rb:1-5",
+     "toolsmith-check-run -- bin/rubocop 2>&1 | tail -3",
+     "toolsmith-files-write <<'BUNDLE'\n=== a.rb\nbin/rails test | tail\nBUNDLE"].each do |command|
+      assert_empty hook("pre-bash.sh", stdin: bash_event(command, session_id: "c3")).out, command
+    end
+  end
+
+  def test_subagent_start_gives_the_tool_list
+    result = hook("subagent-start.sh", stdin: JSON.generate("hook_event_name" => "SubagentStart", "agent_id" => "a1", "agent_type" => "Explore"))
+    assert_equal 0, result.code
+    output = JSON.parse(result.out).fetch("hookSpecificOutput")
+    assert_equal "SubagentStart", output["hookEventName"]
+    manifests.each { |m| assert_includes output["additionalContext"], "- #{m['name']}: #{m['intent']}" }
+    refute_includes output["additionalContext"], "scan"
+    assert_empty hook("subagent-start.sh", env: { "BRIDGE_SESSION_TOKEN" => "bss_test" }).out, "not in a Bridge agent session"
   end
 
   def test_pre_bash_patterns_skip_the_commands_that_misfired

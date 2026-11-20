@@ -7,11 +7,14 @@
 #                      any tool whose name another command on PATH already has.
 #                      Only in a checkout of the toolsmith source, also say when
 #                      a history scan is due
+#   registry subagent  SubagentStart: the same tool list, as the subagent's
+#                      starting context (a subagent never sees SessionStart's)
 #   registry check     PreToolUse (Bash): read the hook event on stdin; when the
 #                      command matches a family a tool replaces, remind Claude of
 #                      the tool (mode "remind") or deny the command (mode "block").
-#                      A reminder shows once per session and tool, and never in a
-#                      subagent, which has no tool list to act on
+#                      A reminder shows once per session (or subagent) and tool.
+#                      The parts of the command that already run a toolsmith
+#                      command, with their heredocs, are left out of the match
 #
 # Reads crates/*/tool.json, families.json and metrics/weekly.json from the
 # plugin root ($TOOLSMITH_ROOT overrides it, for tests). Ruby 2.6+, standard
@@ -121,18 +124,21 @@ def scan_note
   "toolsmith: #{status}. Mention once, at a natural break, that the toolsmith skill can run a scan."
 end
 
-def context
-  listed, clashed = tools.partition { |tool| clash(tool["name"]).nil? }
-  lines = []
-  unless listed.empty?
-    lines << "toolsmith: these commands are on PATH. Each does one job; run `<command> --llm` once in a session before you first use one."
-    all_families = families
-    listed.each do |tool|
+def tool_list(listed)
+  return [] if listed.empty?
+
+  all_families = families
+  ["toolsmith: these commands are on PATH. Each does one job; run `<command> --llm` once in a session before you first use one."] +
+    listed.map do |tool|
       family = all_families[tool["family"]]
       instead = family ? " Use it instead of #{family['title']}." : ""
-      lines << "- #{tool['name']}: #{tool['intent']}#{instead}"
+      "- #{tool['name']}: #{tool['intent']}#{instead}"
     end
-  end
+end
+
+def context
+  listed, clashed = tools.partition { |tool| clash(tool["name"]).nil? }
+  lines = tool_list(listed)
   clashed.each do |tool|
     lines << "toolsmith: #{tool['name']} is not available: #{clash(tool['name'])} has the same name and comes first on PATH. Tell the user."
   end
@@ -141,10 +147,68 @@ def context
   puts lines unless lines.empty?
 end
 
+# A subagent gets only the list: a clash is the main session's to report.
+def subagent
+  lines = tool_list(tools.select { |tool| clash(tool["name"]).nil? })
+  return if lines.empty?
+
+  puts JSON.generate("hookSpecificOutput" => { "hookEventName" => "SubagentStart", "additionalContext" => lines.join("\n") })
+end
+
+TOOL_START = /(?:\A|(?<=[\s;&|(`]))toolsmith-[a-z0-9]+(?:-[a-z0-9]+)*/.freeze
+
+# Where a simple command that starts at index start ends: at the first ; & | ) or
+# newline outside quotes. The & of a redirection (2>&1, &>) does not end it.
+def segment_end(command, start)
+  quote = nil
+  i = start
+  while i < command.length
+    char = command[i]
+    if quote
+      quote = nil if char == quote
+      i += 1 if char == "\\" && quote == '"'
+    elsif char == "'" || char == '"'
+      quote = char
+    elsif char == "\\"
+      i += 1
+    elsif char == "&" && (command[i - 1] == ">" || command[i + 1] == ">")
+      i += 1
+      next
+    elsif ";&|)\n".include?(char)
+      return i
+    end
+    i += 1
+  end
+  command.length
+end
+
+# The command without the toolsmith commands in it and their heredoc bodies, so
+# `toolsmith-text-replace <<'EOF' ... EOF; bin/rails test | tail` is still
+# checked for its test run, and an edit spec's text never matches a pattern.
+def without_tools(command)
+  rest = +""
+  i = 0
+  while (match = TOOL_START.match(command, i))
+    rest << command[i...match.begin(0)]
+    j = segment_end(command, match.begin(0))
+    heredoc = command[match.begin(0)...j][/<<-?\s*(['"]?)(\w+)\1/, 2]
+    newline = heredoc && command.index("\n", j)
+    if newline
+      rest << command[j...newline]
+      terminator = command.index(/^[ \t]*#{Regexp.escape(heredoc)}[ \t]*$/, newline + 1)
+      i = terminator ? (command.index("\n", terminator) || command.length) : command.length
+    else
+      i = j
+    end
+  end
+  rest << command[i..-1].to_s
+end
+
 def check
   event = JSON.parse($stdin.read)
   command = event.dig("tool_input", "command").to_s
-  return if command.empty? || command.include?("toolsmith-")
+  command = without_tools(command) if command.include?("toolsmith-")
+  return if command.strip.empty?
 
   all_families = families
   found = tools.select { |t| (family = all_families[t["family"]]) && matches?(family, command) }
@@ -152,9 +216,9 @@ def check
 
   blocking = found.any? { |tool| tool["mode"] == "block" }
   unless blocking
-    return unless event["agent_id"].to_s.empty?
-
-    fresh = first_reminders(event["session_id"], found.map { |tool| tool["name"] })
+    # A subagent has its own context, so its own reminders.
+    agent = event["agent_id"].to_s
+    fresh = first_reminders(agent.empty? ? event["session_id"].to_s : "#{event['session_id']}-#{agent}", found.map { |tool| tool["name"] })
     found = found.select { |tool| fresh.include?(tool["name"]) }
     return if found.empty?
   end
@@ -174,6 +238,7 @@ end
 begin
   case ARGV.first
   when "context" then context
+  when "subagent" then subagent
   when "check" then check
   end
 rescue StandardError, SyntaxError

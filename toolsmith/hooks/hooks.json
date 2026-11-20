@@ -1,5 +1,5 @@
 {
-  "description": "toolsmith: list the toolsmith commands at session start, and remind Claude of one when a Bash command matches the pattern it replaces",
+  "description": "toolsmith: list the toolsmith commands at session start and subagent start, and remind Claude of one when a Bash command matches the pattern it replaces",
   "hooks": {
     "SessionStart": [
       {
@@ -7,6 +7,17 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/subagent-start.sh\"",
             "timeout": 10
           }
         ]
