@@ -171,6 +171,15 @@ class HooksTest < Minitest::Test
       File.write(File.join(outside, app, "config/application.rb"), "class A < Rails::Application; end\n")
     end
     assert_equal %w[apps/server web], rails_apps("fresh", dir: outside)
+    %w[repo/ group/repo/ group/worktree/].each do |app|
+      FileUtils.mkdir_p(File.join(outside, app, "config"))
+      File.write(File.join(outside, app, "config/application.rb"), "class A < Rails::Application; end\n")
+    end
+    FileUtils.mkdir_p(File.join(outside, "repo/.git"))
+    FileUtils.mkdir_p(File.join(outside, "group/repo/.git"))
+    File.write(File.join(outside, "group/worktree/.git"), "gitdir: /elsewhere\n")
+    assert_equal %w[apps/server web], rails_apps("fresh", dir: outside),
+                 "a folder that holds other git repositories (a repository or a worktree) does not search inside them"
   ensure
     FileUtils.rm_rf(outside)
   end

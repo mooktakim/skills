@@ -7,7 +7,10 @@
 #   one absolute path per line. An app is a directory whose
 #   config/application.rb defines a Rails::Application, at any depth git sees
 #   (files it ignores are skipped; outside git, dependency and build
-#   directories are), plus a symlinked app one level down. Hidden directories,
+#   directories are, and so is every git repository below the project
+#   directory: a folder that holds other repositories, such as ~/Workspace, is
+#   not a project, and searching it timed out every SessionStart hook), plus a
+#   symlinked app one level down. Hidden directories,
 #   an engine's test/dummy or spec/dummy, and an app inside another app are not
 #   apps. The list is cached for every plugin in $TMPDIR/claude-rails-apps/;
 #   "fresh" searches again and rewrites it (the SessionStart hooks pass it). A
@@ -63,7 +66,8 @@ _rails_apps_search() { # <project dir>
         | while IFS= read -r -d '' file; do printf '%s/%s\n' "$root" "$file"; done
     else
       find "$root" -path "$root/*" \( -name '.*' -o -name node_modules -o -name vendor -o -name tmp -o -name log -o -name storage \
-        -o -name coverage -o -name dist -o -name build -o -name target \) -prune -o -path '*/config/application.rb' -print 2>/dev/null
+        -o -name coverage -o -name dist -o -name build -o -name target -o -type d -exec test -e '{}/.git' ';' \) -prune \
+        -o -path '*/config/application.rb' -print 2>/dev/null
     fi
     for dir in "$root"/*/; do
       [ -L "${dir%/}" ] && [ -f "${dir}config/application.rb" ] && printf '%s\n' "${dir}config/application.rb"
